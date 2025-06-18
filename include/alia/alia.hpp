@@ -1,0 +1,7 @@
+#ifndef ALIA_C5D051A4_4C09_49D9_BBA7_993B61332639
+#define ALIA_C5D051A4_4C09_49D9_BBA7_993B61332639
+
+#include "util/rect.hpp"
+#include "util/vec.hpp"
+
+#endif /* ALIA_C5D051A4_4C09_49D9_BBA7_993B61332639 */
