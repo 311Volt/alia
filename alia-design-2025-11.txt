@@ -1,0 +1,91 @@
+
+
+-- ALIA COMPONENTS --
+
+os/window:
+ - backed by win32 (d3d9), x11, etc
+ - mirrors allegro
+
+os/dialog:
+ - w32, x11
+
+gfx/display:
+ - display modes
+ - fullscreen display
+
+gfx/bitmap
+gfx/primitive
+gfx/transform
+
+
+gfx/classic:
+ - backed by sw, dx9, ogl, etc.
+ 
+gfx/accelerated:
+ - superset of classic
+ - backed by dx9, dx11, ogl, etc.
+ - submodules: 
+   - gfx/3d/shader
+   - gfx/3d/texture
+   - gfx/3d/pipeline
+   - gfx/3d/framebuffer
+
+gfx/modern:
+ - not superset of accelerated (can't be interface-compatible)
+ - low priority
+ - backed by vk, dx12
+
+io/keyboard:
+ - dinput, x11
+
+io/mouse:
+ - dinput, x11
+ 
+io/joystick:
+ - dinput, x11
+
+util/unicode:
+ - utf8 shit?
+
+util/ringbuffer:
+ - for audio
+
+core/vec
+core/rect
+core/mat
+ - CAUTION: glm interop?
+
+core/events:
+ - like allegro events
+ - you can register them with the atomic counter
+ - avoid feature creep like axxegro EventDispatcher?
+ 
+audio/device
+audio/sample
+audio/stream
+audio/pipeline
+audio/dsp 
+
+pixel/formats
+pixel/colorspace
+
+font/ttf
+font/render
+
+image
+video
+ - optional libffmpeg integration?
+ 
+ 
+core/vfs:
+ - not a priority
+
+
+
+
+# hypothetical code snippets
+
+```cpp
+alia::window win {800, 600};
+alia::hardware_renderer renderer {alia::backend::d3d9, win};
+```

@@ -3,6 +3,8 @@
 
 #include <cmath>
 #include <type_traits>
+#include <stdexcept> // For std::out_of_range
+#include <utility>
 #include "meta.hpp"
 
 template<typename T> 
@@ -101,6 +103,20 @@ namespace alia {
 				return self.y;
 			} else {
 				static_assert(false, "index out of range");
+			}
+		}
+
+		constexpr auto& operator[](this auto&& self, int i) {
+			if (i == 0) return self.x;
+			else if (i == 1) return self.y;
+			std::unreachable();
+		}
+
+		constexpr auto& at(this auto&& self, int i) {
+			switch (i) {
+				case 0: return self.x;
+				case 1: return self.y;
+				default: throw std::out_of_range("vec2 index out of range");
 			}
 		}
 	};
@@ -202,6 +218,22 @@ namespace alia {
 				return self.z;
 			} else {
 				static_assert(false, "index out of range");
+			}
+		}
+
+		constexpr auto& operator[](this auto&& self, int i) {
+			if (i == 0) return self.x;
+			else if (i == 1) return self.y;
+			else if (i == 2) return self.z;
+			std::unreachable();
+		}
+
+		constexpr auto& at(this auto&& self, int i) {
+			switch (i) {
+				case 0: return self.x;
+				case 1: return self.y;
+				case 2: return self.z;
+				default: throw std::out_of_range("vec3 index out of range");
 			}
 		}
 	};
@@ -309,6 +341,25 @@ namespace alia {
 				return self.w;
 			} else {
 				static_assert(false, "index out of range");
+			}
+		}
+
+		constexpr auto& operator[](this auto&& self, int i) {
+			if (i == 0) return self.x;
+			else if (i == 1) return self.y;
+			else if (i == 2) return self.z;
+			else if (i == 3) return self.w;
+			std::unreachable();
+			
+		}
+
+		constexpr auto& at(this auto&& self, int i) {
+			switch (i) {
+				case 0: return self.x;
+				case 1: return self.y;
+				case 2: return self.z;
+				case 3: return self.w;
+				default: throw std::out_of_range("vec4 index out of range");
 			}
 		}
 	};

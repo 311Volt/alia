@@ -1,5 +1,7 @@
-#ifndef DISPLAY_A9ADB9C3_14F7_4737_8F1B_85CF4C0433B4
-#define DISPLAY_A9ADB9C3_14F7_4737_8F1B_85CF4C0433B4
+#ifndef DISPLAY_D600F9AC_A8A4_4C17_9630_EAD4E9FCC185
+#define DISPLAY_D600F9AC_A8A4_4C17_9630_EAD4E9FCC185
+
+#include "pixel.hpp"
 
 #include "../util/vec.hpp"
 #include "../util/rect.hpp"
@@ -29,28 +31,6 @@ namespace alia {
 		portrait_flipped,
 		landscape,
 		landscape_flipped
-	};
-
-	enum class pixel_format {
-		rgba8888,
-		rgb888,
-		argb8888,
-		bgra8888,
-		abgr8888,
-		rgb565,
-		gray8,
-		gray16,
-		indexed8,
-		rgb332,
-		bgr565,
-		rgba4444,
-		argb4444,
-		bgra4444,
-		abgr4444,
-		rgba5551,
-		argb1555,
-		bgra5551,
-		abgr1555
 	};
 
 	struct display_mode {
@@ -207,23 +187,6 @@ namespace alia {
 
 			virtual int video_init(const char* driver_name) = 0;
 			virtual void video_quit() = 0;
-
-			// virtual void* gl_create_context() = 0;
-			// virtual int gl_delete_context(void* context) = 0;
-			// virtual bool gl_extension_supported(const char* extension) = 0;
-			// virtual int gl_get_attribute(void* attr, int* value) = 0;
-			// virtual void* gl_get_current_context() = 0;
-			// virtual void* gl_get_current_window() = 0;
-			// virtual void gl_get_drawable_size(int* w, int* h) = 0;
-			// virtual void* gl_get_proc_address(const char* proc) = 0;
-			// virtual int gl_get_swap_interval() = 0;
-			// virtual int gl_load_library(const char* path) = 0;
-			// virtual int gl_make_current(void* context) = 0;
-			// virtual void gl_reset_attributes() = 0;
-			// virtual int gl_set_attribute(void* attr, int value) = 0;
-			// virtual int gl_set_swap_interval(int interval) = 0;
-			// virtual void gl_swap_window() = 0;
-			// virtual void gl_unload_library() = 0;
 		};
 	} // namespace detail
 
@@ -238,4 +201,4 @@ namespace alia {
 	};
 } // namespace alia
 
-#endif /* DISPLAY_A9ADB9C3_14F7_4737_8F1B_85CF4C0433B4 */
+#endif /* DISPLAY_D600F9AC_A8A4_4C17_9630_EAD4E9FCC185 */

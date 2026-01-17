@@ -12,6 +12,7 @@ namespace alia {
 	template<typename TBackend>
 	class device {
 	public:
+	
 		device() {
 			//TODO take a TBackend instance in ctor
 		}

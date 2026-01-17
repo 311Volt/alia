@@ -4,11 +4,11 @@
 set(ALIA_BACKEND_GFX_BASIC "SDL2" CACHE STRING "Select the basic graphics backend")
 set_property(CACHE ALIA_BACKEND_GFX_BASIC PROPERTY STRINGS  "SDL2" "D3D9" "OGL")
 
-set(ALIA_BACKEND_GFX_3D_CLASSIC "OGL" CACHE STRING "Select the 3D graphics backend")
-set_property(CACHE ALIA_BACKEND_GFX_3D_CLASSIC PROPERTY STRINGS  "D3D9" "OGL")
+set(ALIA_BACKEND_GFX_HW_CLASSIC "OGL" CACHE STRING "Select the classic hardware-accelerated graphics backend")
+set_property(CACHE ALIA_BACKEND_GFX_HW_CLASSIC PROPERTY STRINGS  "D3D9" "OGL")
 
-set(ALIA_BACKEND_GFX_3D_MODERN "Vulkan" CACHE STRING "Select the Modern 3D graphics backend")
-set_property(CACHE ALIA_BACKEND_GFX_3D_MODERN PROPERTY STRINGS "D3D12" "Vulkan" "Metal")
+set(ALIA_BACKEND_GFX_HW_MODERN "Vulkan" CACHE STRING "Select the modern hardware-accelerated graphics backend")
+set_property(CACHE ALIA_BACKEND_GFX_HW_MODERN PROPERTY STRINGS "D3D12" "Vulkan" "Metal")
 
 set(ALIA_BACKEND_AUDIO "SDL2" CACHE STRING "Select the audio backend")
 set_property(CACHE ALIA_BACKEND_AUDIO PROPERTY STRINGS "SDL2" "OpenAL")
@@ -28,11 +28,11 @@ if(ALIA_BACKEND_GFX_BASIC STREQUAL "SDL2" OR ALIA_BACKEND_AUDIO STREQUAL "SDL2" 
 	set(ALIA_USE_DEP_SDL2 ON)
 endif()
 
-if(ALIA_BACKEND_GFX_3D_CLASSIC STREQUAL "D3D9")
+if(ALIA_BACKEND_GFX_HW_CLASSIC STREQUAL "D3D9")
 	set(ALIA_USE_DEP_D3D9 ON)
 endif()
 
-if(ALIA_BACKEND_GFX_3D_CLASSIC STREQUAL "OGL")
+if(ALIA_BACKEND_GFX_HW_CLASSIC STREQUAL "OGL")
 	set(ALIA_USE_DEP_OGL ON)
 endif()
 
@@ -41,60 +41,65 @@ if(ALIA_BACKEND_INPUT STREQUAL "GLFW")
 endif()
 
 if(ALIA_BACKEND_GFX_BASIC STREQUAL "D3D9")
-	message(WARNING "D3D9 is not yet implemented for ALIA_BACKEND_GFX_BASIC")
+	message(ERROR "D3D9 is not yet implemented for ALIA_BACKEND_GFX_BASIC")
 endif()
 
 if(ALIA_BACKEND_GFX_BASIC STREQUAL "OGL")
-	message(WARNING "OGL is not yet implemented for ALIA_BACKEND_GFX_BASIC")
+	message(ERROR "OGL is not yet implemented for ALIA_BACKEND_GFX_BASIC")
 endif()
 
-if(ALIA_BACKEND_GFX_3D_MODERN STREQUAL "D3D12")
-	message(WARNING "D3D12 is not yet implemented for ALIA_BACKEND_GFX_3D_MODERN")
+if(ALIA_BACKEND_GFX_HW_MODERN STREQUAL "D3D12")
+	message(ERROR "D3D12 is not yet implemented for ALIA_BACKEND_GFX_HW_MODERN")
 endif()
 
-if(ALIA_BACKEND_GFX_3D_MODERN STREQUAL "Vulkan")
-	message(WARNING "Vulkan is not yet implemented for ALIA_BACKEND_GFX_3D_MODERN")
+if(ALIA_BACKEND_GFX_HW_MODERN STREQUAL "Vulkan")
+	# no existing backend for hw_modern yet
+	# TODO change to ERROR
+	message(WARNING "Vulkan is not yet implemented for ALIA_BACKEND_GFX_HW_MODERN")
 endif()
 
-if(ALIA_BACKEND_GFX_3D_MODERN STREQUAL "Metal")
-	message(WARNING "Metal is not yet implemented for ALIA_BACKEND_GFX_3D_MODERN")
+if(ALIA_BACKEND_GFX_HW_MODERN STREQUAL "Metal")
+	message(ERROR "Metal is not yet implemented for ALIA_BACKEND_GFX_HW_MODERN")
 endif()
 
 if(ALIA_BACKEND_AUDIO STREQUAL "OpenAL")
-	message(WARNING "OpenAL is not yet implemented for ALIA_BACKEND_AUDIO")
+	message(ERROR "OpenAL is not yet implemented for ALIA_BACKEND_AUDIO")
 endif()
 
 if(ALIA_BACKEND_INPUT STREQUAL "GLFW")
-	message(WARNING "GLFW is not yet implemented for ALIA_BACKEND_INPUT")
+	message(ERROR "GLFW is not yet implemented for ALIA_BACKEND_INPUT")
 endif()
 
 if(ALIA_BACKEND_PLATFORM STREQUAL "GLFW")
-	message(WARNING "GLFW is not yet implemented for ALIA_BACKEND_PLATFORM")
+	message(ERROR "GLFW is not yet implemented for ALIA_BACKEND_PLATFORM")
 endif()
 
 if(ALIA_BACKEND_PLATFORM STREQUAL "Win32")
-	message(WARNING "Win32 is not yet implemented for ALIA_BACKEND_PLATFORM")
+	message(ERROR "Win32 is not yet implemented for ALIA_BACKEND_PLATFORM")
 endif()
 
 if(ALIA_BACKEND_PLATFORM STREQUAL "X11")
-	message(WARNING "X11 is not yet implemented for ALIA_BACKEND_PLATFORM")
+	message(ERROR "X11 is not yet implemented for ALIA_BACKEND_PLATFORM")
 endif()
 
-
-if(ALIA_BACKEND_GFX_3D_CLASSIC STREQUAL "OGL")
-	target_compile_definitions(alia INTERFACE ALIA_BACKEND_GFX_3D_CLASSIC_USE_OGL)
+if(ALIA_BACKEND_GFX_HW_CLASSIC STREQUAL "D3D9")
+	target_compile_definitions(alia INTERFACE ALIA_BACKEND_GFX_HW_CLASSIC_USE_D3D9)
 endif()
 
-if(ALIA_BACKEND_GFX_3D_MODERN STREQUAL "D3D12")
-	target_compile_definitions(alia INTERFACE ALIA_BACKEND_GFX_3D_MODERN_USE_D3D12)
+if(ALIA_BACKEND_GFX_HW_CLASSIC STREQUAL "OGL")
+	target_compile_definitions(alia INTERFACE ALIA_BACKEND_GFX_HW_CLASSIC_USE_OGL)
 endif()
 
-if(ALIA_BACKEND_GFX_3D_MODERN STREQUAL "Vulkan")
-	target_compile_definitions(alia INTERFACE ALIA_BACKEND_GFX_3D_MODERN_USE_VULKAN)
+if(ALIA_BACKEND_GFX_HW_MODERN STREQUAL "D3D12")
+	target_compile_definitions(alia INTERFACE ALIA_BACKEND_GFX_HW_MODERN_USE_D3D12)
 endif()
 
-if(ALIA_BACKEND_GFX_3D_MODERN STREQUAL "Metal")
-	target_compile_definitions(alia INTERFACE ALIA_BACKEND_GFX_3D_MODERN_USE_METAL)
+if(ALIA_BACKEND_GFX_HW_MODERN STREQUAL "Vulkan")
+	target_compile_definitions(alia INTERFACE ALIA_BACKEND_GFX_HW_MODERN_USE_VULKAN)
+endif()
+
+if(ALIA_BACKEND_GFX_HW_MODERN STREQUAL "Metal")
+	target_compile_definitions(alia INTERFACE ALIA_BACKEND_GFX_HW_MODERN_USE_METAL)
 endif()
 
 if(ALIA_BACKEND_GFX_BASIC STREQUAL "SDL2")

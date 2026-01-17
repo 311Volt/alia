@@ -2,7 +2,7 @@
 
 Welcome!
 
-This is the **Advanced Layer for Interactive Applications**, or **ALIA** for short. The purpose of this library is to deliver a set of C++23 templates for programming interactive applications (particularly video games) in a way that takes maximum advantage of programming techniques made possible by recent C++ standards.
+This is the **Advanced Layer for Interactive Applications**, or **ALIA** for short. The goal of this library is to deliver a set of C++23 templates for programming interactive applications (particularly video games) in a way that takes maximum advantage of programming techniques made possible by recent C++ standards.
 
 # Status and plans
 
@@ -19,8 +19,6 @@ The project is in a very early stage. Scope is limited and only SDL2 backends ar
     - DirectX 9, 10, 11, 12
     - OpenGL
     - Vulkan
-
-
 
 # Goals
 
