@@ -1,8 +1,6 @@
-
-
 #include <alia/alia.hpp>
 
 int main(int argc, char** argv) {
-    hello();
+    print_mdspan_info();
     return 0;
 }

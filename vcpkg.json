@@ -1,0 +1,9 @@
+{
+  "name": "alia",
+  "version": "0.1.0",
+  "description": "alia library",
+  "dependencies": [
+    "mdspan",
+    "gtest"
+  ]
+}
