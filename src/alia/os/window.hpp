@@ -5,6 +5,7 @@
 #include "../core/rect.hpp"
 #include "../util/cstring_view.hpp"
 #include "../events/event_source.hpp"
+#include "window_events.hpp"
 #include <memory>
 #include <cstdint>
 
@@ -30,8 +31,17 @@ enum class window_flags : uint32_t {
 
 constexpr window_flags operator|(window_flags a, window_flags b) {
     return static_cast<window_flags>(
-        static_cast<uint32_t>(a) | static_cast<uint32_t>(b)
-    );
+        static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+}
+
+constexpr window_flags operator&(window_flags a, window_flags b) {
+    return static_cast<window_flags>(
+        static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+}
+
+// Boolean test: any bits set?
+constexpr bool any(window_flags f) {
+    return static_cast<uint32_t>(f) != 0;
 }
 
 // window options for advanced configuration
@@ -124,7 +134,10 @@ public:
     
     // event source
     event_source& get_event_source();
-    
+
+    // Pump pending OS messages and emit events; call once per frame
+    void poll();
+
     // Backend handle (HWND, window, etc.)
     [[nodiscard]] void* native_handle() const;
     

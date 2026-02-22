@@ -52,6 +52,29 @@ target_include_directories(alia PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:include>)
 
+# Graphics backend options
+if(WIN32)
+  option(ALIA_COMPILE_GFX_BACKEND_D3D9   "Compile D3D9 graphics backend"   ON)
+  option(ALIA_COMPILE_GFX_BACKEND_OPENGL "Compile OpenGL graphics backend" ON)
+else()
+  option(ALIA_COMPILE_GFX_BACKEND_D3D9   "Compile D3D9 graphics backend"   OFF)
+  option(ALIA_COMPILE_GFX_BACKEND_OPENGL "Compile OpenGL graphics backend" ON)
+endif()
+
+if(ALIA_COMPILE_GFX_BACKEND_D3D9)
+  target_compile_definitions(alia PUBLIC ALIA_COMPILE_GFX_BACKEND_D3D9)
+  target_link_libraries(alia PRIVATE d3d9)
+endif()
+
+if(ALIA_COMPILE_GFX_BACKEND_OPENGL)
+  target_compile_definitions(alia PUBLIC ALIA_COMPILE_GFX_BACKEND_OPENGL)
+  if(WIN32)
+    target_link_libraries(alia PRIVATE opengl32)
+  else()
+    target_link_libraries(alia PRIVATE GL)
+  endif()
+endif()
+
 include(GNUInstallDirs)
 install(TARGETS alia
     EXPORT alia-targets
@@ -76,6 +99,10 @@ install(EXPORT alia-targets
 if(ALIA_BUILD_EXAMPLES)
   add_subdirectory("examples")
 endif()
+
+include(CTest)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Testing
 option(ALIA_BUILD_TESTS "Build tests" ON)

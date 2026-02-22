@@ -156,12 +156,21 @@ public:
         return rcount;
     }
 
-    constexpr basic_cstring_view substr(size_type pos = 0, size_type count = npos) const {
+    // Returns a string_view substring (no null-terminator guarantee required)
+    constexpr std::basic_string_view<CharT, Traits> substr_sv(size_type pos = 0, size_type count = npos) const {
         if (pos > size_) {
-            throw std::out_of_range("basic_cstring_view::substr");
+            throw std::out_of_range("basic_cstring_view::substr_sv");
         }
         size_type rcount = std::min(count, size_ - pos);
-        return basic_cstring_view(data_ + pos, rcount);
+        return std::basic_string_view<CharT, Traits>(data_ + pos, rcount);
+    }
+
+    // Returns a cstring_view suffix starting at first (null-terminator preserved)
+    constexpr basic_cstring_view suffix(size_type first) const {
+        if (first > size_) {
+            throw std::out_of_range("basic_cstring_view::suffix");
+        }
+        return basic_cstring_view(data_ + first, size_ - first);
     }
 
     // Create substring as std::string
@@ -183,12 +192,12 @@ public:
     }
 
     constexpr int compare(size_type pos1, size_type count1, basic_cstring_view v) const {
-        return substr(pos1, count1).compare(v);
+        return substr_sv(pos1, count1).compare(v);
     }
 
     constexpr int compare(size_type pos1, size_type count1, basic_cstring_view v,
                          size_type pos2, size_type count2) const {
-        return substr(pos1, count1).compare(v.substr(pos2, count2));
+        return substr_sv(pos1, count1).compare(v.substr_sv(pos2, count2));
     }
 
     constexpr int compare(const_pointer s) const {
@@ -196,12 +205,12 @@ public:
     }
 
     constexpr int compare(size_type pos1, size_type count1, const_pointer s) const {
-        return substr(pos1, count1).compare(basic_cstring_view(s));
+        return substr_sv(pos1, count1).compare(s);
     }
 
     constexpr int compare(size_type pos1, size_type count1,
                          const_pointer s, size_type count2) const {
-        return substr(pos1, count1).compare(basic_cstring_view(s, count2));
+        return substr_sv(pos1, count1).compare(std::basic_string_view<CharT, Traits>(s, count2));
     }
 
     // Starts with / ends with

@@ -149,23 +149,55 @@ TEST(CStringViewTest, Swap) {
 }
 
 // Substring Tests
-TEST(CStringViewTest, Substring) {
+TEST(CStringViewTest, SubstrSv) {
     cstring_view csv("Hello, World!");
-    auto sub = csv.substr(0, 5);
-    EXPECT_EQ(sub.size(), 5);
-    EXPECT_STREQ(sub.c_str(), "Hello");
+    std::string_view sv = csv.substr_sv(0, 5);
+    EXPECT_EQ(sv.size(), 5);
+    EXPECT_EQ(sv, "Hello");
 }
 
-TEST(CStringViewTest, SubstringDefaultCount) {
+TEST(CStringViewTest, SubstrSvDefaultCount) {
     cstring_view csv("Hello, World!");
-    auto sub = csv.substr(7);
-    EXPECT_EQ(sub.size(), 6);
-    EXPECT_STREQ(sub.c_str(), "World!");
+    std::string_view sv = csv.substr_sv(7);
+    EXPECT_EQ(sv.size(), 6);
+    EXPECT_EQ(sv, "World!");
 }
 
-TEST(CStringViewTest, SubstringOutOfBounds) {
+TEST(CStringViewTest, SubstrSvOutOfBounds) {
     cstring_view csv("Hello");
-    EXPECT_THROW(csv.substr(10), std::out_of_range);
+    EXPECT_THROW(csv.substr_sv(10), std::out_of_range);
+}
+
+TEST(CStringViewTest, Suffix) {
+    cstring_view csv("Hello, World!");
+    auto suf = csv.suffix(7);
+    EXPECT_EQ(suf.size(), 6);
+    EXPECT_STREQ(suf.c_str(), "World!");
+}
+
+TEST(CStringViewTest, SuffixFromZero) {
+    cstring_view csv("Hello");
+    auto suf = csv.suffix(0);
+    EXPECT_EQ(suf.size(), 5);
+    EXPECT_STREQ(suf.c_str(), "Hello");
+}
+
+TEST(CStringViewTest, SuffixAtEnd) {
+    cstring_view csv("Hello");
+    auto suf = csv.suffix(5);
+    EXPECT_TRUE(suf.empty());
+    EXPECT_STREQ(suf.c_str(), "");
+}
+
+TEST(CStringViewTest, SuffixOutOfBounds) {
+    cstring_view csv("Hello");
+    EXPECT_THROW(csv.suffix(10), std::out_of_range);
+}
+
+TEST(CStringViewTest, SuffixNullTermination) {
+    cstring_view csv("Hello, World!");
+    auto suf = csv.suffix(7);
+    EXPECT_EQ(suf.c_str()[suf.size()], '\0');
 }
 
 TEST(CStringViewTest, CreateSubstr) {
@@ -509,13 +541,6 @@ TEST(CStringViewTest, NonConstViewIteration) {
     EXPECT_EQ(csv.back(), 't');
 }
 
-// Substring Null Termination Test
-TEST(CStringViewTest, SubstringNullTermination) {
-    cstring_view csv("Hello, World!");
-    auto sub = csv.substr(0, 5);
-    EXPECT_EQ(sub.c_str()[sub.size()], '\0');
-}
-
 // Multiple Remove Operations Test
 TEST(CStringViewTest, MultipleRemoveOperations) {
     cstring_view csv("Hello, World!");
@@ -688,10 +713,4 @@ TEST(CStringViewTest, FindLastNotOfCStringWithPosition) {
 TEST(CStringViewTest, FindLastNotOfCStringWithPositionAndCount) {
     cstring_view csv("Hello");
     EXPECT_EQ(csv.find_last_not_of("lo", cstring_view::npos, 2), 1);
-}
-
-// Main function for running tests
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

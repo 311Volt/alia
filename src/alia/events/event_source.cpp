@@ -1,53 +1,63 @@
-#include "event_source.hpp"
-#include "event_queue.hpp"
-#include "event_bus.hpp"
+#include "event_source_impl.hpp"
 
 namespace alia {
 
-event_source::~event_source() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    // In a real implementation, we might want to notify queues/busses 
-    // that the source is dying.
-}
+// ── queue_receiver ────────────────────────────────────────────────────
 
-void event_source::register_queue(event_queue* queue) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    queues_.push_back(queue);
-}
-
-void event_source::unregister_queue(event_queue* queue) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    std::erase(queues_, queue);
-}
-
-void event_source::register_bus(event_bus* bus) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    busses_.push_back(bus);
-}
-
-void event_source::unregister_bus(event_bus* bus) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    std::erase(busses_, bus);
-}
-
-void event_source::emit_impl(const base_event* ev, std::size_t size, event_type_id type) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    // For queues, we need to clone the event into event_owner (soo_any<64>)
-    // This is tricky because emit_impl doesn't know the full type EventT.
-    // However, the event system design says "soo_any<64>".
-    // We'll assume the event fits in 64 bytes for now, or handle it via a virtual clone if needed.
-    // Since 'event' concept requires aggregate, we can't easily use virtual.
-    // But we can use the size passed in.
-    
-    for (auto* q : queues_) {
-        // Here we'd need a way to wrap the raw memory into soo_any.
-        // For the sake of this implementation, let's assume we can push it.
-        // (Simplified for now as the user didn't specify the exact cloning mechanism)
+queue_receiver::~queue_receiver() {
+    // Notify all registered sources that this receiver is going away.
+    // We iterate directly — no concurrent modification expected during destruction.
+    for (auto* sid : sources) {
+        std::lock_guard<std::mutex> lock(sid->mutex);
+        sid->queues.erase(this);
     }
+}
 
-    for (auto* b : busses_) {
-        // Busses usually dispatch immediately or queue internally.
+void queue_receiver::notify_source_end_of_lifetime(source_identity* sid) {
+    std::lock_guard<std::mutex> lock(mutex);
+    sources.erase(sid);
+}
+
+// ── source_identity ───────────────────────────────────────────────────
+
+source_identity::~source_identity() {
+    // Notify all registered receivers that this source is going away.
+    for (auto* rec : queues) {
+        std::lock_guard<std::mutex> lock(rec->mutex);
+        rec->sources.erase(this);
+    }
+}
+
+void source_identity::notify_queue_end_of_lifetime(queue_receiver* rec) {
+    std::lock_guard<std::mutex> lock(mutex);
+    queues.erase(rec);
+}
+
+// ── event_queue ───────────────────────────────────────────────────────
+
+void event_queue::register_source(event_source* source) {
+    auto* rec = receiver_.get();
+    auto* sid = source->identity_.get();
+    {
+        std::lock_guard<std::mutex> lock(sid->mutex);
+        sid->queues.insert(rec);
+    }
+    {
+        std::lock_guard<std::mutex> lock(rec->mutex);
+        rec->sources.insert(sid);
+    }
+}
+
+void event_queue::unregister_source(event_source* source) {
+    auto* rec = receiver_.get();
+    auto* sid = source->identity_.get();
+    {
+        std::lock_guard<std::mutex> lock(sid->mutex);
+        sid->queues.erase(rec);
+    }
+    {
+        std::lock_guard<std::mutex> lock(rec->mutex);
+        rec->sources.erase(sid);
     }
 }
 
