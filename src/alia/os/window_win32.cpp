@@ -6,6 +6,7 @@
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <variant>
 
 #include "window.hpp"
 #include "window_events.hpp"
@@ -44,7 +45,6 @@ struct window::impl {
     event_source source;
     vec2i        client_size    = {};
     std::string  title_utf8;
-    window_flags flags          = window_flags::none;
     bool         cursor_visible = true;
     bool         mouse_grabbed  = false;
 
@@ -163,31 +163,22 @@ LRESULT CALLBACK window::impl::wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM l
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
-// ── Constructors ──────────────────────────────────────────────────────
+// ── Constructor ───────────────────────────────────────────────────────
 
-window::window(vec2i size, cstring_view title, window_flags flags)
-    : window(size, flags, window_options{.title = title})
-{}
-
-window::window(vec2i size, window_flags flags)
-    : window(size, flags, window_options{})
-{}
-
-window::window(vec2i size, window_flags flags, const window_options& opts)
+window::window(vec2i size, window_options opts)
 {
     impl::ensure_class_registered();
 
     auto imp = std::make_unique<impl>();
     imp->client_size = size;
-    imp->flags       = flags;
     imp->title_utf8  = opts.title.data();
 
-    DWORD style   = WS_OVERLAPPEDWINDOW;
+    DWORD style    = WS_OVERLAPPEDWINDOW;
     DWORD ex_style = 0;
 
-    if (!any(flags & window_flags::resizable))
+    if (!opts.resizable)
         style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
-    if (any(flags & window_flags::no_frame))
+    if (opts.borderless)
         style = WS_POPUP;
 
     // Calculate adjusted window rect so the client area matches requested size
@@ -197,9 +188,9 @@ window::window(vec2i size, window_flags flags, const window_options& opts)
     int win_h = wr.bottom - wr.top;
 
     int pos_x = CW_USEDEFAULT, pos_y = CW_USEDEFAULT;
-    if (opts.position.x >= 0 && opts.position.y >= 0) {
-        pos_x = opts.position.x;
-        pos_y = opts.position.y;
+    if (auto* pt = std::get_if<vec2i>(&opts.position)) {
+        pos_x = pt->x;
+        pos_y = pt->y;
     } else {
         // Center on primary monitor
         int sw = GetSystemMetrics(SM_CXSCREEN);
@@ -220,9 +211,9 @@ window::window(vec2i size, window_flags flags, const window_options& opts)
     if (!hwnd) return;  // impl_ stays null → window is invalid
 
     imp->hwnd = hwnd;
-    ShowWindow(hwnd, any(flags & window_flags::minimized) ? SW_MINIMIZE
-                   : any(flags & window_flags::maximized) ? SW_MAXIMIZE
-                                                          : SW_SHOW);
+    ShowWindow(hwnd, opts.minimized ? SW_MINIMIZE
+                   : opts.maximized ? SW_MAXIMIZE
+                                    : SW_SHOW);
     UpdateWindow(hwnd);
 
     impl_ = std::move(imp);
@@ -257,8 +248,6 @@ float       window::aspect_ratio() const {
     auto s = size();
     return s.y ? static_cast<float>(s.x) / s.y : 1.0f;
 }
-window_flags window::flags()       const { return impl_ ? impl_->flags : window_flags::none; }
-
 cstring_view window::title() const {
     static const char* empty = "";
     return impl_ ? cstring_view(impl_->title_utf8.c_str()) : cstring_view(empty);

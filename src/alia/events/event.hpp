@@ -1,10 +1,11 @@
-#ifndef EVENT_D20B5DB9_6979_4D79_B3F7_E50D954510D6
-#define EVENT_D20B5DB9_6979_4D79_B3F7_E50D954510D6
+#ifndef EVENT_EDF071D1_00E2_44D5_ABDC_8B19C4250DCB
+#define EVENT_EDF071D1_00E2_44D5_ABDC_8B19C4250DCB
 
 #include <cstdint>
 #include <type_traits>
 #include <atomic>
 #include <concepts>
+#include "../util/type_erasure.hpp"
 
 namespace alia {
 
@@ -20,20 +21,16 @@ constexpr event_type_id_t RUNTIME_EVENT_ID_START = 0x40000000;
 template<typename T>
 concept event = std::is_aggregate_v<T>;
 
-// ── Event Metadata ────────────────────────────────────────────────────
+// ── Event Source (forward declaration) ────────────────────────────────
 
-// Forward declaration
 class event_source;
 
-struct event_metadata {
-    double timestamp;
-    event_source* source;
-};
+// ── Event Metadata ────────────────────────────────────────────────────
 
-template<event TEvent>
-struct event_with_metadata {
-    event_metadata meta;
-    TEvent ev;
+struct event_metadata {
+    double          timestamp;
+    event_source*   source;
+    event_type_id_t event_type_id;
 };
 
 // ── Runtime Event Type ID Generation ──────────────────────────────────
@@ -59,6 +56,44 @@ event_type_id_t get_event_type_id() noexcept {
     return id;
 }
 
+// ── Event Slot ────────────────────────────────────────────────────────
+//
+// event_slot<TEvent> is the storage unit placed in the event queue's any_deque.
+// The base class is layout-compatible with all specialisations, allowing the
+// queue to read metadata and dispatch without knowing the concrete event type.
+
+struct event_slot_base; // forward – needed by event_vtable_t
+
+/// Per-event-type vtable used by the event queue for type-erased dispatch.
+struct event_vtable_t {
+    /// Type-erasure vtable for the event payload (TEvent, not the whole slot).
+    /// Used by pop() to move-construct the payload into an soo_any.
+    const type_erasure_vtable_t* event_type_erasure_vt;
+
+    /// Returns a pointer to the TEvent payload inside the given slot.
+    void* (*get_event_ptr)(event_slot_base* slot) noexcept;
+};
+
+struct event_slot_base {
+    event_metadata        meta;
+    const event_vtable_t* event_vt;
+};
+
+template<event TEvent>
+struct event_slot : event_slot_base {
+    TEvent ev;
+
+    static const event_vtable_t* get_event_vtable() noexcept {
+        static const event_vtable_t vt = {
+            type_erasure_vtable_for<TEvent>(),
+            [](event_slot_base* slot) noexcept -> void* {
+                return &static_cast<event_slot<TEvent>*>(slot)->ev;
+            },
+        };
+        return &vt;
+    }
+};
+
 } // namespace alia
 
-#endif /* EVENT_D20B5DB9_6979_4D79_B3F7_E50D954510D6 */
+#endif /* EVENT_EDF071D1_00E2_44D5_ABDC_8B19C4250DCB */

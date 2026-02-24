@@ -1,10 +1,10 @@
-#ifndef SOO_ANY_A9188CF7_8309_48F9_ACBB_284E3029AA2B
-#define SOO_ANY_A9188CF7_8309_48F9_ACBB_284E3029AA2B
+#ifndef SOO_ANY_BB3690F1_CC6C_44CB_B46B_F8FA87F482E7
+#define SOO_ANY_BB3690F1_CC6C_44CB_B46B_F8FA87F482E7
 
+#include "type_erasure.hpp"
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
-#include <stdexcept>
 #include <new>
 #include <cstring>
 
@@ -16,231 +16,138 @@ public:
     }
 };
 
-// Small object optimized any with configurable buffer size
+// Small object optimized any with configurable buffer size.
+//
+// Uses type_erasure_vtable_t as its vtable. Vtable functions always receive
+// direct object pointers; soo_any manages heap allocation separately.
 template<std::size_t SmallBufferSize = 32>
 class soo_any {
 private:
-    // Type operations interface
-    struct ops_table {
-        void (*destroy)(void* storage) noexcept;
-        void (*copy)(const void* src, void* dst);
-        void (*move)(void* src, void* dst) noexcept;
-        const std::type_info& (*type)() noexcept;
-    };
-
-    // Storage strategy enum
     enum class storage_type : unsigned char {
         empty,
-        small,  // Stored in local buffer
-        large   // Stored on heap
+        small,  // object lives in buffer_
+        large   // object lives on heap; ptr_ holds the raw allocation
     };
 
-    // Small buffer for SOO
     alignas(std::max_align_t) unsigned char buffer_[SmallBufferSize];
-    
-    // Pointer for large objects (reuses buffer space when possible)
-    void* ptr_;
-    
-    // Operations table pointer
-    const ops_table* ops_;
-    
-    // Storage type indicator
-    storage_type storage_;
+    void*                               ptr_;     // heap allocation for large objects
+    const type_erasure_vtable_t*        ops_;
+    storage_type                        storage_;
 
-    // Determine if type T should use small object optimization
     template<typename T>
-    static constexpr bool use_soo() {
-        return sizeof(T) <= SmallBufferSize && 
+    static constexpr bool use_soo() noexcept {
+        return sizeof(T) <= SmallBufferSize &&
                alignof(T) <= alignof(std::max_align_t) &&
                std::is_nothrow_move_constructible_v<T>;
     }
 
-    // Get pointer to stored value
+    // Returns pointer to the live object (regardless of storage path).
     void* get_ptr() noexcept {
-        return storage_ == storage_type::small ? 
-               static_cast<void*>(buffer_) : ptr_;
+        return storage_ == storage_type::small ? static_cast<void*>(buffer_) : ptr_;
     }
-
     const void* get_ptr() const noexcept {
-        return storage_ == storage_type::small ? 
-               static_cast<const void*>(buffer_) : ptr_;
+        return storage_ == storage_type::small ? static_cast<const void*>(buffer_) : ptr_;
     }
 
-    // Operations table implementations for small objects
-    template<typename T>
-    static void destroy_small(void* storage) noexcept {
-        static_cast<T*>(storage)->~T();
-    }
-
-    template<typename T>
-    static void copy_small(const void* src, void* dst) {
-        new (dst) T(*static_cast<const T*>(src));
-    }
-
-    template<typename T>
-    static void move_small(void* src, void* dst) noexcept {
-        new (dst) T(std::move(*static_cast<T*>(src)));
-    }
-
-    // Operations table implementations for large objects
-    template<typename T>
-    static void destroy_large(void* storage) noexcept {
-        delete static_cast<T*>(*static_cast<T**>(storage));
-    }
-
-    template<typename T>
-    static void copy_large(const void* src, void* dst) {
-        *static_cast<T**>(dst) = new T(**static_cast<T* const*>(src));
-    }
-
-    template<typename T>
-    static void move_large(void* src, void* dst) noexcept {
-        *static_cast<T**>(dst) = *static_cast<T**>(src);
-        *static_cast<T**>(src) = nullptr;
-    }
-
-    // Type info getter
-    template<typename T>
-    static const std::type_info& get_type() noexcept {
-        return typeid(T);
-    }
-
-    // Get operations table for type T
-    template<typename T>
-    static const ops_table* get_ops_table() noexcept {
-        using decay_t = std::decay_t<T>;
-        
-        if constexpr (use_soo<decay_t>()) {
-            static constexpr ops_table table = {
-                &destroy_small<decay_t>,
-                &copy_small<decay_t>,
-                &move_small<decay_t>,
-                &get_type<decay_t>
-            };
-            return &table;
-        } else {
-            static constexpr ops_table table = {
-                &destroy_large<decay_t>,
-                &copy_large<decay_t>,
-                &move_large<decay_t>,
-                &get_type<decay_t>
-            };
-            return &table;
-        }
-    }
-
-    // Destroy currently stored value
+    // Runs the destructor and, for large objects, frees the heap allocation.
     void destroy() noexcept {
-        if (ops_) {
-            ops_->destroy(storage_ == storage_type::small ? 
-                         static_cast<void*>(buffer_) : 
-                         static_cast<void*>(&ptr_));
+        if (!ops_) return;
+        void* obj = get_ptr();
+        ops_->destroy(obj);
+        if (storage_ == storage_type::large) {
+            ::operator delete(ptr_, std::align_val_t{ops_->align});
         }
     }
 
 public:
-    // Default constructor - empty any
-    soo_any() noexcept 
-        : ptr_(nullptr)
-        , ops_(nullptr)
-        , storage_(storage_type::empty) {
-    }
+    // ── Constructors ──────────────────────────────────────────────────
 
-    // Copy constructor
-    soo_any(const soo_any& other) 
-        : ops_(other.ops_)
-        , storage_(other.storage_) {
-        
-        if (ops_) {
-            if (storage_ == storage_type::small) {
-                ops_->copy(other.buffer_, buffer_);
-            } else {
-                ops_->copy(&other.ptr_, &ptr_);
-            }
+    soo_any() noexcept : ptr_(nullptr), ops_(nullptr), storage_(storage_type::empty) {}
+
+    soo_any(const soo_any& other) : ops_(other.ops_), storage_(other.storage_) {
+        if (!ops_) { ptr_ = nullptr; return; }
+        if (storage_ == storage_type::small) {
+            ops_->copy_construct(buffer_, other.buffer_);
         } else {
-            ptr_ = nullptr;
+            ptr_ = ::operator new(ops_->size, std::align_val_t{ops_->align});
+            ops_->copy_construct(ptr_, other.ptr_);
         }
     }
 
-    // Move constructor
-    soo_any(soo_any&& other) noexcept 
-        : ops_(other.ops_)
-        , storage_(other.storage_) {
-        
-        if (ops_) {
-            if (storage_ == storage_type::small) {
-                ops_->move(other.buffer_, buffer_);
-                other.destroy();
-            } else {
-                ptr_ = other.ptr_;
-                other.ptr_ = nullptr;
-            }
+    soo_any(soo_any&& other) noexcept : ops_(other.ops_), storage_(other.storage_) {
+        if (!ops_) { ptr_ = nullptr; }
+        else if (storage_ == storage_type::small) {
+            ops_->move_construct(buffer_, other.buffer_);
+            other.ops_->destroy(other.buffer_); // no dealloc needed
         } else {
-            ptr_ = nullptr;
+            ptr_ = other.ptr_;
+            other.ptr_ = nullptr;
         }
-        
         other.ops_ = nullptr;
         other.storage_ = storage_type::empty;
     }
 
-    // Value constructor
-    template<typename T, 
+    // Value constructor – constructs T in-place.
+    template<typename T,
              typename = std::enable_if_t<!std::is_same_v<std::decay_t<T>, soo_any>>>
     soo_any(T&& value) {
-        using decay_t = std::decay_t<T>;
-        
-        ops_ = get_ops_table<decay_t>();
-        
-        if constexpr (use_soo<decay_t>()) {
+        using D = std::decay_t<T>;
+        ops_ = type_erasure_vtable_for<D>();
+        if constexpr (use_soo<D>()) {
             storage_ = storage_type::small;
-            new (buffer_) decay_t(std::forward<T>(value));
+            ::new(buffer_) D(std::forward<T>(value));
         } else {
             storage_ = storage_type::large;
-            ptr_ = new decay_t(std::forward<T>(value));
+            ptr_ = ::operator new(sizeof(D), std::align_val_t{alignof(D)});
+            ::new(ptr_) D(std::forward<T>(value));
         }
     }
 
-    // Destructor
-    ~soo_any() {
-        destroy();
+    // Tagged move-construct from an external object pointer and its vtable.
+    // Useful when type information is only available at runtime (e.g. when
+    // extracting an event payload from a type-erased queue).
+    soo_any(move_construct_tag_t, const type_erasure_vtable_t* vt, void* obj) {
+        ops_ = vt;
+        bool small = vt->size <= SmallBufferSize &&
+                     vt->align <= alignof(std::max_align_t) &&
+                     vt->is_nothrow_move;
+        if (small) {
+            storage_ = storage_type::small;
+            vt->move_construct(buffer_, obj);
+        } else {
+            storage_ = storage_type::large;
+            ptr_ = ::operator new(vt->size, std::align_val_t{vt->align});
+            vt->move_construct(ptr_, obj);
+        }
     }
 
-    // Copy assignment
+    ~soo_any() { destroy(); }
+
+    // ── Assignment ────────────────────────────────────────────────────
+
     soo_any& operator=(const soo_any& other) {
-        if (this != &other) {
-            soo_any temp(other);
-            swap(temp);
-        }
+        if (this != &other) { soo_any temp(other); swap(temp); }
         return *this;
     }
 
-    // Move assignment
     soo_any& operator=(soo_any&& other) noexcept {
-        if (this != &other) {
-            destroy();
-            
-            ops_ = other.ops_;
-            storage_ = other.storage_;
-            
-            if (ops_) {
-                if (storage_ == storage_type::small) {
-                    ops_->move(other.buffer_, buffer_);
-                    other.destroy();
-                } else {
-                    ptr_ = other.ptr_;
-                    other.ptr_ = nullptr;
-                }
-            } else {
-                ptr_ = nullptr;
-            }
-            
-            other.ops_ = nullptr;
-            other.storage_ = storage_type::empty;
+        if (this == &other) return *this;
+        destroy();
+        ops_     = other.ops_;
+        storage_ = other.storage_;
+        if (!ops_) { ptr_ = nullptr; }
+        else if (storage_ == storage_type::small) {
+            ops_->move_construct(buffer_, other.buffer_);
+            other.ops_->destroy(other.buffer_);
+        } else {
+            ptr_ = other.ptr_;
+            other.ptr_ = nullptr;
         }
+        other.ops_ = nullptr;
+        other.storage_ = storage_type::empty;
         return *this;
     }
 
-    // Value assignment
     template<typename T,
              typename = std::enable_if_t<!std::is_same_v<std::decay_t<T>, soo_any>>>
     soo_any& operator=(T&& value) {
@@ -249,52 +156,55 @@ public:
         return *this;
     }
 
-    // Emplace construction
+    // ── Emplace ───────────────────────────────────────────────────────
+
     template<typename T, typename... Args>
     std::decay_t<T>& emplace(Args&&... args) {
-        using decay_t = std::decay_t<T>;
-        
+        using D = std::decay_t<T>;
         destroy();
-        
-        ops_ = get_ops_table<decay_t>();
-        
-        if constexpr (use_soo<decay_t>()) {
+        ops_ = type_erasure_vtable_for<D>();
+        if constexpr (use_soo<D>()) {
             storage_ = storage_type::small;
-            new (buffer_) decay_t(std::forward<Args>(args)...);
-            return *reinterpret_cast<decay_t*>(buffer_);
+            ::new(buffer_) D(std::forward<Args>(args)...);
+            return *reinterpret_cast<D*>(buffer_);
         } else {
             storage_ = storage_type::large;
-            ptr_ = new decay_t(std::forward<Args>(args)...);
-            return *static_cast<decay_t*>(ptr_);
+            ptr_ = ::operator new(sizeof(D), std::align_val_t{alignof(D)});
+            ::new(ptr_) D(std::forward<Args>(args)...);
+            return *static_cast<D*>(ptr_);
         }
     }
 
-    // Reset to empty state
+    // ── Modifiers ─────────────────────────────────────────────────────
+
     void reset() noexcept {
         destroy();
-        ops_ = nullptr;
+        ops_     = nullptr;
         storage_ = storage_type::empty;
-        ptr_ = nullptr;
+        ptr_     = nullptr;
     }
 
-    // Swap
     void swap(soo_any& other) noexcept {
         soo_any temp(std::move(other));
         other = std::move(*this);
         *this = std::move(temp);
     }
 
-    // Check if contains a value
-    bool has_value() const noexcept {
-        return ops_ != nullptr;
-    }
+    // ── Observers ─────────────────────────────────────────────────────
 
-    // Get type info
+    bool has_value() const noexcept { return ops_ != nullptr; }
+
     const std::type_info& type() const noexcept {
-        return ops_ ? ops_->type() : typeid(void);
+        return ops_ ? ops_->type_id() : typeid(void);
     }
 
-    // Friend cast functions
+    // Unchecked raw pointer to the stored object.
+    // Caller must ensure the type is correct.
+    void*       get_ptr_unchecked() noexcept       { return get_ptr(); }
+    const void* get_ptr_unchecked() const noexcept { return get_ptr(); }
+
+    // ── Friend casts ──────────────────────────────────────────────────
+
     template<typename T, std::size_t Size>
     friend T* any_cast(soo_any<Size>* operand) noexcept;
 
@@ -302,45 +212,27 @@ public:
     friend const T* any_cast(const soo_any<Size>* operand) noexcept;
 };
 
-// any_cast for pointers
+// ── any_cast ──────────────────────────────────────────────────────────
+
 template<typename T, std::size_t Size>
 T* any_cast(soo_any<Size>* operand) noexcept {
-    using decay_t = std::decay_t<T>;
-    
-    if (!operand || operand->type() != typeid(decay_t)) {
-        return nullptr;
-    }
-    
-    if (operand->storage_ == soo_any<Size>::storage_type::small) {
-        return reinterpret_cast<decay_t*>(operand->buffer_);
-    } else {
-        return static_cast<decay_t*>(operand->ptr_);
-    }
+    using D = std::decay_t<T>;
+    if (!operand || operand->type() != typeid(D)) return nullptr;
+    return static_cast<D*>(operand->get_ptr());
 }
 
 template<typename T, std::size_t Size>
 const T* any_cast(const soo_any<Size>* operand) noexcept {
-    using decay_t = std::decay_t<T>;
-    
-    if (!operand || operand->type() != typeid(decay_t)) {
-        return nullptr;
-    }
-    
-    if (operand->storage_ == soo_any<Size>::storage_type::small) {
-        return reinterpret_cast<const decay_t*>(operand->buffer_);
-    } else {
-        return static_cast<const decay_t*>(operand->ptr_);
-    }
+    using D = std::decay_t<T>;
+    if (!operand || operand->type() != typeid(D)) return nullptr;
+    return static_cast<const D*>(operand->get_ptr());
 }
 
-// any_cast for references
 template<typename T, std::size_t Size>
 T any_cast(soo_any<Size>& operand) {
     using nonref = std::remove_cv_t<std::remove_reference_t<T>>;
     auto* result = any_cast<nonref>(&operand);
-    if (!result) {
-        throw bad_soo_any_cast();
-    }
+    if (!result) throw bad_soo_any_cast();
     return static_cast<T>(*result);
 }
 
@@ -348,9 +240,7 @@ template<typename T, std::size_t Size>
 T any_cast(const soo_any<Size>& operand) {
     using nonref = std::remove_cv_t<std::remove_reference_t<T>>;
     auto* result = any_cast<nonref>(&operand);
-    if (!result) {
-        throw bad_soo_any_cast();
-    }
+    if (!result) throw bad_soo_any_cast();
     return static_cast<T>(*result);
 }
 
@@ -358,13 +248,12 @@ template<typename T, std::size_t Size>
 T any_cast(soo_any<Size>&& operand) {
     using nonref = std::remove_cv_t<std::remove_reference_t<T>>;
     auto* result = any_cast<nonref>(&operand);
-    if (!result) {
-        throw bad_soo_any_cast();
-    }
+    if (!result) throw bad_soo_any_cast();
     return static_cast<T>(std::move(*result));
 }
 
-// Helper function to create soo_any
+// ── make_any ──────────────────────────────────────────────────────────
+
 template<typename T, std::size_t Size = 32, typename... Args>
 soo_any<Size> make_any(Args&&... args) {
     soo_any<Size> result;
@@ -372,4 +261,4 @@ soo_any<Size> make_any(Args&&... args) {
     return result;
 }
 
-#endif /* SOO_ANY_A9188CF7_8309_48F9_ACBB_284E3029AA2B */
+#endif /* SOO_ANY_BB3690F1_CC6C_44CB_B46B_F8FA87F482E7 */

@@ -33,6 +33,16 @@ add_library(alia ${alia_headers} ${alia_sources})
 
 option(ALIA_USE_KOKKOS_MDSPAN "Use Kokkos MDSPAN implementation instead of std::mdspan" ON)
 option(ALIA_BUILD_EXAMPLES "Build example programs" ON)
+option(ALIA_STATIC_RUNTIME "Statically link the C/C++ runtime (useful with MinGW to avoid DLL mismatch)" OFF)
+
+if(ALIA_STATIC_RUNTIME)
+  if(MINGW)
+    target_link_options(alia PUBLIC -static-libgcc -static-libstdc++
+      -Wl,-Bstatic,-lwinpthread,-Bdynamic)
+  elseif(MSVC)
+    set_property(TARGET alia PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  endif()
+endif()
 
 if (NOT ALIA_MDSPAN_FEATURE_TEST_OK)
   set(ALIA_USE_KOKKOS_MDSPAN ON)

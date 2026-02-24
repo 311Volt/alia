@@ -3,18 +3,69 @@
 
 #include "event.hpp"
 #include "../util/any_deque.hpp"
+#include "../util/soo_any.hpp"
 #include <mutex>
 #include <condition_variable>
-#include <optional>
 #include <chrono>
 #include <unordered_set>
 #include <memory>
 
 namespace alia {
 
+/* TODO optimize storage!!!
+ * currently we waste:
+ * - sizeof(void*) for event_slot_base vtable pointer
+ * - sizeof(void*) for any_deque vtable pointer 
+ * - 4 bytes for event_type_id (could be inside vtable)
+ * - 
+ */
+
 class event_source;
 class event_queue;
 struct source_identity; // defined in event_source.hpp
+
+// ── any_event_handle ──────────────────────────────────────────────────
+//
+// Non-owning view of the front event in an event_queue, returned by peek().
+// Valid only while the event remains in the queue (i.e. until the next pop()
+// or clear() on the same queue).
+
+struct any_event_handle {
+    event_metadata meta;
+    void*          event; ///< pointer to the TEvent payload inside the queue
+
+    /// Returns a pointer to the event as TEvent, or nullptr if the type
+    /// does not match.
+    template<alia::event EventT>
+    const EventT* get_if() const noexcept {
+        if (meta.event_type_id != get_event_type_id<EventT>()) return nullptr;
+        return static_cast<const EventT*>(event);
+    }
+};
+
+// ── any_event_owner ───────────────────────────────────────────────────
+//
+// Owning handle to a popped event, returned by pop(). The event payload is
+// move-constructed out of the queue into an internal soo_any<80> buffer.
+
+struct any_event_owner {
+    event_metadata meta;
+    soo_any<80>    event; ///< owns the moved-out TEvent payload
+
+    /// Returns a pointer to the event as TEvent, or nullptr if the type
+    /// does not match.
+    template<alia::event EventT>
+    EventT* get_if() noexcept {
+        if (meta.event_type_id != get_event_type_id<EventT>()) return nullptr;
+        return static_cast<EventT*>(event.get_ptr_unchecked());
+    }
+
+    template<alia::event EventT>
+    const EventT* get_if() const noexcept {
+        if (meta.event_type_id != get_event_type_id<EventT>()) return nullptr;
+        return static_cast<const EventT*>(event.get_ptr_unchecked());
+    }
+};
 
 // ── Queue Receiver ────────────────────────────────────────────────────
 
@@ -36,17 +87,17 @@ struct queue_receiver {
     // Called by source_identity::~source_identity() so we drop the dangling ptr.
     void notify_source_end_of_lifetime(source_identity* sid);
 
-    template<event TEvent>
-    void push_event(const event_with_metadata<TEvent>& event_data) {
+    template<alia::event TEvent>
+    void push_event(const event_slot<TEvent>& slot_data) {
         std::lock_guard<std::mutex> lock(mutex);
-        events.push_back(event_data);
+        events.push_back(slot_data);
         cv.notify_one();
     }
 
-    template<event TEvent>
-    void push_event(event_with_metadata<TEvent>&& event_data) {
+    template<alia::event TEvent>
+    void push_event(event_slot<TEvent>&& slot_data) {
         std::lock_guard<std::mutex> lock(mutex);
-        events.push_back(std::move(event_data));
+        events.push_back(std::move(slot_data));
         cv.notify_one();
     }
 };
@@ -62,19 +113,6 @@ private:
     friend class event_source;
     friend struct source_identity;
     friend struct queue_receiver;
-
-    // ── Type-erased helpers (called with receiver_->mutex already held) ──
-
-    [[nodiscard]] const void* peek_impl() const noexcept {
-        if (receiver_->events.empty()) return nullptr;
-        const void* payload = *receiver_->events.begin();
-        return static_cast<const char*>(payload) + sizeof(event_metadata);
-    }
-
-    [[nodiscard]] const void* peek_with_metadata_impl() const noexcept {
-        if (receiver_->events.empty()) return nullptr;
-        return *receiver_->events.begin();
-    }
 
 public:
     event_queue() : receiver_(std::make_unique<queue_receiver>(this)) {}
@@ -117,65 +155,39 @@ public:
         return receiver_->events.size();
     }
 
-    // ── Peek (without metadata) ───────────────────────────────────────
+    // ── Peek ──────────────────────────────────────────────────────────
 
-    template<event TEvent>
-    [[nodiscard]] const TEvent* peek() const noexcept {
+    // Returns a non-owning view of the front event without removing it.
+    // The returned handle is valid until the next pop() or clear().
+    // Returns an empty handle (null event pointer) if the queue is empty.
+    [[nodiscard]] any_event_handle peek() const noexcept {
         std::lock_guard<std::mutex> lock(receiver_->mutex);
-        if (peek_impl() == nullptr) return nullptr;
-        auto it = receiver_->events.begin();
-        if (it.vtable() != any_deque::vtable_for<event_with_metadata<TEvent>>())
-            return nullptr;
-        return &static_cast<const event_with_metadata<TEvent>*>(*it)->ev;
+        if (receiver_->events.empty()) return {};
+        auto* slot = static_cast<event_slot_base*>(receiver_->events.front());
+        return { slot->meta, slot->event_vt->get_event_ptr(slot) };
     }
 
-    // ── Peek with metadata ────────────────────────────────────────────
+    // ── Pop ───────────────────────────────────────────────────────────
 
-    template<event TEvent>
-    [[nodiscard]] const event_with_metadata<TEvent>* peek_with_metadata() const noexcept {
+    // Removes the front event and returns ownership of its payload.
+    // The payload is move-constructed into the returned any_event_owner.
+    // Asserts if the queue is empty.
+    [[nodiscard]] any_event_owner pop() {
         std::lock_guard<std::mutex> lock(receiver_->mutex);
-        if (peek_with_metadata_impl() == nullptr) return nullptr;
-        auto it = receiver_->events.begin();
-        if (it.vtable() != any_deque::vtable_for<event_with_metadata<TEvent>>())
-            return nullptr;
-        return static_cast<const event_with_metadata<TEvent>*>(*it);
-    }
-
-    // ── Pop (without metadata) ────────────────────────────────────────
-
-    template<event TEvent>
-    [[nodiscard]] std::optional<TEvent> pop() {
-        std::lock_guard<std::mutex> lock(receiver_->mutex);
-        if (receiver_->events.empty()) return std::nullopt;
-        auto it = receiver_->events.begin();
-        if (it.vtable() != any_deque::vtable_for<event_with_metadata<TEvent>>())
-            return std::nullopt;
-        auto* event_data = static_cast<event_with_metadata<TEvent>*>(*it);
-        TEvent result = std::move(event_data->ev);
+        auto* slot = static_cast<event_slot_base*>(receiver_->events.front());
+        event_metadata meta = slot->meta;
+        void* event_ptr = slot->event_vt->get_event_ptr(slot);
+        const type_erasure_vtable_t* evt_vt = slot->event_vt->event_type_erasure_vt;
+        soo_any<80> owned(move_construct_tag, evt_vt, event_ptr);
         receiver_->events.pop_front();
-        return result;
+        return { meta, std::move(owned) };
     }
 
-    // Pop front event without type checking (discards it)
-    void pop() {
+    // Discards the front event without returning it.
+    void discard() {
         std::lock_guard<std::mutex> lock(receiver_->mutex);
         if (!receiver_->events.empty())
             receiver_->events.pop_front();
-    }
-
-    // ── Pop with metadata ─────────────────────────────────────────────
-
-    template<event TEvent>
-    [[nodiscard]] std::optional<event_with_metadata<TEvent>> pop_with_metadata() {
-        std::lock_guard<std::mutex> lock(receiver_->mutex);
-        if (receiver_->events.empty()) return std::nullopt;
-        auto it = receiver_->events.begin();
-        if (it.vtable() != any_deque::vtable_for<event_with_metadata<TEvent>>())
-            return std::nullopt;
-        auto* event_data = static_cast<event_with_metadata<TEvent>*>(*it);
-        event_with_metadata<TEvent> result = std::move(*event_data);
-        receiver_->events.pop_front();
-        return result;
     }
 
     // ── Wait for Event ────────────────────────────────────────────────

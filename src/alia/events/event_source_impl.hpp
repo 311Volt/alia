@@ -1,5 +1,5 @@
-#ifndef EVENT_SOURCE_IMPL_3A7F9B2E_5C8D_4E1A_9B6F_2D8A4C1E7B3D
-#define EVENT_SOURCE_IMPL_3A7F9B2E_5C8D_4E1A_9B6F_2D8A4C1E7B3D
+#ifndef EVENT_SOURCE_IMPL_D5C7A87A_DEB4_4438_B9DE_C76EEF7532C2
+#define EVENT_SOURCE_IMPL_D5C7A87A_DEB4_4438_B9DE_C76EEF7532C2
 
 #include "event_source.hpp"
 #include "event_queue.hpp"
@@ -14,13 +14,15 @@ void event_source::emit(const TEvent& ev) {
     std::lock_guard<std::mutex> lock(identity_->mutex);
     if (identity_->queues.empty()) return;
 
-    event_with_metadata<TEvent> event_data;
-    event_data.meta.timestamp = get_time();
-    event_data.meta.source = this;
-    event_data.ev = ev;
+    event_slot<TEvent> slot;
+    slot.meta.timestamp     = get_time();
+    slot.meta.source        = this;
+    slot.meta.event_type_id = get_event_type_id<TEvent>();
+    slot.event_vt           = event_slot<TEvent>::get_event_vtable();
+    slot.ev                 = ev;
 
     for (auto* rec : identity_->queues) {
-        rec->push_event(event_data);
+        rec->push_event(slot);
     }
 }
 
@@ -29,21 +31,23 @@ void event_source::emit(TEvent&& ev) {
     std::lock_guard<std::mutex> lock(identity_->mutex);
     if (identity_->queues.empty()) return;
 
-    event_with_metadata<TEvent> event_data;
-    event_data.meta.timestamp = get_time();
-    event_data.meta.source = this;
-    event_data.ev = std::move(ev);
+    event_slot<TEvent> slot;
+    slot.meta.timestamp     = get_time();
+    slot.meta.source        = this;
+    slot.meta.event_type_id = get_event_type_id<TEvent>();
+    slot.event_vt           = event_slot<TEvent>::get_event_vtable();
+    slot.ev                 = std::move(ev);
 
     // For a single queue we can move; otherwise we copy to all but the last.
     if (identity_->queues.size() == 1) {
-        (*identity_->queues.begin())->push_event(std::move(event_data));
+        (*identity_->queues.begin())->push_event(std::move(slot));
     } else {
         for (auto* rec : identity_->queues) {
-            rec->push_event(event_data);
+            rec->push_event(slot);
         }
     }
 }
 
 } // namespace alia
 
-#endif /* EVENT_SOURCE_IMPL_3A7F9B2E_5C8D_4E1A_9B6F_2D8A4C1E7B3D */
+#endif /* EVENT_SOURCE_IMPL_D5C7A87A_DEB4_4438_B9DE_C76EEF7532C2 */

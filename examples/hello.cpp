@@ -9,13 +9,12 @@ int main() {
     // ── Window ────────────────────────────────────────────────────────
     alia::window win(
         {800, 600},
-        "Hello ALIA — colored triangle",
-        alia::window_flags::windowed | alia::window_flags::resizable);
+        { .title = "Hello ALIA — colored triangle", .resizable = true });
 
     if (!win) return 1;
 
     // ── Graphics device (picks D3D9 first, OpenGL as fallback) ───────
-    alia::gfx_device device = alia::gfx_device::create();
+    alia::gfx_device device = alia::gfx_device::create(alia::gfx_backend::opengl);
     alia::swapchain  swap   = alia::swapchain::create(device, win);
 
     // ── Event queue subscribed to the window ─────────────────────────
@@ -38,16 +37,15 @@ int main() {
 
         // ── Event dispatch ────────────────────────────────────────────
         while (!events.empty()) {
-            if (auto e = events.pop<alia::window_close_event>()) {
+            auto ev = events.pop();
+            if (auto* e = ev.get_if<alia::window_close_event>()) {
                 running = false;
-            } else if (auto e = events.pop<alia::window_resize_event>()) {
+            } else if (auto* e = ev.get_if<alia::window_resize_event>()) {
                 swap.on_resize(e->new_size);
-            } else if (auto e = events.pop<alia::window_key_event>()) {
+            } else if (auto* e = ev.get_if<alia::window_key_event>()) {
                 // Escape quits
                 if (e->pressed && e->vk_code == 27 /*VK_ESCAPE*/)
                     running = false;
-            } else {
-                events.pop();  // discard unhandled event
             }
         }
 

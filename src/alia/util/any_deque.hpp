@@ -22,6 +22,7 @@
 // insert / erase (mid)                          : O(n)
 // copy / move construction                      : O(total bytes)
 
+#include "type_erasure.hpp"
 #include <deque>
 #include <vector>
 #include <cstddef>
@@ -38,37 +39,11 @@
 class any_deque {
 public:
     // ── vtable ────────────────────────────────────────────────────────
-    struct vtable_t {
-        std::size_t size;   // sizeof(T)
-        std::size_t align;  // alignof(T)
-        void (*copy_construct)(void* dst, const void* src);
-        void (*move_construct)(void* dst, void* src) noexcept;
-        void (*destroy)      (void* obj)             noexcept;
-    };
+    using vtable_t = type_erasure_vtable_t;
 
-private:
-    template<typename T>
-    static constexpr vtable_t make_vtable() noexcept {
-        return vtable_t{
-            sizeof(T),
-            alignof(T),
-            [](void* d, const void* s) {
-                ::new(d) T(*static_cast<const T*>(s));
-            },
-            [](void* d, void* s) noexcept {
-                ::new(d) T(std::move(*static_cast<T*>(s)));
-            },
-            [](void* p) noexcept {
-                static_cast<T*>(p)->~T();
-            },
-        };
-    }
-
-public:
     template<typename T>
     static const vtable_t* vtable_for() noexcept {
-        static constexpr vtable_t vt = make_vtable<T>();
-        return &vt;
+        return type_erasure_vtable_for<T>();
     }
 
 private:
