@@ -1,42 +1,11 @@
 #ifdef ALIA_COMPILE_GFX_BACKEND_D3D9
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#include <d3d9.h>
-#include <algorithm>
+#include "detail/d3d9_backend.hpp"
 #include <cstring>
 #include <memory>
 #include <stdexcept>
-#include <span>
-
-#include "gfx_device.hpp"
 
 namespace alia {
-
-
-// ── Helpers ───────────────────────────────────────────────────────────
-
-static DWORD to_d3d_color(color c) {
-    auto clamp = [](float v) -> BYTE {
-        return static_cast<BYTE>(std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f);
-    };
-    return D3DCOLOR_RGBA(clamp(c.r), clamp(c.g), clamp(c.b), clamp(c.a));
-}
-
-static D3DMATRIX make_identity() {
-    D3DMATRIX m;
-    std::memset(&m, 0, sizeof(m));
-    m._11 = m._22 = m._33 = m._44 = 1.0f;
-    return m;
-}
-
-// Vertex for fixed-function pipeline: XYZ + diffuse colour
-struct d3d9_vertex {
-    float x, y, z;
-    DWORD color;
-    static constexpr DWORD FVF = D3DFVF_XYZ | D3DFVF_DIFFUSE;
-};
 
 // ── Hidden dummy window ───────────────────────────────────────────────
 
@@ -57,120 +26,79 @@ static HWND create_dummy_hwnd() {
                            nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
 }
 
-// ── D3D9 device impl ─────────────────────────────────────────────────
+// ── D3D9 device impl ──────────────────────────────────────────────────
 
-struct d3d9_device_impl : gfx_device_impl {
-    IDirect3D9*       d3d    = nullptr;
-    IDirect3DDevice9* device = nullptr;
-    HWND              dummy  = nullptr;
-
-    ~d3d9_device_impl() override {
-        if (device) { device->Release(); device = nullptr; }
-        if (d3d)    { d3d->Release();    d3d    = nullptr; }
-        if (dummy)  { DestroyWindow(dummy); dummy = nullptr; }
-    }
-
-    const char* backend_name() const noexcept override { return "d3d9"; }
-};
+d3d9_device_impl::~d3d9_device_impl() {
+    if (device) { device->Release(); device = nullptr; }
+    if (d3d)    { d3d->Release();    d3d    = nullptr; }
+    if (dummy)  { DestroyWindow(dummy); dummy = nullptr; }
+}
 
 // ── D3D9 swapchain impl ───────────────────────────────────────────────
 
-struct d3d9_swapchain_impl : swapchain_impl {
-    IDirect3DDevice9*    device     = nullptr;  // non-owning
-    IDirect3DSwapChain9* swap_chain = nullptr;
-    HWND                 hwnd       = nullptr;
-    vec2i                size       = {};
+d3d9_swapchain_impl::~d3d9_swapchain_impl() {
+    if (swap_chain) { swap_chain->Release(); swap_chain = nullptr; }
+}
 
-    float transform_[16] = {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    };
-    float projection_[16] = {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    };
+void d3d9_swapchain_impl::set_render_target_to_back_buffer() {
+    IDirect3DSurface9* bb = nullptr;
+    swap_chain->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &bb);
+    device->SetRenderTarget(0, bb);
+    bb->Release();
+}
 
-    ~d3d9_swapchain_impl() override {
-        if (swap_chain) { swap_chain->Release(); swap_chain = nullptr; }
-    }
+static D3DMATRIX make_identity() {
+    D3DMATRIX m;
+    std::memset(&m, 0, sizeof(m));
+    m._11 = m._22 = m._33 = m._44 = 1.0f;
+    return m;
+}
 
-    void set_render_target_to_back_buffer() {
-        IDirect3DSurface9* bb = nullptr;
-        swap_chain->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &bb);
-        device->SetRenderTarget(0, bb);
-        bb->Release();
-    }
+void d3d9_swapchain_impl::setup_render_states() {
+    device->SetTransform(D3DTS_WORLD,      (const D3DMATRIX*)transform_);
+    D3DMATRIX view = make_identity();
+    device->SetTransform(D3DTS_VIEW,       &view);
+    device->SetTransform(D3DTS_PROJECTION, (const D3DMATRIX*)projection_);
 
-    void set_transform(std::span<const float, 16> m) override {
-        std::copy(m.begin(), m.end(), transform_);
-    }
-    void get_transform(std::span<float, 16> m) const override {
-        std::copy(std::begin(transform_), std::end(transform_), m.begin());
-    }
-    void set_projection(std::span<const float, 16> m) override {
-        std::copy(m.begin(), m.end(), projection_);
-    }
-    void get_projection(std::span<float, 16> m) const override {
-        std::copy(std::begin(projection_), std::end(projection_), m.begin());
-    }
+    device->SetRenderState(D3DRS_LIGHTING,        FALSE);
+    device->SetRenderState(D3DRS_CULLMODE,        D3DCULL_NONE);
+    device->SetRenderState(D3DRS_ZENABLE,         FALSE);
+    device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
 
-    void setup_render_states() {
-        device->SetTransform(D3DTS_WORLD,      (const D3DMATRIX*)transform_);
-        D3DMATRIX view = make_identity();
-        device->SetTransform(D3DTS_VIEW,       &view);
-        device->SetTransform(D3DTS_PROJECTION, (const D3DMATRIX*)projection_);
+    D3DVIEWPORT9 vp = {0, 0, (DWORD)size.x, (DWORD)size.y, 0.0f, 1.0f};
+    device->SetViewport(&vp);
+}
 
-        // Fixed-function state
-        device->SetRenderState(D3DRS_LIGHTING,  FALSE);
-        device->SetRenderState(D3DRS_CULLMODE,  D3DCULL_NONE);
-        device->SetRenderState(D3DRS_ZENABLE,   FALSE);
-        device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+void d3d9_swapchain_impl::set_transform(std::span<const float, 16> m) { std::copy(m.begin(), m.end(), transform_); }
+void d3d9_swapchain_impl::get_transform(std::span<float, 16> m) const { std::copy(std::begin(transform_), std::end(transform_), m.begin()); }
+void d3d9_swapchain_impl::set_projection(std::span<const float, 16> m) { std::copy(m.begin(), m.end(), projection_); }
+void d3d9_swapchain_impl::get_projection(std::span<float, 16> m) const { std::copy(std::begin(projection_), std::end(projection_), m.begin()); }
 
-        // Viewport to match back buffer
-        D3DVIEWPORT9 vp = {0, 0, (DWORD)size.x, (DWORD)size.y, 0.0f, 1.0f};
-        device->SetViewport(&vp);
-    }
+void d3d9_swapchain_impl::clear(color c) {
+    set_render_target_to_back_buffer();
+    setup_render_states();
+    device->Clear(0, nullptr, D3DCLEAR_TARGET, to_d3d_color(c), 1.0f, 0);
+    device->BeginScene();
+}
 
-    void clear(color c) override {
-        set_render_target_to_back_buffer();
-        setup_render_states();
-        device->Clear(0, nullptr, D3DCLEAR_TARGET, to_d3d_color(c), 1.0f, 0);
-        device->BeginScene();
-    }
+void d3d9_swapchain_impl::present() {
+    device->EndScene();
+    swap_chain->Present(nullptr, nullptr, nullptr, nullptr, 0);
+}
 
-    void draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2) override {
-        d3d9_vertex verts[3] = {
-            {v0.position.x, v0.position.y, -0.5f, to_d3d_color(v0.col)},
-            {v1.position.x, v1.position.y, -0.5f, to_d3d_color(v1.col)},
-            {v2.position.x, v2.position.y, -0.5f, to_d3d_color(v2.col)},
-        };
-        device->SetFVF(d3d9_vertex::FVF);
-        device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 1, verts, sizeof(d3d9_vertex));
-    }
+void d3d9_swapchain_impl::on_resize(vec2i new_size) {
+    size = new_size;
+    if (swap_chain) { swap_chain->Release(); swap_chain = nullptr; }
 
-    void present() override {
-        device->EndScene();
-        swap_chain->Present(nullptr, nullptr, nullptr, nullptr, 0);
-    }
-
-    void on_resize(vec2i new_size) override {
-        size = new_size;
-        if (swap_chain) { swap_chain->Release(); swap_chain = nullptr; }
-
-        D3DPRESENT_PARAMETERS pp = {};
-        pp.Windowed             = TRUE;
-        pp.SwapEffect           = D3DSWAPEFFECT_DISCARD;
-        pp.BackBufferFormat     = D3DFMT_UNKNOWN;
-        pp.BackBufferWidth      = (UINT)new_size.x;
-        pp.BackBufferHeight     = (UINT)new_size.y;
-        pp.hDeviceWindow        = hwnd;
-        device->CreateAdditionalSwapChain(&pp, &swap_chain);
-    }
-};
+    D3DPRESENT_PARAMETERS pp = {};
+    pp.Windowed             = TRUE;
+    pp.SwapEffect           = D3DSWAPEFFECT_DISCARD;
+    pp.BackBufferFormat     = D3DFMT_UNKNOWN;
+    pp.BackBufferWidth      = (UINT)new_size.x;
+    pp.BackBufferHeight     = (UINT)new_size.y;
+    pp.hDeviceWindow        = hwnd;
+    device->CreateAdditionalSwapChain(&pp, &swap_chain);
+}
 
 // ── Factory functions ─────────────────────────────────────────────────
 
@@ -194,7 +122,6 @@ static std::unique_ptr<gfx_device_impl> create_d3d9_device() {
                                     D3DCREATE_HARDWARE_VERTEXPROCESSING,
                                     &pp, &device);
     if (FAILED(hr)) {
-        // Retry with software vertex processing
         hr = d3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, dummy,
                                D3DCREATE_SOFTWARE_VERTEXPROCESSING,
                                &pp, &device);
@@ -238,7 +165,7 @@ static std::unique_ptr<swapchain_impl> create_d3d9_swapchain(
     return impl;
 }
 
-// ── Registration function ─────────────────────────────────────────────
+// ── Registration ──────────────────────────────────────────────────────
 
 void register_d3d9_backend() {
     register_gfx_backend({

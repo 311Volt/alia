@@ -6,7 +6,7 @@ This is the **Advanced Layer for Interactive Applications**, or **ALIA** for sho
 
 # Status and plans
 
-The project is in a very early stage.
+The project is in a very early stage. Do NOT use it yet.
 
 ### Planned backends
 

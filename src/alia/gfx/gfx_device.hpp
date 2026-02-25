@@ -4,6 +4,7 @@
 #include "../core/vec.hpp"
 #include "../core/color.hpp"
 #include "vertex.hpp"
+#include <cstdint>
 #include <memory>
 #include <span>
 
@@ -37,6 +38,13 @@ struct swapchain_impl {
     virtual void get_transform(std::span<float, 16> m) const = 0;
     virtual void set_projection(std::span<const float, 16> m) = 0;
     virtual void get_projection(std::span<float, 16> m) const = 0;
+
+    virtual void draw_triangles(std::span<const colored_vertex> vertices) = 0;
+    virtual void draw_triangle_strip(std::span<const colored_vertex> vertices) = 0;
+    virtual void draw_triangle_fan(std::span<const colored_vertex> vertices) = 0;
+    virtual void draw_triangles(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices) = 0;
+    virtual void draw_triangle_strip(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices) = 0;
+    virtual void draw_triangle_fan(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices) = 0;
 };
 
 // ── OpenGL platform ops (internal) ───────────────────────────────────
@@ -113,6 +121,12 @@ public:
     // Per-frame API: clear → draw → present
     void clear(color c);
     void draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2);
+    void draw_triangles(std::span<const colored_vertex> vertices);
+    void draw_triangle_strip(std::span<const colored_vertex> vertices);
+    void draw_triangle_fan(std::span<const colored_vertex> vertices);
+    void draw_triangles(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices);
+    void draw_triangle_strip(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices);
+    void draw_triangle_fan(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices);
     void present();
 
     // Call when the window is resized

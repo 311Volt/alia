@@ -4,9 +4,10 @@
 #include "alia/gfx/primitives.hpp"
 #include "alia/events/event_queue.hpp" // event_queue
 
+#include <print>
+#include <iostream>
 
 int main() {
-    // ── Window ────────────────────────────────────────────────────────
     alia::window win(
         {800, 600},
         { 
@@ -14,20 +15,15 @@ int main() {
             .resizable = true 
         }
     );
-
-    // ── Graphics device (picks D3D9 first, OpenGL as fallback) ───────
-    alia::gfx_device device = alia::gfx_device::create(alia::gfx_backend::d3d9);
+    alia::gfx_device device = alia::gfx_device::create(alia::gfx_backend::opengl);
     alia::swapchain  swap   = alia::swapchain::create(device, win);
 
-    // Set pixel-space projection (800x600, y-down)
     alia::set_current_projection(
         alia::transform::ortho(0, 800, 600, 0));
 
-    // ── Event queue subscribed to the window ─────────────────────────
     alia::event_queue events;
     events.register_source(&win.get_event_source());
 
-    // ── Triangle vertices in pixel space ──────────────────────────────
     alia::colored_vertex tri[3] = {
         {{ 400.0f, 100.0f}, {1.0f, 0.15f, 0.15f}},   // top  — red
         {{ 100.0f, 500.0f}, {0.15f, 1.0f, 0.15f}},   // BL   — green
@@ -37,12 +33,11 @@ int main() {
     bool running = true;
 
     while (running) {
-        // ── OS message pump ───────────────────────────────────────────
         win.poll();
 
-        // ── Event dispatch ────────────────────────────────────────────
         while (!events.empty()) {
             auto ev = events.pop();
+            std::cout << std::format("[{:.6f}] event: {}\n", ev.meta.timestamp, ev.meta.event_type_id);
             if (auto* e = ev.get_if<alia::window_close_event>()) {
                 running = false;
             } else if (auto* e = ev.get_if<alia::window_resize_event>()) {
@@ -53,11 +48,9 @@ int main() {
             }
         }
 
-        // ── Render ────────────────────────────────────────────────────
         alia::clear(alia::color::cornflower_blue);
         alia::draw_triangle(tri[0], tri[1], tri[2]);
         
-        // Draw some primitives
         alia::fill_rect(alia::rect_f::pos_size({50, 50}, {100, 100}), alia::color(1, 1, 0, 0.5f));
         alia::draw_rect(alia::rect_f::pos_size({200, 50}, {100, 100}), alia::color(0, 1, 1, 1), 5.0f);
         alia::draw_line({50, 200}, {300, 250}, alia::color(1, 0, 1, 1), 3.0f);
