@@ -1,63 +1,23 @@
 #ifdef ALIA_COMPILE_GFX_BACKEND_OPENGL
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
 #include <GL/gl.h>
 #include <algorithm>
 #include <memory>
-#include <stdexcept>
+#include <span>
 
 #include "gfx_device.hpp"
 
 namespace alia {
 
-// ── Hidden dummy window ───────────────────────────────────────────────
-
-static HWND create_ogl_dummy_hwnd() {
-    static const wchar_t* cls = L"AliaDummy_OGL";
-    static bool registered = false;
-    if (!registered) {
-        WNDCLASSEXW wc = {};
-        wc.cbSize        = sizeof(wc);
-        wc.lpfnWndProc   = DefWindowProcW;
-        wc.hInstance     = GetModuleHandleW(nullptr);
-        wc.lpszClassName = cls;
-        RegisterClassExW(&wc);
-        registered = true;
-    }
-    return CreateWindowExW(0, cls, L"", WS_OVERLAPPEDWINDOW,
-                           0, 0, 1, 1,
-                           nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
-}
-
-static bool set_pixel_format(HDC hdc) {
-    PIXELFORMATDESCRIPTOR pfd = {};
-    pfd.nSize      = sizeof(pfd);
-    pfd.nVersion   = 1;
-    pfd.dwFlags    = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-    pfd.iPixelType = PFD_TYPE_RGBA;
-    pfd.cColorBits = 32;
-    pfd.cDepthBits = 24;
-    pfd.cStencilBits = 8;
-    pfd.iLayerType = PFD_MAIN_PLANE;
-
-    int pf = ChoosePixelFormat(hdc, &pfd);
-    if (!pf) return false;
-    return SetPixelFormat(hdc, pf, &pfd) == TRUE;
-}
-
 // ── OpenGL device impl ────────────────────────────────────────────────
 
 struct ogl_device_impl : gfx_device_impl {
-    HWND  dummy_hwnd = nullptr;
-    HDC   dummy_hdc  = nullptr;
-    HGLRC ctx        = nullptr;
+    void* ctx = nullptr;  // opaque context handle (HGLRC on Win32)
 
     ~ogl_device_impl() override {
-        if (ctx)        { wglMakeCurrent(nullptr, nullptr); wglDeleteContext(ctx); ctx = nullptr; }
-        if (dummy_hdc)  { ReleaseDC(dummy_hwnd, dummy_hdc); dummy_hdc = nullptr; }
-        if (dummy_hwnd) { DestroyWindow(dummy_hwnd); dummy_hwnd = nullptr; }
+        const auto& ops = get_ogl_platform();
+        ops.make_none_current();
+        ops.destroy_context(ctx);
     }
 
     const char* backend_name() const noexcept override { return "opengl"; }
@@ -66,23 +26,54 @@ struct ogl_device_impl : gfx_device_impl {
 // ── OpenGL swapchain impl ─────────────────────────────────────────────
 
 struct ogl_swapchain_impl : swapchain_impl {
-    HWND  hwnd = nullptr;
-    HDC   hdc  = nullptr;
-    HGLRC ctx  = nullptr;  // non-owning; owned by ogl_device_impl
-    vec2i size = {};
+    void*  native  = nullptr;  // native window handle (for destroy_surface)
+    void*  surface = nullptr;  // opaque surface handle (HDC on Win32)
+    void*  ctx     = nullptr;  // non-owning ref to device context
+    vec2i  size    = {};
+
+    float transform_[16] = {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    };
+    float projection_[16] = {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    };
 
     ~ogl_swapchain_impl() override {
-        if (hdc && hwnd) ReleaseDC(hwnd, hdc);
+        get_ogl_platform().destroy_surface(native, surface);
     }
 
     void clear(color c) override {
-        wglMakeCurrent(hdc, ctx);
+        get_ogl_platform().make_current(surface, ctx);
         glViewport(0, 0, size.x, size.y);
         glClearColor(c.r, c.g, c.b, c.a);
         glClear(GL_COLOR_BUFFER_BIT);
     }
 
+    void set_transform(std::span<const float, 16> m) override {
+        std::copy(m.begin(), m.end(), transform_);
+    }
+    void get_transform(std::span<float, 16> m) const override {
+        std::copy(std::begin(transform_), std::end(transform_), m.begin());
+    }
+    void set_projection(std::span<const float, 16> m) override {
+        std::copy(m.begin(), m.end(), projection_);
+    }
+    void get_projection(std::span<float, 16> m) const override {
+        std::copy(std::begin(projection_), std::end(projection_), m.begin());
+    }
+
     void draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2) override {
+        glMatrixMode(GL_PROJECTION);
+        glLoadMatrixf(projection_);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadMatrixf(transform_);
+
         // Immediate-mode OpenGL 2.x
         glBegin(GL_TRIANGLES);
             glColor3f(v0.col.r, v0.col.g, v0.col.b);
@@ -95,7 +86,7 @@ struct ogl_swapchain_impl : swapchain_impl {
     }
 
     void present() override {
-        SwapBuffers(hdc);
+        get_ogl_platform().swap_buffers(surface);
     }
 
     void on_resize(vec2i new_size) override {
@@ -106,36 +97,11 @@ struct ogl_swapchain_impl : swapchain_impl {
 // ── Factory functions ─────────────────────────────────────────────────
 
 static std::unique_ptr<gfx_device_impl> create_ogl_device() {
-    HWND dummy = create_ogl_dummy_hwnd();
-    if (!dummy) return nullptr;
+    void* ctx = get_ogl_platform().create_context();
+    if (!ctx) return nullptr;
 
-    HDC hdc = GetDC(dummy);
-    if (!hdc) { DestroyWindow(dummy); return nullptr; }
-
-    if (!set_pixel_format(hdc)) {
-        ReleaseDC(dummy, hdc);
-        DestroyWindow(dummy);
-        return nullptr;
-    }
-
-    HGLRC ctx = wglCreateContext(hdc);
-    if (!ctx) {
-        ReleaseDC(dummy, hdc);
-        DestroyWindow(dummy);
-        return nullptr;
-    }
-
-    if (!wglMakeCurrent(hdc, ctx)) {
-        wglDeleteContext(ctx);
-        ReleaseDC(dummy, hdc);
-        DestroyWindow(dummy);
-        return nullptr;
-    }
-
-    auto impl        = std::make_unique<ogl_device_impl>();
-    impl->dummy_hwnd = dummy;
-    impl->dummy_hdc  = hdc;
-    impl->ctx        = ctx;
+    auto impl  = std::make_unique<ogl_device_impl>();
+    impl->ctx  = ctx;
     return impl;
 }
 
@@ -143,27 +109,14 @@ static std::unique_ptr<swapchain_impl> create_ogl_swapchain(
     gfx_device_impl& dev, void* native_handle, vec2i initial_size)
 {
     auto& ogl_dev = static_cast<ogl_device_impl&>(dev);
-    HWND hwnd = static_cast<HWND>(native_handle);
+    void* surface = get_ogl_platform().create_surface(native_handle, ogl_dev.ctx);
+    if (!surface) return nullptr;
 
-    HDC hdc = GetDC(hwnd);
-    if (!hdc) return nullptr;
-
-    // SetPixelFormat may only be called once per DC; attempt it
-    if (!set_pixel_format(hdc)) {
-        // Pixel format might already be set (e.g. second swapchain on same window) — try anyway
-        // If it truly fails, wglMakeCurrent will catch it
-    }
-
-    if (!wglMakeCurrent(hdc, ogl_dev.ctx)) {
-        ReleaseDC(hwnd, hdc);
-        return nullptr;
-    }
-
-    auto impl   = std::make_unique<ogl_swapchain_impl>();
-    impl->hwnd  = hwnd;
-    impl->hdc   = hdc;
-    impl->ctx   = ogl_dev.ctx;
-    impl->size  = initial_size;
+    auto impl    = std::make_unique<ogl_swapchain_impl>();
+    impl->native  = native_handle;
+    impl->surface = surface;
+    impl->ctx     = ogl_dev.ctx;
+    impl->size    = initial_size;
     return impl;
 }
 

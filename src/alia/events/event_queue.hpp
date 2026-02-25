@@ -1,5 +1,5 @@
-#ifndef EVENT_QUEUE_2F8D6E3A_4B1C_4D7E_9A5F_6E2B8C1D4A7E
-#define EVENT_QUEUE_2F8D6E3A_4B1C_4D7E_9A5F_6E2B8C1D4A7E
+#ifndef EVENT_QUEUE_FDC8A835_A095_46D3_9AAF_9D408FBD5C3B
+#define EVENT_QUEUE_FDC8A835_A095_46D3_9AAF_9D408FBD5C3B
 
 #include "event.hpp"
 #include "../util/any_deque.hpp"
@@ -12,12 +12,7 @@
 
 namespace alia {
 
-/* TODO optimize storage!!!
- * currently we waste:
- * - sizeof(void*) for event_slot_base vtable pointer
- * - sizeof(void*) for any_deque vtable pointer 
- * - 4 bytes for event_type_id (could be inside vtable)
- * - 
+/* TODO optimize storage
  */
 
 class event_source;
@@ -217,4 +212,4 @@ public:
 
 } // namespace alia
 
-#endif /* EVENT_QUEUE_2F8D6E3A_4B1C_4D7E_9A5F_6E2B8C1D4A7E */
+#endif /* EVENT_QUEUE_FDC8A835_A095_46D3_9AAF_9D408FBD5C3B */

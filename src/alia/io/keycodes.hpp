@@ -78,6 +78,15 @@ constexpr key_mod& operator&=(key_mod& a, key_mod b) {
     return a;
 }
 
+// mouse buttons
+enum class mouse_button : int {
+    left   = 0,
+    right  = 1,
+    middle = 2,
+    x1     = 3,  // extra button 1
+    x2     = 4,  // extra button 2
+};
+
 } // namespace alia
 
 #endif // ALIA_IO_KEYCODES_HPP

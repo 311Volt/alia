@@ -8,10 +8,12 @@
 #include <cstring>
 #include <memory>
 #include <stdexcept>
+#include <span>
 
 #include "gfx_device.hpp"
 
 namespace alia {
+
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -79,6 +81,19 @@ struct d3d9_swapchain_impl : swapchain_impl {
     HWND                 hwnd       = nullptr;
     vec2i                size       = {};
 
+    float transform_[16] = {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    };
+    float projection_[16] = {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    };
+
     ~d3d9_swapchain_impl() override {
         if (swap_chain) { swap_chain->Release(); swap_chain = nullptr; }
     }
@@ -90,12 +105,24 @@ struct d3d9_swapchain_impl : swapchain_impl {
         bb->Release();
     }
 
+    void set_transform(std::span<const float, 16> m) override {
+        std::copy(m.begin(), m.end(), transform_);
+    }
+    void get_transform(std::span<float, 16> m) const override {
+        std::copy(std::begin(transform_), std::end(transform_), m.begin());
+    }
+    void set_projection(std::span<const float, 16> m) override {
+        std::copy(m.begin(), m.end(), projection_);
+    }
+    void get_projection(std::span<float, 16> m) const override {
+        std::copy(std::begin(projection_), std::end(projection_), m.begin());
+    }
+
     void setup_render_states() {
-        // Transforms: identity so XYZ maps directly to clip space
-        D3DMATRIX id = make_identity();
-        device->SetTransform(D3DTS_WORLD,      &id);
-        device->SetTransform(D3DTS_VIEW,       &id);
-        device->SetTransform(D3DTS_PROJECTION, &id);
+        device->SetTransform(D3DTS_WORLD,      (const D3DMATRIX*)transform_);
+        D3DMATRIX view = make_identity();
+        device->SetTransform(D3DTS_VIEW,       &view);
+        device->SetTransform(D3DTS_PROJECTION, (const D3DMATRIX*)projection_);
 
         // Fixed-function state
         device->SetRenderState(D3DRS_LIGHTING,  FALSE);
@@ -117,9 +144,9 @@ struct d3d9_swapchain_impl : swapchain_impl {
 
     void draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2) override {
         d3d9_vertex verts[3] = {
-            {v0.position.x, v0.position.y, 0.5f, to_d3d_color(v0.col)},
-            {v1.position.x, v1.position.y, 0.5f, to_d3d_color(v1.col)},
-            {v2.position.x, v2.position.y, 0.5f, to_d3d_color(v2.col)},
+            {v0.position.x, v0.position.y, -0.5f, to_d3d_color(v0.col)},
+            {v1.position.x, v1.position.y, -0.5f, to_d3d_color(v1.col)},
+            {v2.position.x, v2.position.y, -0.5f, to_d3d_color(v2.col)},
         };
         device->SetFVF(d3d9_vertex::FVF);
         device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 1, verts, sizeof(d3d9_vertex));

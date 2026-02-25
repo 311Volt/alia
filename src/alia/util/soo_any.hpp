@@ -20,19 +20,19 @@ public:
 //
 // Uses type_erasure_vtable_t as its vtable. Vtable functions always receive
 // direct object pointers; soo_any manages heap allocation separately.
+//
+// Layout (two fields only):
+//   ops_ == nullptr  →  empty
+//   is_small()       →  object lives in buffer_
+//   else             →  heap pointer stored in buffer_
 template<std::size_t SmallBufferSize = 32>
 class soo_any {
-private:
-    enum class storage_type : unsigned char {
-        empty,
-        small,  // object lives in buffer_
-        large   // object lives on heap; ptr_ holds the raw allocation
-    };
+    static_assert(SmallBufferSize >= sizeof(void*),
+                  "SmallBufferSize must be at least sizeof(void*)");
 
+private:
     alignas(std::max_align_t) unsigned char buffer_[SmallBufferSize];
-    void*                               ptr_;     // heap allocation for large objects
-    const type_erasure_vtable_t*        ops_;
-    storage_type                        storage_;
+    const type_erasure_vtable_t*            ops_;
 
     template<typename T>
     static constexpr bool use_soo() noexcept {
@@ -41,50 +41,73 @@ private:
                std::is_nothrow_move_constructible_v<T>;
     }
 
+    // Caller must ensure ops_ != nullptr.
+    bool is_small() const noexcept {
+        return ops_->size  <= SmallBufferSize &&
+               ops_->align <= alignof(std::max_align_t) &&
+               ops_->is_nothrow_move;
+    }
+
+    void* load_ptr() noexcept {
+        void* p;
+        std::memcpy(&p, buffer_, sizeof(void*));
+        return p;
+    }
+    const void* load_ptr() const noexcept {
+        void* p;
+        std::memcpy(&p, buffer_, sizeof(void*));
+        return p;
+    }
+    void store_ptr(void* p) noexcept {
+        std::memcpy(buffer_, &p, sizeof(void*));
+    }
+
     // Returns pointer to the live object (regardless of storage path).
     void* get_ptr() noexcept {
-        return storage_ == storage_type::small ? static_cast<void*>(buffer_) : ptr_;
+        return is_small() ? static_cast<void*>(buffer_) : load_ptr();
     }
     const void* get_ptr() const noexcept {
-        return storage_ == storage_type::small ? static_cast<const void*>(buffer_) : ptr_;
+        return is_small() ? static_cast<const void*>(buffer_) : load_ptr();
     }
 
     // Runs the destructor and, for large objects, frees the heap allocation.
     void destroy() noexcept {
         if (!ops_) return;
-        void* obj = get_ptr();
-        ops_->destroy(obj);
-        if (storage_ == storage_type::large) {
-            ::operator delete(ptr_, std::align_val_t{ops_->align});
+        if (is_small()) {
+            ops_->destroy(buffer_);
+        } else {
+            void* p = load_ptr();
+            ops_->destroy(p);
+            ::operator delete(p, std::align_val_t{ops_->align});
         }
     }
 
 public:
     // ── Constructors ──────────────────────────────────────────────────
 
-    soo_any() noexcept : ptr_(nullptr), ops_(nullptr), storage_(storage_type::empty) {}
+    soo_any() noexcept : ops_(nullptr) {}
 
-    soo_any(const soo_any& other) : ops_(other.ops_), storage_(other.storage_) {
-        if (!ops_) { ptr_ = nullptr; return; }
-        if (storage_ == storage_type::small) {
+    soo_any(const soo_any& other) : ops_(other.ops_) {
+        if (!ops_) return;
+        if (other.is_small()) {
             ops_->copy_construct(buffer_, other.buffer_);
         } else {
-            ptr_ = ::operator new(ops_->size, std::align_val_t{ops_->align});
-            ops_->copy_construct(ptr_, other.ptr_);
+            void* p = ::operator new(ops_->size, std::align_val_t{ops_->align});
+            ops_->copy_construct(p, other.load_ptr());
+            store_ptr(p);
         }
     }
 
-    soo_any(soo_any&& other) noexcept : ops_(other.ops_), storage_(other.storage_) {
-        if (!ops_) { ptr_ = nullptr; }
-        else if (storage_ == storage_type::small) {
+    soo_any(soo_any&& other) noexcept : ops_(other.ops_) {
+        if (!ops_) { /* empty */ }
+        else if (other.is_small()) {
             ops_->move_construct(buffer_, other.buffer_);
             other.ops_->destroy(other.buffer_); // no dealloc needed
         } else {
-            ptr_ = other.ptr_;
-            other.ptr_ = nullptr;
+            // steal the heap pointer
+            std::memcpy(buffer_, other.buffer_, sizeof(void*));
         }
         other.ops_ = nullptr;
-        other.storage_ = storage_type::empty;
     }
 
     // Value constructor – constructs T in-place.
@@ -94,12 +117,11 @@ public:
         using D = std::decay_t<T>;
         ops_ = type_erasure_vtable_for<D>();
         if constexpr (use_soo<D>()) {
-            storage_ = storage_type::small;
             ::new(buffer_) D(std::forward<T>(value));
         } else {
-            storage_ = storage_type::large;
-            ptr_ = ::operator new(sizeof(D), std::align_val_t{alignof(D)});
-            ::new(ptr_) D(std::forward<T>(value));
+            void* p = ::operator new(sizeof(D), std::align_val_t{alignof(D)});
+            ::new(p) D(std::forward<T>(value));
+            store_ptr(p);
         }
     }
 
@@ -108,16 +130,12 @@ public:
     // extracting an event payload from a type-erased queue).
     soo_any(move_construct_tag_t, const type_erasure_vtable_t* vt, void* obj) {
         ops_ = vt;
-        bool small = vt->size <= SmallBufferSize &&
-                     vt->align <= alignof(std::max_align_t) &&
-                     vt->is_nothrow_move;
-        if (small) {
-            storage_ = storage_type::small;
+        if (is_small()) {
             vt->move_construct(buffer_, obj);
         } else {
-            storage_ = storage_type::large;
-            ptr_ = ::operator new(vt->size, std::align_val_t{vt->align});
-            vt->move_construct(ptr_, obj);
+            void* p = ::operator new(vt->size, std::align_val_t{vt->align});
+            vt->move_construct(p, obj);
+            store_ptr(p);
         }
     }
 
@@ -133,18 +151,15 @@ public:
     soo_any& operator=(soo_any&& other) noexcept {
         if (this == &other) return *this;
         destroy();
-        ops_     = other.ops_;
-        storage_ = other.storage_;
-        if (!ops_) { ptr_ = nullptr; }
-        else if (storage_ == storage_type::small) {
+        ops_ = other.ops_;
+        if (!ops_) { /* empty */ }
+        else if (other.is_small()) {
             ops_->move_construct(buffer_, other.buffer_);
             other.ops_->destroy(other.buffer_);
         } else {
-            ptr_ = other.ptr_;
-            other.ptr_ = nullptr;
+            std::memcpy(buffer_, other.buffer_, sizeof(void*));
         }
         other.ops_ = nullptr;
-        other.storage_ = storage_type::empty;
         return *this;
     }
 
@@ -164,14 +179,13 @@ public:
         destroy();
         ops_ = type_erasure_vtable_for<D>();
         if constexpr (use_soo<D>()) {
-            storage_ = storage_type::small;
             ::new(buffer_) D(std::forward<Args>(args)...);
             return *reinterpret_cast<D*>(buffer_);
         } else {
-            storage_ = storage_type::large;
-            ptr_ = ::operator new(sizeof(D), std::align_val_t{alignof(D)});
-            ::new(ptr_) D(std::forward<Args>(args)...);
-            return *static_cast<D*>(ptr_);
+            void* p = ::operator new(sizeof(D), std::align_val_t{alignof(D)});
+            ::new(p) D(std::forward<Args>(args)...);
+            store_ptr(p);
+            return *static_cast<D*>(p);
         }
     }
 
@@ -179,9 +193,7 @@ public:
 
     void reset() noexcept {
         destroy();
-        ops_     = nullptr;
-        storage_ = storage_type::empty;
-        ptr_     = nullptr;
+        ops_ = nullptr;
     }
 
     void swap(soo_any& other) noexcept {

@@ -27,7 +27,12 @@ check_cxx_source_compiles([[
 file(GLOB_RECURSE alia_headers "src/*.hpp" "src/*.h")
 file(GLOB_RECURSE alia_sources "src/*.cpp" "src/*.c")
 
-add_library(alia ${alia_headers} ${alia_sources})
+option(ALIA_STATIC "Build alia as a static library" ON)
+if(ALIA_STATIC)
+  add_library(alia STATIC ${alia_headers} ${alia_sources})
+else()
+  add_library(alia SHARED ${alia_headers} ${alia_sources})
+endif()
 
 # include("backends.cmake")
 
@@ -61,6 +66,24 @@ endif()
 target_include_directories(alia PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:include>)
+
+# Platform backend options
+if(WIN32)
+  option(ALIA_COMPILE_PLATFORM_BACKEND_WIN32 "Compile Win32 platform backend" ON)
+  option(ALIA_COMPILE_PLATFORM_BACKEND_X11   "Compile X11 platform backend"   OFF)
+else()
+  option(ALIA_COMPILE_PLATFORM_BACKEND_WIN32 "Compile Win32 platform backend" OFF)
+  option(ALIA_COMPILE_PLATFORM_BACKEND_X11   "Compile X11 platform backend"   ON)
+endif()
+
+if(ALIA_COMPILE_PLATFORM_BACKEND_WIN32)
+  target_compile_definitions(alia PUBLIC ALIA_COMPILE_PLATFORM_BACKEND_WIN32)
+endif()
+
+if(ALIA_COMPILE_PLATFORM_BACKEND_X11)
+  target_compile_definitions(alia PUBLIC ALIA_COMPILE_PLATFORM_BACKEND_X11)
+  target_link_libraries(alia PRIVATE X11)
+endif()
 
 # Graphics backend options
 if(WIN32)

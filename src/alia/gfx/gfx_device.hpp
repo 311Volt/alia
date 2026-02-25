@@ -3,18 +3,13 @@
 
 #include "../core/vec.hpp"
 #include "../core/color.hpp"
+#include "vertex.hpp"
 #include <memory>
+#include <span>
 
 namespace alia {
 
 class window;
-
-// ── Vertex type ───────────────────────────────────────────────────────
-
-struct colored_vertex {
-    vec2f position;  // NDC coordinates: x,y in [-1, 1]
-    color col;       // RGB(A) color
-};
 
 // ── Backend selection ─────────────────────────────────────────────────
 
@@ -37,7 +32,28 @@ struct swapchain_impl {
     virtual void draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2) = 0;
     virtual void present() = 0;
     virtual void on_resize(vec2i new_size) = 0;
+
+    virtual void set_transform(std::span<const float, 16> m) = 0;
+    virtual void get_transform(std::span<float, 16> m) const = 0;
+    virtual void set_projection(std::span<const float, 16> m) = 0;
+    virtual void get_projection(std::span<float, 16> m) const = 0;
 };
+
+// ── OpenGL platform ops (internal) ───────────────────────────────────
+// Platform backends provide this to decouple backend_ogl.cpp from OS headers.
+
+struct ogl_platform_ops {
+    void* (*create_context)();                                      // → opaque ctx (HGLRC on Win32)
+    void  (*destroy_context)(void* ctx);
+    void* (*create_surface)(void* native_handle, void* ctx);        // → opaque surface (HDC on Win32)
+    void  (*destroy_surface)(void* native_handle, void* surface);
+    void  (*make_current)(void* surface, void* ctx);
+    void  (*swap_buffers)(void* surface);
+    void  (*make_none_current)();
+};
+
+void                    register_ogl_platform(ogl_platform_ops ops);
+const ogl_platform_ops& get_ogl_platform();
 
 // ── Backend registry ──────────────────────────────────────────────────
 
@@ -57,9 +73,9 @@ void register_gfx_backend(gfx_backend_entry entry);
 class gfx_device {
 public:
     gfx_device() = default;
-    ~gfx_device() = default;
-    gfx_device(gfx_device&&) noexcept = default;
-    gfx_device& operator=(gfx_device&&) noexcept = default;
+    ~gfx_device();
+    gfx_device(gfx_device&&) noexcept;
+    gfx_device& operator=(gfx_device&&) noexcept;
     gfx_device(const gfx_device&) = delete;
     gfx_device& operator=(const gfx_device&) = delete;
 
@@ -82,9 +98,9 @@ private:
 class swapchain {
 public:
     swapchain() = default;
-    ~swapchain() = default;
-    swapchain(swapchain&&) noexcept = default;
-    swapchain& operator=(swapchain&&) noexcept = default;
+    ~swapchain();
+    swapchain(swapchain&&) noexcept;
+    swapchain& operator=(swapchain&&) noexcept;
     swapchain(const swapchain&) = delete;
     swapchain& operator=(const swapchain&) = delete;
 
@@ -102,10 +118,30 @@ public:
     // Call when the window is resized
     void on_resize(vec2i new_size);
 
+    void set_transform(std::span<const float, 16> m);
+    void get_transform(std::span<float, 16> m) const;
+    void set_projection(std::span<const float, 16> m);
+    void get_projection(std::span<float, 16> m) const;
+
 private:
     std::unique_ptr<swapchain_impl> impl_;
     explicit swapchain(std::unique_ptr<swapchain_impl> impl) : impl_(std::move(impl)) {}
 };
+
+// ── Context API ───────────────────────────────────────────────────────
+
+inline thread_local gfx_device* tl_current_device = nullptr;
+inline thread_local swapchain*  tl_current_swapchain = nullptr;
+inline thread_local window*     tl_current_window = nullptr;
+
+void        make_current(gfx_device& d);
+void        make_current(swapchain& s);
+void        make_current(window& w);
+gfx_device& current_device();
+swapchain&  current_swapchain();
+window&     current_window();
+
+void        on_resize(vec2i new_size);
 
 } // namespace alia
 
