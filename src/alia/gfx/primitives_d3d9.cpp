@@ -1,94 +1,150 @@
 #ifdef ALIA_COMPILE_GFX_BACKEND_D3D9
 
 #include "detail/d3d9_backend.hpp"
+#include <unordered_map>
+#include <typeindex>
+#include <any>
 #include <vector>
 
 namespace alia {
 
-// ── Vertex conversion helper ──────────────────────────────────────────
+// ── Compiled vertex declaration cache ────────────────────────────────
 
-static std::vector<d3d9_vertex> to_d3d9(std::span<const colored_vertex> src) {
-    std::vector<d3d9_vertex> out;
-    out.reserve(src.size());
-    for (const auto& v : src)
-        out.push_back({v.position.x, v.position.y, -0.5f, to_d3d_color(v.col)});
-    return out;
+struct d3d9_compiled_vtx {
+    IDirect3DVertexDeclaration9* decl = nullptr;
+};
+
+static std::unordered_map<std::type_index, std::any>& vtx_cache() {
+    static std::unordered_map<std::type_index, std::any> cache;
+    return cache;
 }
 
-// ── Single triangle ───────────────────────────────────────────────────
+// Single-slot cache: avoids the map lookup when the same type is used consecutively.
+static std::type_index              s_last_type{typeid(void)};
+static IDirect3DVertexDeclaration9* s_last_decl = nullptr;
 
-void d3d9_swapchain_impl::draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2) {
-    d3d9_vertex verts[3] = {
-        {v0.position.x, v0.position.y, -0.5f, to_d3d_color(v0.col)},
-        {v1.position.x, v1.position.y, -0.5f, to_d3d_color(v1.col)},
-        {v2.position.x, v2.position.y, -0.5f, to_d3d_color(v2.col)},
-    };
-    device->SetFVF(d3d9_vertex::FVF);
-    device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 1, verts, sizeof(d3d9_vertex));
-}
-
-// ── Unindexed bulk ────────────────────────────────────────────────────
-
-void d3d9_swapchain_impl::draw_triangles(std::span<const colored_vertex> vertices) {
-    const UINT n = (UINT)vertices.size();
-    if (n < 3) return;
-    auto verts = to_d3d9(vertices);
-    device->SetFVF(d3d9_vertex::FVF);
-    device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, n / 3, verts.data(), sizeof(d3d9_vertex));
-}
-
-void d3d9_swapchain_impl::draw_triangle_strip(std::span<const colored_vertex> vertices) {
-    const UINT n = (UINT)vertices.size();
-    if (n < 3) return;
-    auto verts = to_d3d9(vertices);
-    device->SetFVF(d3d9_vertex::FVF);
-    device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, n - 2, verts.data(), sizeof(d3d9_vertex));
-}
-
-void d3d9_swapchain_impl::draw_triangle_fan(std::span<const colored_vertex> vertices) {
-    const UINT n = (UINT)vertices.size();
-    if (n < 3) return;
-    auto verts = to_d3d9(vertices);
-    device->SetFVF(d3d9_vertex::FVF);
-    device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, n - 2, verts.data(), sizeof(d3d9_vertex));
-}
-
-// ── Indexed bulk ──────────────────────────────────────────────────────
-
-void d3d9_swapchain_impl::draw_triangles(
-    std::span<const colored_vertex> vertices, std::span<const uint32_t> indices)
+static IDirect3DVertexDeclaration9* get_or_compile(
+    IDirect3DDevice9* device,
+    std::type_index vtx_type,
+    std::span<const vertex_element> elements)
 {
-    const UINT ni = (UINT)indices.size();
-    const UINT nv = (UINT)vertices.size();
-    if (ni < 3 || nv == 0) return;
-    auto verts = to_d3d9(vertices);
-    device->SetFVF(d3d9_vertex::FVF);
-    device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST, 0, nv, ni / 3,
-        indices.data(), D3DFMT_INDEX32, verts.data(), sizeof(d3d9_vertex));
+    if (vtx_type == s_last_type)
+        return s_last_decl;
+
+    auto& cache = vtx_cache();
+    auto it = cache.find(vtx_type);
+    if (it != cache.end()) {
+        s_last_type = vtx_type;
+        s_last_decl = std::any_cast<d3d9_compiled_vtx&>(it->second).decl;
+        return s_last_decl;
+    }
+
+    // Build D3DVERTEXELEMENT9 array from vertex_element descriptors
+    std::vector<D3DVERTEXELEMENT9> d3d_elems;
+    for (const auto& e : elements) {
+        D3DVERTEXELEMENT9 d3d_e = {};
+        d3d_e.Stream = 0;
+        d3d_e.Offset = static_cast<WORD>(e.offset);
+        d3d_e.Method = D3DDECLMETHOD_DEFAULT;
+
+        switch (e.attribute) {
+        case vertex_attr::position:
+            d3d_e.Usage = D3DDECLUSAGE_POSITION;
+            d3d_e.UsageIndex = 0;
+            break;
+        case vertex_attr::color_attr:
+            d3d_e.Usage = D3DDECLUSAGE_COLOR;
+            d3d_e.UsageIndex = 0;
+            break;
+        case vertex_attr::tex_coord:
+            d3d_e.Usage = D3DDECLUSAGE_TEXCOORD;
+            d3d_e.UsageIndex = 0;
+            break;
+        }
+
+        switch (e.storage) {
+        case vertex_storage::float_2: d3d_e.Type = D3DDECLTYPE_FLOAT2; break;
+        case vertex_storage::float_3: d3d_e.Type = D3DDECLTYPE_FLOAT3; break;
+        case vertex_storage::float_4: d3d_e.Type = D3DDECLTYPE_FLOAT4; break;
+        }
+
+        d3d_elems.push_back(d3d_e);
+    }
+    d3d_elems.push_back(D3DDECL_END());
+
+    IDirect3DVertexDeclaration9* decl = nullptr;
+    HRESULT hr = device->CreateVertexDeclaration(d3d_elems.data(), &decl);
+    if (FAILED(hr))
+        return nullptr;
+
+    cache[vtx_type] = d3d9_compiled_vtx{decl};
+    s_last_type = vtx_type;
+    s_last_decl = decl;
+    return decl;
 }
 
-void d3d9_swapchain_impl::draw_triangle_strip(
-    std::span<const colored_vertex> vertices, std::span<const uint32_t> indices)
-{
-    const UINT ni = (UINT)indices.size();
-    const UINT nv = (UINT)vertices.size();
-    if (ni < 3 || nv == 0) return;
-    auto verts = to_d3d9(vertices);
-    device->SetFVF(d3d9_vertex::FVF);
-    device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLESTRIP, 0, nv, ni - 2,
-        indices.data(), D3DFMT_INDEX32, verts.data(), sizeof(d3d9_vertex));
+// ── Helpers ──────────────────────────────────────────────────────────
+
+static D3DPRIMITIVETYPE to_d3d_prim(prim_type type) {
+    switch (type) {
+    case prim_type::triangle_list:  return D3DPT_TRIANGLELIST;
+    case prim_type::triangle_strip: return D3DPT_TRIANGLESTRIP;
+    case prim_type::triangle_fan:   return D3DPT_TRIANGLEFAN;
+    }
+    return D3DPT_TRIANGLELIST;
 }
 
-void d3d9_swapchain_impl::draw_triangle_fan(
-    std::span<const colored_vertex> vertices, std::span<const uint32_t> indices)
+static UINT compute_prim_count(prim_type type, int vertex_count) {
+    switch (type) {
+    case prim_type::triangle_list:  return static_cast<UINT>(vertex_count) / 3;
+    case prim_type::triangle_strip: return static_cast<UINT>(vertex_count) - 2;
+    case prim_type::triangle_fan:   return static_cast<UINT>(vertex_count) - 2;
+    }
+    return 0;
+}
+
+// ── Drawing ──────────────────────────────────────────────────────────
+
+void d3d9_swapchain_impl::draw_prim(
+    prim_type type,
+    const void* vertices, int count, int stride,
+    std::type_index vtx_type,
+    std::span<const vertex_element> elements)
 {
-    const UINT ni = (UINT)indices.size();
-    const UINT nv = (UINT)vertices.size();
-    if (ni < 3 || nv == 0) return;
-    auto verts = to_d3d9(vertices);
-    device->SetFVF(d3d9_vertex::FVF);
-    device->DrawIndexedPrimitiveUP(D3DPT_TRIANGLEFAN, 0, nv, ni - 2,
-        indices.data(), D3DFMT_INDEX32, verts.data(), sizeof(d3d9_vertex));
+    if (count < 3) return;
+
+    auto* decl = get_or_compile(device, vtx_type, elements);
+    if (!decl) return;
+
+    device->SetVertexDeclaration(decl);
+    device->DrawPrimitiveUP(to_d3d_prim(type),
+        compute_prim_count(type, count),
+        vertices,
+        static_cast<UINT>(stride));
+}
+
+void d3d9_swapchain_impl::draw_indexed_prim(
+    prim_type type,
+    const void* vertices, int count, int stride,
+    std::span<const uint32_t> indices,
+    std::type_index vtx_type,
+    std::span<const vertex_element> elements)
+{
+    const UINT ni = static_cast<UINT>(indices.size());
+    if (ni < 3 || count == 0) return;
+
+    auto* decl = get_or_compile(device, vtx_type, elements);
+    if (!decl) return;
+
+    device->SetVertexDeclaration(decl);
+    device->DrawIndexedPrimitiveUP(to_d3d_prim(type),
+        0,
+        static_cast<UINT>(count),
+        compute_prim_count(type, static_cast<int>(ni)),
+        indices.data(),
+        D3DFMT_INDEX32,
+        vertices,
+        static_cast<UINT>(stride));
 }
 
 } // namespace alia

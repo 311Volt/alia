@@ -11,17 +11,6 @@ void present() {
     current_swapchain().present();
 }
 
-void draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2) {
-    current_swapchain().draw_triangle(v0, v1, v2);
-}
-
-void draw_triangles(std::span<const colored_vertex> v)                                     { current_swapchain().draw_triangles(v); }
-void draw_triangle_strip(std::span<const colored_vertex> v)                                { current_swapchain().draw_triangle_strip(v); }
-void draw_triangle_fan(std::span<const colored_vertex> v)                                  { current_swapchain().draw_triangle_fan(v); }
-void draw_triangles(std::span<const colored_vertex> v, std::span<const uint32_t> idx)      { current_swapchain().draw_triangles(v, idx); }
-void draw_triangle_strip(std::span<const colored_vertex> v, std::span<const uint32_t> idx) { current_swapchain().draw_triangle_strip(v, idx); }
-void draw_triangle_fan(std::span<const colored_vertex> v, std::span<const uint32_t> idx)   { current_swapchain().draw_triangle_fan(v, idx); }
-
 void fill_rect(rect_f r, color c) {
     colored_vertex v0{{r.left(), r.top()}, c};
     colored_vertex v1{{r.right(), r.top()}, c};

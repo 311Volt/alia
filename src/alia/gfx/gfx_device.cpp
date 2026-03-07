@@ -183,10 +183,6 @@ namespace alia {
         if (impl_)
             impl_->clear(c);
     }
-    void swapchain::draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2) {
-        if (impl_)
-            impl_->draw_triangle(v0, v1, v2);
-    }
     void swapchain::present() {
         if (impl_)
             impl_->present();
@@ -213,29 +209,21 @@ namespace alia {
             impl_->get_projection(m);
     }
 
-    void swapchain::draw_triangles(std::span<const colored_vertex> v) {
+    void swapchain::draw_prim(prim_type type,
+                              const void* vertices, int count, int stride,
+                              std::type_index vtx_type,
+                              std::span<const vertex_element> elements) {
         if (impl_)
-            impl_->draw_triangles(v);
+            impl_->draw_prim(type, vertices, count, stride, vtx_type, elements);
     }
-    void swapchain::draw_triangle_strip(std::span<const colored_vertex> v) {
+
+    void swapchain::draw_indexed_prim(prim_type type,
+                                      const void* vertices, int count, int stride,
+                                      std::span<const uint32_t> indices,
+                                      std::type_index vtx_type,
+                                      std::span<const vertex_element> elements) {
         if (impl_)
-            impl_->draw_triangle_strip(v);
-    }
-    void swapchain::draw_triangle_fan(std::span<const colored_vertex> v) {
-        if (impl_)
-            impl_->draw_triangle_fan(v);
-    }
-    void swapchain::draw_triangles(std::span<const colored_vertex> v, std::span<const uint32_t> idx) {
-        if (impl_)
-            impl_->draw_triangles(v, idx);
-    }
-    void swapchain::draw_triangle_strip(std::span<const colored_vertex> v, std::span<const uint32_t> idx) {
-        if (impl_)
-            impl_->draw_triangle_strip(v, idx);
-    }
-    void swapchain::draw_triangle_fan(std::span<const colored_vertex> v, std::span<const uint32_t> idx) {
-        if (impl_)
-            impl_->draw_triangle_fan(v, idx);
+            impl_->draw_indexed_prim(type, vertices, count, stride, indices, vtx_type, elements);
     }
 
 } // namespace alia

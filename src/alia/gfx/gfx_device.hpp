@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <typeindex>
 
 namespace alia {
 
@@ -27,10 +28,15 @@ struct gfx_device_impl {
     virtual const char* backend_name() const noexcept = 0;
 };
 
+enum class prim_type {
+    triangle_list,
+    triangle_strip,
+    triangle_fan,
+};
+
 struct swapchain_impl {
     virtual ~swapchain_impl() = default;
     virtual void clear(color c) = 0;
-    virtual void draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2) = 0;
     virtual void present() = 0;
     virtual void on_resize(vec2i new_size) = 0;
 
@@ -39,12 +45,16 @@ struct swapchain_impl {
     virtual void set_projection(std::span<const float, 16> m) = 0;
     virtual void get_projection(std::span<float, 16> m) const = 0;
 
-    virtual void draw_triangles(std::span<const colored_vertex> vertices) = 0;
-    virtual void draw_triangle_strip(std::span<const colored_vertex> vertices) = 0;
-    virtual void draw_triangle_fan(std::span<const colored_vertex> vertices) = 0;
-    virtual void draw_triangles(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices) = 0;
-    virtual void draw_triangle_strip(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices) = 0;
-    virtual void draw_triangle_fan(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices) = 0;
+    virtual void draw_prim(prim_type type,
+                           const void* vertices, int count, int stride,
+                           std::type_index vtx_type,
+                           std::span<const vertex_element> elements) = 0;
+
+    virtual void draw_indexed_prim(prim_type type,
+                                   const void* vertices, int count, int stride,
+                                   std::span<const uint32_t> indices,
+                                   std::type_index vtx_type,
+                                   std::span<const vertex_element> elements) = 0;
 };
 
 // ── OpenGL platform ops (internal) ───────────────────────────────────
@@ -120,14 +130,18 @@ public:
 
     // Per-frame API: clear → draw → present
     void clear(color c);
-    void draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2);
-    void draw_triangles(std::span<const colored_vertex> vertices);
-    void draw_triangle_strip(std::span<const colored_vertex> vertices);
-    void draw_triangle_fan(std::span<const colored_vertex> vertices);
-    void draw_triangles(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices);
-    void draw_triangle_strip(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices);
-    void draw_triangle_fan(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices);
     void present();
+
+    void draw_prim(prim_type type,
+                   const void* vertices, int count, int stride,
+                   std::type_index vtx_type,
+                   std::span<const vertex_element> elements);
+
+    void draw_indexed_prim(prim_type type,
+                           const void* vertices, int count, int stride,
+                           std::span<const uint32_t> indices,
+                           std::type_index vtx_type,
+                           std::span<const vertex_element> elements);
 
     // Call when the window is resized
     void on_resize(vec2i new_size);

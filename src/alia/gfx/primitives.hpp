@@ -1,28 +1,79 @@
-#ifndef PRIMITIVES_C23762A7_E841_4445_87DF_B0FD558E484E
-#define PRIMITIVES_C23762A7_E841_4445_87DF_B0FD558E484E
+#ifndef PRIMITIVES_D9F74B98_135A_46B0_8FD9_AE94ABAE9905
+#define PRIMITIVES_D9F74B98_135A_46B0_8FD9_AE94ABAE9905
 
-#include "vertex.hpp"
+#include "gfx_device.hpp"
 #include "../core/rect.hpp"
 #include <cstdint>
 #include <span>
+#include <typeinfo>
 
 namespace alia {
 
 void clear(color c);
 void present();
 
-// Single triangle
-void draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2);
+// ── Template drawing API ─────────────────────────────────────────────
 
-// Unindexed bulk
-void draw_triangles(std::span<const colored_vertex> vertices);
-void draw_triangle_strip(std::span<const colored_vertex> vertices);
-void draw_triangle_fan(std::span<const colored_vertex> vertices);
+template<vertex_type TVertex>
+void draw_triangle(TVertex v0, TVertex v1, TVertex v2) {
+    TVertex verts[3] = {v0, v1, v2};
+    static constexpr auto elems = TVertex::elements();
+    current_swapchain().draw_prim(prim_type::triangle_list,
+        verts, 3, static_cast<int>(sizeof(TVertex)),
+        typeid(TVertex), elems);
+}
 
-// Indexed bulk
-void draw_triangles(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices);
-void draw_triangle_strip(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices);
-void draw_triangle_fan(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices);
+template<vertex_type TVertex>
+void draw_triangles(std::span<const TVertex> vertices) {
+    static constexpr auto elems = TVertex::elements();
+    current_swapchain().draw_prim(prim_type::triangle_list,
+        vertices.data(), static_cast<int>(vertices.size()), static_cast<int>(sizeof(TVertex)),
+        typeid(TVertex), elems);
+}
+
+template<vertex_type TVertex>
+void draw_triangle_strip(std::span<const TVertex> vertices) {
+    static constexpr auto elems = TVertex::elements();
+    current_swapchain().draw_prim(prim_type::triangle_strip,
+        vertices.data(), static_cast<int>(vertices.size()), static_cast<int>(sizeof(TVertex)),
+        typeid(TVertex), elems);
+}
+
+template<vertex_type TVertex>
+void draw_triangle_fan(std::span<const TVertex> vertices) {
+    static constexpr auto elems = TVertex::elements();
+    current_swapchain().draw_prim(prim_type::triangle_fan,
+        vertices.data(), static_cast<int>(vertices.size()), static_cast<int>(sizeof(TVertex)),
+        typeid(TVertex), elems);
+}
+
+// ── Indexed variants ─────────────────────────────────────────────────
+
+template<vertex_type TVertex>
+void draw_triangles(std::span<const TVertex> vertices, std::span<const uint32_t> indices) {
+    static constexpr auto elems = TVertex::elements();
+    current_swapchain().draw_indexed_prim(prim_type::triangle_list,
+        vertices.data(), static_cast<int>(vertices.size()), static_cast<int>(sizeof(TVertex)),
+        indices, typeid(TVertex), elems);
+}
+
+template<vertex_type TVertex>
+void draw_triangle_strip(std::span<const TVertex> vertices, std::span<const uint32_t> indices) {
+    static constexpr auto elems = TVertex::elements();
+    current_swapchain().draw_indexed_prim(prim_type::triangle_strip,
+        vertices.data(), static_cast<int>(vertices.size()), static_cast<int>(sizeof(TVertex)),
+        indices, typeid(TVertex), elems);
+}
+
+template<vertex_type TVertex>
+void draw_triangle_fan(std::span<const TVertex> vertices, std::span<const uint32_t> indices) {
+    static constexpr auto elems = TVertex::elements();
+    current_swapchain().draw_indexed_prim(prim_type::triangle_fan,
+        vertices.data(), static_cast<int>(vertices.size()), static_cast<int>(sizeof(TVertex)),
+        indices, typeid(TVertex), elems);
+}
+
+// ── Convenience shapes ───────────────────────────────────────────────
 
 void fill_rect(rect_f r, color c);
 void draw_rect(rect_f r, color c, float thickness = 1.0f);
@@ -30,4 +81,4 @@ void draw_line(vec2f a, vec2f b, color c, float thickness = 1.0f);
 
 } // namespace alia
 
-#endif /* PRIMITIVES_C23762A7_E841_4445_87DF_B0FD558E484E */
+#endif /* PRIMITIVES_D9F74B98_135A_46B0_8FD9_AE94ABAE9905 */

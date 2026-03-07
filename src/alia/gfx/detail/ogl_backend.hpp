@@ -12,7 +12,7 @@
 
 namespace alia {
 
-// ── OpenGL device impl ────────────────────────────────────────────────
+// ── OpenGL device impl ──────────────────────────────────────────────
 
 struct ogl_device_impl : gfx_device_impl {
     void* ctx = nullptr;  // opaque context handle (HGLRC on Win32)
@@ -21,7 +21,7 @@ struct ogl_device_impl : gfx_device_impl {
     const char* backend_name() const noexcept override { return "opengl"; }
 };
 
-// ── OpenGL swapchain impl ─────────────────────────────────────────────
+// ── OpenGL swapchain impl ───────────────────────────────────────────
 
 struct ogl_swapchain_impl : swapchain_impl {
     void*  native  = nullptr;  // native window handle (for destroy_surface)
@@ -53,13 +53,16 @@ struct ogl_swapchain_impl : swapchain_impl {
     void present() override;
     void on_resize(vec2i new_size) override;
 
-    void draw_triangle(colored_vertex v0, colored_vertex v1, colored_vertex v2) override;
-    void draw_triangles(std::span<const colored_vertex> vertices) override;
-    void draw_triangle_strip(std::span<const colored_vertex> vertices) override;
-    void draw_triangle_fan(std::span<const colored_vertex> vertices) override;
-    void draw_triangles(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices) override;
-    void draw_triangle_strip(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices) override;
-    void draw_triangle_fan(std::span<const colored_vertex> vertices, std::span<const uint32_t> indices) override;
+    void draw_prim(prim_type type,
+                   const void* vertices, int count, int stride,
+                   std::type_index vtx_type,
+                   std::span<const vertex_element> elements) override;
+
+    void draw_indexed_prim(prim_type type,
+                           const void* vertices, int count, int stride,
+                           std::span<const uint32_t> indices,
+                           std::type_index vtx_type,
+                           std::span<const vertex_element> elements) override;
 };
 
 } // namespace alia
