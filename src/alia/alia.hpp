@@ -15,9 +15,6 @@
 
 #include "io/keycodes.hpp"
 #include "io/keyboard.hpp"
-#include "io/mouse.hpp"
-#include "io/joystick.hpp"
-#include "io/touch.hpp"
 
 namespace alia {
 

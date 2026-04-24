@@ -4,7 +4,6 @@
 #ifdef ALIA_COMPILE_GFX_BACKEND_OPENGL
 
 #include <GL/gl.h>
-#include <algorithm>
 #include <cstdint>
 #include <span>
 
