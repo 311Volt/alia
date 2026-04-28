@@ -9,6 +9,7 @@
 #include <d3d9.h>
 #include <algorithm>
 #include <cstdint>
+#include <memory>
 #include <span>
 
 #include "../gfx_device.hpp"
@@ -24,6 +25,35 @@ inline DWORD to_d3d_color(color c) {
     return D3DCOLOR_RGBA(clamp(c.r), clamp(c.g), clamp(c.b), clamp(c.a));
 }
 
+// ── D3D9 texture impl ───────────────────────────────────────────────
+
+struct d3d9_texture_impl : texture_impl {
+    IDirect3DDevice9*  device_     = nullptr;  // non-owning
+    IDirect3DTexture9* texture_    = nullptr;
+    int                width_      = 0;
+    int                height_     = 0;
+    int                mip_levels_ = 1;
+    bool               autogen_    = false;   // created with D3DUSAGE_AUTOGENMIPMAP
+    pixel_format       fmt_        = pixel_format::bgra8888;
+    sampler_state      sampler_    = {};
+
+    ~d3d9_texture_impl() override;
+
+    pixel_format  format()     const noexcept override { return fmt_; }
+    int           width()      const noexcept override { return width_; }
+    int           height()     const noexcept override { return height_; }
+    int           mip_levels() const noexcept override { return mip_levels_; }
+    sampler_state sampler()    const noexcept override { return sampler_; }
+
+    // Sampler state is stored and applied per-stage at bind time (D3D9 limitation).
+    void set_sampler(const sampler_state& s) override { sampler_ = s; }
+
+    bool lock(rect_i region, int level, texture_lock_info& out) override;
+    void unlock(const texture_lock_info& info, bool wrote) override;
+    void generate_mipmaps() override;
+    std::unique_ptr<texture_impl> clone() const override;
+};
+
 // ── D3D9 device impl ────────────────────────────────────────────────
 
 struct d3d9_device_impl : gfx_device_impl {
@@ -33,6 +63,9 @@ struct d3d9_device_impl : gfx_device_impl {
 
     ~d3d9_device_impl() override;
     const char* backend_name() const noexcept override { return "d3d9"; }
+
+    std::unique_ptr<texture_impl> create_texture(
+        pixel_format fmt, vec2i size, int mip_levels) override;
 };
 
 // ── D3D9 swapchain impl ─────────────────────────────────────────────

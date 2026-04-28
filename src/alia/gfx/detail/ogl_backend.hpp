@@ -4,12 +4,45 @@
 #ifdef ALIA_COMPILE_GFX_BACKEND_OPENGL
 
 #include <GL/gl.h>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
 
 #include "../gfx_device.hpp"
 
 namespace alia {
+
+// ── OpenGL texture impl ──────────────────────────────────────────────
+
+struct ogl_texture_impl : texture_impl {
+    GLuint       tex_id          = 0;
+    int          width_          = 0;
+    int          height_         = 0;
+    int          mip_levels_     = 1;
+    pixel_format fmt_            = pixel_format::rgba8888;
+    sampler_state sampler_       = {};
+
+    // CPU staging buffer for lock/unlock (glGetTexImage / glTexSubImage2D)
+    std::unique_ptr<std::byte[]> stage_buf_;
+    std::size_t                  stage_buf_bytes_ = 0;
+
+    ~ogl_texture_impl() override;
+
+    pixel_format  format()     const noexcept override { return fmt_; }
+    int           width()      const noexcept override { return width_; }
+    int           height()     const noexcept override { return height_; }
+    int           mip_levels() const noexcept override { return mip_levels_; }
+    sampler_state sampler()    const noexcept override { return sampler_; }
+
+    void set_sampler(const sampler_state& s) override;
+    bool lock(rect_i region, int level, texture_lock_info& out) override;
+    void unlock(const texture_lock_info& info, bool wrote) override;
+    void generate_mipmaps() override;
+    std::unique_ptr<texture_impl> clone() const override;
+
+    void apply_sampler() noexcept;
+};
 
 // ── OpenGL device impl ──────────────────────────────────────────────
 
@@ -18,6 +51,9 @@ struct ogl_device_impl : gfx_device_impl {
 
     ~ogl_device_impl() override;
     const char* backend_name() const noexcept override { return "opengl"; }
+
+    std::unique_ptr<texture_impl> create_texture(
+        pixel_format fmt, vec2i size, int mip_levels) override;
 };
 
 // ── OpenGL swapchain impl ───────────────────────────────────────────

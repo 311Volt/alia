@@ -1,9 +1,12 @@
-#ifndef ALIA_GFX_GFX_DEVICE_HPP
-#define ALIA_GFX_GFX_DEVICE_HPP
+#ifndef GFX_DEVICE_EEFA16EE_8C09_453F_9EBB_D094DD1124EA
+#define GFX_DEVICE_EEFA16EE_8C09_453F_9EBB_D094DD1124EA
 
 #include "../core/vec.hpp"
+#include "../core/rect.hpp"
 #include "../core/color.hpp"
 #include "vertex.hpp"
+#include "pixel.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -21,11 +24,72 @@ enum class gfx_backend {
     opengl,
 };
 
+// ── Texture sampler state ─────────────────────────────────────────────
+
+enum class texture_filter { nearest, linear };
+enum class texture_wrap   { clamp, repeat, mirror };
+
+struct sampler_state {
+    texture_filter min_filter = texture_filter::linear;
+    texture_filter mag_filter = texture_filter::linear;
+    texture_filter mip_filter = texture_filter::linear;
+    texture_wrap   wrap_u     = texture_wrap::clamp;
+    texture_wrap   wrap_v     = texture_wrap::clamp;
+};
+
+// ── Texture lock protocol (internal) ─────────────────────────────────
+// Returned by texture_impl::lock(); passed back to texture_impl::unlock().
+
+struct texture_lock_info {
+    vec2i      origin;       // top-left of locked region within the mip level
+    vec2i      extent;       // size of locked region in pixels
+    int        level;        // mip level that was locked
+    int        stride_bytes; // bytes per row in the mapped buffer
+    std::byte* data;         // pointer to the locked region (backend-owned)
+};
+
+// ── texture_impl (internal) ───────────────────────────────────────────
+
+struct texture_impl {
+    virtual ~texture_impl() = default;
+
+    virtual pixel_format  format()     const noexcept = 0;
+    virtual int           width()      const noexcept = 0;
+    virtual int           height()     const noexcept = 0;
+    virtual int           mip_levels() const noexcept = 0;
+
+    virtual sampler_state sampler()    const noexcept = 0;
+    virtual void          set_sampler(const sampler_state& s) = 0;
+
+    // Map a subregion of the given mip level into CPU-accessible memory.
+    // Returns false if the format is unsupported, the level is out of range,
+    // or the backend cannot map it (e.g. autogen level > 0 on D3D9).
+    virtual bool lock(rect_i region, int level, texture_lock_info& out) = 0;
+
+    // Release the lock. If wrote == true the backend re-uploads the region
+    // (required for backends that stage through a CPU buffer, e.g. OpenGL).
+    virtual void unlock(const texture_lock_info& info, bool wrote) = 0;
+
+    // Fill mip levels 1+ from level 0.
+    virtual void generate_mipmaps() = 0;
+
+    // GPU-to-GPU deep copy.
+    virtual std::unique_ptr<texture_impl> clone() const = 0;
+};
+
 // ── Implementation interfaces (internal) ─────────────────────────────
 
 struct gfx_device_impl {
     virtual ~gfx_device_impl() = default;
     virtual const char* backend_name() const noexcept = 0;
+
+    // Create an uninitialised GPU texture.
+    // mip_levels == 1  → no mipmaps
+    // mip_levels == 0  → full chain down to 1×1 (alia::full_mip_chain)
+    // mip_levels >  1  → explicit level count
+    // Returns nullptr if the format or size is unsupported by the backend.
+    virtual std::unique_ptr<texture_impl> create_texture(
+        pixel_format fmt, vec2i size, int mip_levels) = 0;
 };
 
 enum class prim_type {
@@ -173,4 +237,4 @@ void        on_resize(vec2i new_size);
 
 } // namespace alia
 
-#endif // ALIA_GFX_GFX_DEVICE_HPP
+#endif /* GFX_DEVICE_EEFA16EE_8C09_453F_9EBB_D094DD1124EA */
