@@ -113,6 +113,19 @@ struct d3d9_swapchain_impl : swapchain_impl {
                            std::span<const uint32_t> indices,
                            std::type_index vtx_type,
                            std::span<const vertex_element> elements) override;
+
+    void draw_textured_prim(prim_type type,
+                            const void* vertices, int count, int stride,
+                            std::type_index vtx_type,
+                            std::span<const vertex_element> elements,
+                            texture_impl* tex) override;
+
+    void draw_textured_indexed_prim(prim_type type,
+                                    const void* vertices, int count, int stride,
+                                    std::span<const uint32_t> indices,
+                                    std::type_index vtx_type,
+                                    std::span<const vertex_element> elements,
+                                    texture_impl* tex) override;
 };
 
 } // namespace alia

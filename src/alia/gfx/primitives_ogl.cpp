@@ -145,6 +145,46 @@ namespace alia {
         compiled.teardown();
     }
 
+    void ogl_swapchain_impl::draw_textured_prim(
+        prim_type type, const void* vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture_impl* tex)
+    {
+        if (count < 3 || !tex) return;
+        auto* ogl_tex = static_cast<ogl_texture_impl*>(tex);
+
+        setup_matrices(projection_, transform_);
+        const auto& compiled = get_or_compile(vtx_type, elements);
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, ogl_tex->tex_id);
+        compiled.setup(vertices, stride);
+        glDrawArrays(to_gl_mode(type), 0, count);
+        compiled.teardown();
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glDisable(GL_TEXTURE_2D);
+    }
+
+    void ogl_swapchain_impl::draw_textured_indexed_prim(
+        prim_type type, const void* vertices, int count, int stride,
+        std::span<const uint32_t> indices,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture_impl* tex)
+    {
+        if (indices.size() < 3 || count == 0 || !tex) return;
+        auto* ogl_tex = static_cast<ogl_texture_impl*>(tex);
+
+        setup_matrices(projection_, transform_);
+        const auto& compiled = get_or_compile(vtx_type, elements);
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, ogl_tex->tex_id);
+        compiled.setup(vertices, stride);
+        glDrawElements(to_gl_mode(type), static_cast<GLsizei>(indices.size()),
+                       GL_UNSIGNED_INT, indices.data());
+        compiled.teardown();
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glDisable(GL_TEXTURE_2D);
+    }
+
 } // namespace alia
 
 #endif // ALIA_COMPILE_GFX_BACKEND_OPENGL

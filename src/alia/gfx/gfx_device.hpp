@@ -15,6 +15,7 @@
 namespace alia {
 
 class window;
+class texture;
 
 // ── Backend selection ─────────────────────────────────────────────────
 
@@ -119,6 +120,19 @@ struct swapchain_impl {
                                    std::span<const uint32_t> indices,
                                    std::type_index vtx_type,
                                    std::span<const vertex_element> elements) = 0;
+
+    virtual void draw_textured_prim(prim_type type,
+                                    const void* vertices, int count, int stride,
+                                    std::type_index vtx_type,
+                                    std::span<const vertex_element> elements,
+                                    texture_impl* tex) = 0;
+
+    virtual void draw_textured_indexed_prim(prim_type type,
+                                            const void* vertices, int count, int stride,
+                                            std::span<const uint32_t> indices,
+                                            std::type_index vtx_type,
+                                            std::span<const vertex_element> elements,
+                                            texture_impl* tex) = 0;
 };
 
 // ── OpenGL platform ops (internal) ───────────────────────────────────
@@ -206,6 +220,19 @@ public:
                            std::span<const uint32_t> indices,
                            std::type_index vtx_type,
                            std::span<const vertex_element> elements);
+
+    void draw_textured_prim(prim_type type,
+                            const void* vertices, int count, int stride,
+                            std::type_index vtx_type,
+                            std::span<const vertex_element> elements,
+                            texture& tex);
+
+    void draw_textured_indexed_prim(prim_type type,
+                                    const void* vertices, int count, int stride,
+                                    std::span<const uint32_t> indices,
+                                    std::type_index vtx_type,
+                                    std::span<const vertex_element> elements,
+                                    texture& tex);
 
     // Call when the window is resized
     void on_resize(vec2i new_size);

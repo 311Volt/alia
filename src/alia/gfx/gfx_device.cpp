@@ -1,4 +1,5 @@
 #include "gfx_device.hpp"
+#include "texture.hpp"
 #include "../os/window.hpp"
 #include <vector>
 #include <string_view>
@@ -224,6 +225,25 @@ namespace alia {
                                       std::span<const vertex_element> elements) {
         if (impl_)
             impl_->draw_indexed_prim(type, vertices, count, stride, indices, vtx_type, elements);
+    }
+
+    void swapchain::draw_textured_prim(prim_type type,
+                                       const void* vertices, int count, int stride,
+                                       std::type_index vtx_type,
+                                       std::span<const vertex_element> elements,
+                                       texture& tex) {
+        if (impl_)
+            impl_->draw_textured_prim(type, vertices, count, stride, vtx_type, elements, tex.impl());
+    }
+
+    void swapchain::draw_textured_indexed_prim(prim_type type,
+                                               const void* vertices, int count, int stride,
+                                               std::span<const uint32_t> indices,
+                                               std::type_index vtx_type,
+                                               std::span<const vertex_element> elements,
+                                               texture& tex) {
+        if (impl_)
+            impl_->draw_textured_indexed_prim(type, vertices, count, stride, indices, vtx_type, elements, tex.impl());
     }
 
 } // namespace alia

@@ -1,5 +1,4 @@
 #include "primitives.hpp"
-#include "gfx_device.hpp"
 
 namespace alia {
 
@@ -49,6 +48,15 @@ void draw_rect(rect_f r, color c, float thickness) {
     draw_line({tr.x, tr.y - h}, {br.x, br.y + h}, c, thickness);
     draw_line({br.x + h, br.y}, {bl.x - h, bl.y}, c, thickness);
     draw_line({bl.x, bl.y + h}, {tl.x, tl.y - h}, c, thickness);
+}
+
+void draw_textured_rect(rect_f r, texture& tex) {
+    uv_vertex v0{{r.left(),  r.top()},    {0.0f, 0.0f}};
+    uv_vertex v1{{r.right(), r.top()},    {1.0f, 0.0f}};
+    uv_vertex v2{{r.left(),  r.bottom()}, {0.0f, 1.0f}};
+    uv_vertex v3{{r.right(), r.bottom()}, {1.0f, 1.0f}};
+    uv_vertex verts[6] = {v0, v1, v2, v1, v3, v2};
+    draw_textured_triangles<uv_vertex>(tex, verts);
 }
 
 } // namespace alia

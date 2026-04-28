@@ -83,6 +83,27 @@ static IDirect3DVertexDeclaration9* get_or_compile(
     return decl;
 }
 
+// ── Sampler state application ─────────────────────────────────────────
+
+static void apply_d3d9_sampler(IDirect3DDevice9* device, DWORD stage, const sampler_state& s) {
+    auto filt = [](texture_filter f) -> DWORD {
+        return f == texture_filter::nearest ? D3DTEXF_POINT : D3DTEXF_LINEAR;
+    };
+    auto addr = [](texture_wrap w) -> DWORD {
+        switch (w) {
+        case texture_wrap::clamp:  return D3DTADDRESS_CLAMP;
+        case texture_wrap::repeat: return D3DTADDRESS_WRAP;
+        case texture_wrap::mirror: return D3DTADDRESS_MIRROR;
+        }
+        return D3DTADDRESS_CLAMP;
+    };
+    device->SetSamplerState(stage, D3DSAMP_MINFILTER, filt(s.min_filter));
+    device->SetSamplerState(stage, D3DSAMP_MAGFILTER, filt(s.mag_filter));
+    device->SetSamplerState(stage, D3DSAMP_MIPFILTER, filt(s.mip_filter));
+    device->SetSamplerState(stage, D3DSAMP_ADDRESSU,  addr(s.wrap_u));
+    device->SetSamplerState(stage, D3DSAMP_ADDRESSV,  addr(s.wrap_v));
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 static D3DPRIMITIVETYPE to_d3d_prim(prim_type type) {
@@ -145,6 +166,51 @@ void d3d9_swapchain_impl::draw_indexed_prim(
         D3DFMT_INDEX32,
         vertices,
         static_cast<UINT>(stride));
+}
+
+void d3d9_swapchain_impl::draw_textured_prim(
+    prim_type type,
+    const void* vertices, int count, int stride,
+    std::type_index vtx_type,
+    std::span<const vertex_element> elements,
+    texture_impl* tex)
+{
+    if (count < 3 || !tex) return;
+    auto* d3d_tex = static_cast<d3d9_texture_impl*>(tex);
+    auto* decl = get_or_compile(device, vtx_type, elements);
+    if (!decl) return;
+
+    device->SetTexture(0, d3d_tex->texture_);
+    apply_d3d9_sampler(device, 0, d3d_tex->sampler_);
+    device->SetVertexDeclaration(decl);
+    device->DrawPrimitiveUP(to_d3d_prim(type),
+        compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
+    device->SetTexture(0, nullptr);
+}
+
+void d3d9_swapchain_impl::draw_textured_indexed_prim(
+    prim_type type,
+    const void* vertices, int count, int stride,
+    std::span<const uint32_t> indices,
+    std::type_index vtx_type,
+    std::span<const vertex_element> elements,
+    texture_impl* tex)
+{
+    const UINT ni = static_cast<UINT>(indices.size());
+    if (ni < 3 || count == 0 || !tex) return;
+    auto* d3d_tex = static_cast<d3d9_texture_impl*>(tex);
+    auto* decl = get_or_compile(device, vtx_type, elements);
+    if (!decl) return;
+
+    device->SetTexture(0, d3d_tex->texture_);
+    apply_d3d9_sampler(device, 0, d3d_tex->sampler_);
+    device->SetVertexDeclaration(decl);
+    device->DrawIndexedPrimitiveUP(to_d3d_prim(type),
+        0, static_cast<UINT>(count),
+        compute_prim_count(type, static_cast<int>(ni)),
+        indices.data(), D3DFMT_INDEX32,
+        vertices, static_cast<UINT>(stride));
+    device->SetTexture(0, nullptr);
 }
 
 } // namespace alia
