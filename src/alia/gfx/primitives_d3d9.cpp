@@ -104,6 +104,23 @@ static void apply_d3d9_sampler(IDirect3DDevice9* device, DWORD stage, const samp
     device->SetSamplerState(stage, D3DSAMP_ADDRESSV,  addr(s.wrap_v));
 }
 
+static void apply_d3d9_vertex_color(IDirect3DDevice9* device) {
+    device->SetTexture(0, nullptr);
+    device->SetTextureStageState(0, D3DTSS_COLOROP,   D3DTOP_SELECTARG1);
+    device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
+    device->SetTextureStageState(0, D3DTSS_ALPHAOP,   D3DTOP_SELECTARG1);
+    device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
+}
+
+static void apply_d3d9_texture_color(IDirect3DDevice9* device) {
+    device->SetTextureStageState(0, D3DTSS_COLOROP,   D3DTOP_SELECTARG1);
+    device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    device->SetTextureStageState(0, D3DTSS_ALPHAOP,   D3DTOP_SELECTARG1);
+    device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    device->SetTextureStageState(1, D3DTSS_COLOROP,   D3DTOP_DISABLE);
+    device->SetTextureStageState(1, D3DTSS_ALPHAOP,   D3DTOP_DISABLE);
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 static D3DPRIMITIVETYPE to_d3d_prim(prim_type type) {
@@ -138,6 +155,7 @@ void d3d9_draw_prim(
     auto* decl = get_or_compile(device, vtx_type, elements);
     if (!decl) return;
 
+    apply_d3d9_vertex_color(device);
     device->SetVertexDeclaration(decl);
     device->DrawPrimitiveUP(to_d3d_prim(type),
         compute_prim_count(type, count),
@@ -159,6 +177,7 @@ void d3d9_draw_indexed_prim(
     auto* decl = get_or_compile(device, vtx_type, elements);
     if (!decl) return;
 
+    apply_d3d9_vertex_color(device);
     device->SetVertexDeclaration(decl);
     device->DrawIndexedPrimitiveUP(to_d3d_prim(type),
         0,
@@ -185,10 +204,11 @@ void d3d9_draw_textured_prim(
 
     device->SetTexture(0, d3d_tex->texture_);
     apply_d3d9_sampler(device, 0, d3d_tex->sampler_);
+    apply_d3d9_texture_color(device);
     device->SetVertexDeclaration(decl);
     device->DrawPrimitiveUP(to_d3d_prim(type),
         compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
-    device->SetTexture(0, nullptr);
+    apply_d3d9_vertex_color(device);
 }
 
 void d3d9_draw_textured_indexed_prim(
@@ -208,13 +228,14 @@ void d3d9_draw_textured_indexed_prim(
 
     device->SetTexture(0, d3d_tex->texture_);
     apply_d3d9_sampler(device, 0, d3d_tex->sampler_);
+    apply_d3d9_texture_color(device);
     device->SetVertexDeclaration(decl);
     device->DrawIndexedPrimitiveUP(to_d3d_prim(type),
         0, static_cast<UINT>(count),
         compute_prim_count(type, static_cast<int>(ni)),
         indices.data(), D3DFMT_INDEX32,
         vertices, static_cast<UINT>(stride));
-    device->SetTexture(0, nullptr);
+    apply_d3d9_vertex_color(device);
 }
 
 } // namespace alia

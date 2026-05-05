@@ -31,6 +31,57 @@ static D3DFORMAT to_d3d_format(pixel_format fmt) noexcept {
 
 // ── d3d9_texture_impl ─────────────────────────────────────────────────
 
+static bool d3d9_supports_texture_format(
+    IDirect3DDevice9* device, D3DFORMAT fmt, DWORD usage)
+{
+    if (fmt == D3DFMT_UNKNOWN)
+        return false;
+
+    IDirect3D9* d3d = nullptr;
+    if (FAILED(device->GetDirect3D(&d3d)) || !d3d)
+        return false;
+
+    D3DDEVICE_CREATION_PARAMETERS params = {};
+    D3DDISPLAYMODE display_mode = {};
+    const bool supported =
+        SUCCEEDED(device->GetCreationParameters(&params))
+        && SUCCEEDED(d3d->GetAdapterDisplayMode(params.AdapterOrdinal, &display_mode))
+        && SUCCEEDED(d3d->CheckDeviceFormat(
+            params.AdapterOrdinal,
+            params.DeviceType,
+            display_mode.Format,
+            usage,
+            D3DRTYPE_TEXTURE,
+            fmt));
+
+    d3d->Release();
+    return supported;
+}
+
+static pixel_format choose_d3d9_texture_format(
+    IDirect3DDevice9* device, pixel_format requested, DWORD usage)
+{
+    const D3DFORMAT requested_fmt = to_d3d_format(requested);
+    if (d3d9_supports_texture_format(device, requested_fmt, usage))
+        return requested;
+
+    switch (requested) {
+        case pixel_format::rgb888:
+        case pixel_format::rgba8888:
+        case pixel_format::bgr888:
+        case pixel_format::bgra8888:
+        case pixel_format::rgb565:
+        case pixel_format::gray_u8:
+            if (d3d9_supports_texture_format(device, D3DFMT_A8R8G8B8, usage))
+                return pixel_format::bgra8888;
+            break;
+        default:
+            break;
+    }
+
+    return requested;
+}
+
 d3d9_texture_impl::~d3d9_texture_impl() {
     if (texture_) texture_->Release();
 }
@@ -130,9 +181,6 @@ std::unique_ptr<texture_impl> d3d9_texture_impl::clone() const {
 
 std::unique_ptr<texture_impl>
 d3d9_device_impl::create_texture(pixel_format fmt, vec2i size, int mip_levels) {
-    const D3DFORMAT d3dfmt = to_d3d_format(fmt);
-    if (d3dfmt == D3DFMT_UNKNOWN) return nullptr;
-
     // mip_levels == 1  → no mipmaps
     // mip_levels == 0  → full chain via D3DUSAGE_AUTOGENMIPMAP (driver generates)
     // mip_levels >  1  → full chain via D3DUSAGE_AUTOGENMIPMAP (count ignored;
@@ -140,6 +188,10 @@ d3d9_device_impl::create_texture(pixel_format fmt, vec2i size, int mip_levels) {
     const bool autogen = (mip_levels != 1);
     const DWORD usage  = autogen ? D3DUSAGE_AUTOGENMIPMAP : 0u;
     const UINT  mips   = autogen ? 0u : 1u;
+    const pixel_format actual_fmt = choose_d3d9_texture_format(device, fmt, usage);
+    const D3DFORMAT d3dfmt = to_d3d_format(actual_fmt);
+    if (!d3d9_supports_texture_format(device, d3dfmt, usage))
+        return nullptr;
 
     IDirect3DTexture9* tex = nullptr;
     if (FAILED(device->CreateTexture(
@@ -150,7 +202,7 @@ d3d9_device_impl::create_texture(pixel_format fmt, vec2i size, int mip_levels) {
     auto t = std::make_unique<d3d9_texture_impl>();
     t->device_     = device;
     t->texture_    = tex;
-    t->fmt_        = fmt;
+    t->fmt_        = actual_fmt;
     t->width_      = size.x;
     t->height_     = size.y;
     t->autogen_    = autogen;
