@@ -24,8 +24,8 @@ check_cxx_source_compiles([[
   int main() { return 0; }
 ]] ALIA_MDSPAN_FEATURE_TEST_OK)
 
-file(GLOB_RECURSE alia_headers "src/*.hpp" "src/*.h")
-file(GLOB_RECURSE alia_sources "src/*.cpp" "src/*.c")
+file(GLOB_RECURSE alia_headers CONFIGURE_DEPENDS "src/*.hpp" "src/*.h")
+file(GLOB_RECURSE alia_sources CONFIGURE_DEPENDS "src/*.cpp" "src/*.c")
 
 option(ALIA_STATIC "Build alia as a static library" ON)
 if(ALIA_STATIC)
@@ -36,7 +36,7 @@ endif()
 
 # include("backends.cmake")
 
-option(ALIA_USE_KOKKOS_MDSPAN "Use Kokkos MDSPAN implementation instead of std::mdspan" ON)
+option(ALIA_USE_KOKKOS_MDSPAN "Use Kokkos MDSPAN implementation instead of std::mdspan (for libstdc++ <16 and libc++ <18)" ON)
 option(ALIA_BUILD_EXAMPLES "Build example programs" ON)
 option(ALIA_STATIC_RUNTIME "Statically link the C/C++ runtime (useful with MinGW to avoid DLL mismatch)" OFF)
 

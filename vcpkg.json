@@ -4,6 +4,7 @@
   "description": "alia library",
   "dependencies": [
     "mdspan",
-    "gtest"
+    "gtest",
+    "stb"
   ]
 }
