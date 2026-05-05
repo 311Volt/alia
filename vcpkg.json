@@ -5,6 +5,7 @@
   "dependencies": [
     "mdspan",
     "gtest",
-    "stb"
+    "stb",
+    "freetype"
   ]
 }

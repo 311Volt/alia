@@ -63,6 +63,9 @@ if (ALIA_USE_KOKKOS_MDSPAN)
   target_compile_definitions(alia PUBLIC ALIA_USE_KOKKOS_MDSPAN)
 endif()
 
+find_package(Freetype REQUIRED)
+target_link_libraries(alia PRIVATE Freetype::Freetype)
+
 target_include_directories(alia PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:include>)

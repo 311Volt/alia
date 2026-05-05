@@ -104,6 +104,21 @@ static void apply_d3d9_sampler(IDirect3DDevice9* device, DWORD stage, const samp
     device->SetSamplerState(stage, D3DSAMP_ADDRESSV,  addr(s.wrap_v));
 }
 
+static bool has_vertex_color(std::span<const vertex_element> elements) {
+    for (const auto& e : elements) {
+        if (e.attribute == vertex_attr::color_attr)
+            return true;
+    }
+    return false;
+}
+
+static void apply_d3d9_alpha_blend(IDirect3DDevice9* device) {
+    device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+    device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+    device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+    device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+}
+
 static void apply_d3d9_vertex_color(IDirect3DDevice9* device) {
     device->SetTexture(0, nullptr);
     device->SetTextureStageState(0, D3DTSS_COLOROP,   D3DTOP_SELECTARG1);
@@ -112,11 +127,20 @@ static void apply_d3d9_vertex_color(IDirect3DDevice9* device) {
     device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
 }
 
-static void apply_d3d9_texture_color(IDirect3DDevice9* device) {
-    device->SetTextureStageState(0, D3DTSS_COLOROP,   D3DTOP_SELECTARG1);
-    device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-    device->SetTextureStageState(0, D3DTSS_ALPHAOP,   D3DTOP_SELECTARG1);
-    device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+static void apply_d3d9_texture_color(IDirect3DDevice9* device, bool modulate_with_vertex_color) {
+    if (modulate_with_vertex_color) {
+        device->SetTextureStageState(0, D3DTSS_COLOROP,   D3DTOP_MODULATE);
+        device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+        device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        device->SetTextureStageState(0, D3DTSS_ALPHAOP,   D3DTOP_MODULATE);
+        device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+        device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+    } else {
+        device->SetTextureStageState(0, D3DTSS_COLOROP,   D3DTOP_SELECTARG1);
+        device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+        device->SetTextureStageState(0, D3DTSS_ALPHAOP,   D3DTOP_SELECTARG1);
+        device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    }
     device->SetTextureStageState(1, D3DTSS_COLOROP,   D3DTOP_DISABLE);
     device->SetTextureStageState(1, D3DTSS_ALPHAOP,   D3DTOP_DISABLE);
 }
@@ -155,6 +179,7 @@ void d3d9_draw_prim(
     auto* decl = get_or_compile(device, vtx_type, elements);
     if (!decl) return;
 
+    apply_d3d9_alpha_blend(device);
     apply_d3d9_vertex_color(device);
     device->SetVertexDeclaration(decl);
     device->DrawPrimitiveUP(to_d3d_prim(type),
@@ -177,6 +202,7 @@ void d3d9_draw_indexed_prim(
     auto* decl = get_or_compile(device, vtx_type, elements);
     if (!decl) return;
 
+    apply_d3d9_alpha_blend(device);
     apply_d3d9_vertex_color(device);
     device->SetVertexDeclaration(decl);
     device->DrawIndexedPrimitiveUP(to_d3d_prim(type),
@@ -202,9 +228,10 @@ void d3d9_draw_textured_prim(
     auto* decl = get_or_compile(device, vtx_type, elements);
     if (!decl) return;
 
+    apply_d3d9_alpha_blend(device);
     device->SetTexture(0, d3d_tex->texture_);
     apply_d3d9_sampler(device, 0, d3d_tex->sampler_);
-    apply_d3d9_texture_color(device);
+    apply_d3d9_texture_color(device, has_vertex_color(elements));
     device->SetVertexDeclaration(decl);
     device->DrawPrimitiveUP(to_d3d_prim(type),
         compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
@@ -226,9 +253,10 @@ void d3d9_draw_textured_indexed_prim(
     auto* decl = get_or_compile(device, vtx_type, elements);
     if (!decl) return;
 
+    apply_d3d9_alpha_blend(device);
     device->SetTexture(0, d3d_tex->texture_);
     apply_d3d9_sampler(device, 0, d3d_tex->sampler_);
-    apply_d3d9_texture_color(device);
+    apply_d3d9_texture_color(device, has_vertex_color(elements));
     device->SetVertexDeclaration(decl);
     device->DrawIndexedPrimitiveUP(to_d3d_prim(type),
         0, static_cast<UINT>(count),

@@ -19,7 +19,6 @@
 #include <cstddef>
 #include <cstring>
 #include <memory>
-#include <stdexcept>
 
 namespace alia {
 

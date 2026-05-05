@@ -6,7 +6,6 @@
 #include "../core/rect.hpp"
 #include <cstdint>
 #include <span>
-#include <typeinfo>
 
 namespace alia {
 

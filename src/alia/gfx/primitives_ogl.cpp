@@ -116,6 +116,19 @@ namespace alia {
         return GL_TRIANGLES;
     }
 
+    static bool has_vertex_color(std::span<const vertex_element> elements) {
+        for (const auto& e : elements) {
+            if (e.attribute == vertex_attr::color_attr)
+                return true;
+        }
+        return false;
+    }
+
+    static void apply_ogl_alpha_blend() {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+
     // ── Drawing ──────────────────────────────────────────────────────────
 
     void ogl_draw_prim(
@@ -129,6 +142,7 @@ namespace alia {
         get_current_transform_matrix(std::span<float, 16>(transform, 16));
         get_current_projection_matrix(std::span<float, 16>(projection, 16));
         setup_matrices(projection, transform);
+        apply_ogl_alpha_blend();
         const auto &compiled = get_or_compile(vtx_type, elements);
         compiled.setup(vertices, stride);
         glDrawArrays(to_gl_mode(type), 0, count);
@@ -147,6 +161,7 @@ namespace alia {
         get_current_transform_matrix(std::span<float, 16>(transform, 16));
         get_current_projection_matrix(std::span<float, 16>(projection, 16));
         setup_matrices(projection, transform);
+        apply_ogl_alpha_blend();
         const auto &compiled = get_or_compile(vtx_type, elements);
         compiled.setup(vertices, stride);
         glDrawElements(to_gl_mode(type), static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, indices.data());
@@ -166,9 +181,15 @@ namespace alia {
         get_current_transform_matrix(std::span<float, 16>(transform, 16));
         get_current_projection_matrix(std::span<float, 16>(projection, 16));
         setup_matrices(projection, transform);
+        apply_ogl_alpha_blend();
         const auto& compiled = get_or_compile(vtx_type, elements);
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, ogl_tex->tex_id);
+        glTexEnvi(
+            GL_TEXTURE_ENV,
+            GL_TEXTURE_ENV_MODE,
+            has_vertex_color(elements) ? GL_MODULATE : GL_REPLACE);
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
         compiled.setup(vertices, stride);
         glDrawArrays(to_gl_mode(type), 0, count);
         compiled.teardown();
@@ -190,9 +211,15 @@ namespace alia {
         get_current_transform_matrix(std::span<float, 16>(transform, 16));
         get_current_projection_matrix(std::span<float, 16>(projection, 16));
         setup_matrices(projection, transform);
+        apply_ogl_alpha_blend();
         const auto& compiled = get_or_compile(vtx_type, elements);
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, ogl_tex->tex_id);
+        glTexEnvi(
+            GL_TEXTURE_ENV,
+            GL_TEXTURE_ENV_MODE,
+            has_vertex_color(elements) ? GL_MODULATE : GL_REPLACE);
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
         compiled.setup(vertices, stride);
         glDrawElements(to_gl_mode(type), static_cast<GLsizei>(indices.size()),
                        GL_UNSIGNED_INT, indices.data());
