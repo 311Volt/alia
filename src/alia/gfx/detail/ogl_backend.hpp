@@ -50,10 +50,12 @@ struct ogl_device_impl : gfx_device_impl {
     void* ctx = nullptr;  // opaque context handle (HGLRC on Win32)
 
     ~ogl_device_impl() override;
-    const char* backend_name() const noexcept override { return "opengl"; }
 
     std::unique_ptr<texture_impl> create_texture(
         pixel_format fmt, vec2i size, int mip_levels) override;
+
+    std::unique_ptr<swapchain_impl> create_swapchain(
+        void* native_handle, vec2i initial_size) override;
 };
 
 // ── OpenGL swapchain impl ───────────────────────────────────────────
@@ -64,54 +66,36 @@ struct ogl_swapchain_impl : swapchain_impl {
     void*  ctx     = nullptr;  // non-owning ref to device context
     vec2i  size    = {};
 
-    float transform_[16] = {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    };
-    float projection_[16] = {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-    };
-
     ~ogl_swapchain_impl() override;
-
-    void set_transform(std::span<const float, 16> m) override;
-    void get_transform(std::span<float, 16> m) const override;
-    void set_projection(std::span<const float, 16> m) override;
-    void get_projection(std::span<float, 16> m) const override;
 
     void clear(color c) override;
     void present() override;
     void on_resize(vec2i new_size) override;
+};
 
-    void draw_prim(prim_type type,
+void ogl_draw_prim(prim_type type,
                    const void* vertices, int count, int stride,
                    std::type_index vtx_type,
-                   std::span<const vertex_element> elements) override;
+                   std::span<const vertex_element> elements);
 
-    void draw_indexed_prim(prim_type type,
+void ogl_draw_indexed_prim(prim_type type,
                            const void* vertices, int count, int stride,
                            std::span<const uint32_t> indices,
                            std::type_index vtx_type,
-                           std::span<const vertex_element> elements) override;
+                           std::span<const vertex_element> elements);
 
-    void draw_textured_prim(prim_type type,
+void ogl_draw_textured_prim(prim_type type,
                             const void* vertices, int count, int stride,
                             std::type_index vtx_type,
                             std::span<const vertex_element> elements,
-                            texture_impl* tex) override;
+                            texture_impl* tex);
 
-    void draw_textured_indexed_prim(prim_type type,
+void ogl_draw_textured_indexed_prim(prim_type type,
                                     const void* vertices, int count, int stride,
                                     std::span<const uint32_t> indices,
                                     std::type_index vtx_type,
                                     std::span<const vertex_element> elements,
-                                    texture_impl* tex) override;
-};
+                                    texture_impl* tex);
 
 } // namespace alia
 

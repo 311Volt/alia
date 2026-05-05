@@ -46,7 +46,7 @@ static bool set_pixel_format(HDC hdc) {
 }
 
 // ── Opaque context struct ─────────────────────────────────────────────
-// The "context" handle exposed to backend_ogl.cpp is a pointer to this.
+// The "context" handle exposed to the OpenGL device code is a pointer to this.
 
 struct win_ogl_ctx {
     HWND  dummy_hwnd = nullptr;

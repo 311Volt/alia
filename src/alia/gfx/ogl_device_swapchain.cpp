@@ -17,11 +17,6 @@ namespace alia {
 
     ogl_swapchain_impl::~ogl_swapchain_impl() { get_ogl_platform().destroy_surface(native, surface); }
 
-    void ogl_swapchain_impl::set_transform(std::span<const float, 16> m) { std::copy(m.begin(), m.end(), transform_); }
-    void ogl_swapchain_impl::get_transform(std::span<float, 16> m) const { std::copy(std::begin(transform_), std::end(transform_), m.begin()); }
-    void ogl_swapchain_impl::set_projection(std::span<const float, 16> m) { std::copy(m.begin(), m.end(), projection_); }
-    void ogl_swapchain_impl::get_projection(std::span<float, 16> m) const { std::copy(std::begin(projection_), std::end(projection_), m.begin()); }
-
     void ogl_swapchain_impl::clear(color c) {
         get_ogl_platform().make_current(surface, ctx);
         glViewport(0, 0, size.x, size.y);
@@ -45,16 +40,16 @@ namespace alia {
         return impl;
     }
 
-    static std::unique_ptr<swapchain_impl> create_ogl_swapchain(gfx_device_impl &dev, void *native_handle, vec2i initial_size) {
-        auto &ogl_dev = static_cast<ogl_device_impl &>(dev);
-        void *surface = get_ogl_platform().create_surface(native_handle, ogl_dev.ctx);
+    std::unique_ptr<swapchain_impl>
+    ogl_device_impl::create_swapchain(void *native_handle, vec2i initial_size) {
+        void *surface = get_ogl_platform().create_surface(native_handle, ctx);
         if (!surface)
             return nullptr;
 
         auto impl = std::make_unique<ogl_swapchain_impl>();
         impl->native = native_handle;
         impl->surface = surface;
-        impl->ctx = ogl_dev.ctx;
+        impl->ctx = ctx;
         impl->size = initial_size;
         return impl;
     }
@@ -63,10 +58,14 @@ namespace alia {
 
     void register_ogl_backend() {
         register_gfx_backend({
-            "opengl",
             gfx_backend::opengl,
             create_ogl_device,
-            create_ogl_swapchain,
+            {
+                ogl_draw_prim,
+                ogl_draw_indexed_prim,
+                ogl_draw_textured_prim,
+                ogl_draw_textured_indexed_prim,
+            },
         });
     }
 

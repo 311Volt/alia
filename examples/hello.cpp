@@ -18,7 +18,7 @@ int main() {
         }
     );
     alia::gfx_device device = alia::gfx_device::create(alia::gfx_backend::opengl);
-    alia::swapchain  swap   = alia::swapchain::create(device, win);
+    auto swapchain = device.create_swapchain({.target = win});
 
     alia::set_current_projection(
         alia::transform::ortho(0, 800, 600, 0));
@@ -45,7 +45,7 @@ int main() {
             if (auto* e = ev.get_if<alia::window_close_event>()) {
                 running = false;
             } else if (auto* e = ev.get_if<alia::window_resize_event>()) {
-                swap.on_resize(e->new_size);
+                alia::on_resize(e->new_size);
             } else if (auto* e = ev.get_if<alia::window_key_down_event>()) {
                 if (e->key == alia::key::escape)
                     running = false;

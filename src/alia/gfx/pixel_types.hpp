@@ -12,10 +12,6 @@ namespace alia {
     //   - `using has_<channel> = void;`  declares which channels are present.
     //   - `using channel_type = ...;`      declares the channel value type.
     //
-    // This means no external specializations are needed for user-defined types
-    // that follow the same convention. For library types you cannot modify,
-    // specialize the trait templates below.
-    //
     // All types satisfy: no internal padding, trivially copyable, standard layout.
     // It is safe to reinterpret_cast a contiguous byte buffer as an array of any
     // of these types (alignment is at most 4 bytes, all sizes divide evenly).

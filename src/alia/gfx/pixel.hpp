@@ -10,9 +10,8 @@ namespace alia {
     // ============================================================================
     // Pixel format identifier
     //
-    // Each built-in pixel struct carries `static constexpr pixel_format format_id`
-    // and the pixel concept enforces its presence. User-defined types must also
-    // provide format_id; use pixel_format::custom for non-built-in formats.
+    // Each pixel struct carries `static constexpr pixel_format format_id`
+    // and the pixel concept enforces its presence.
     // ============================================================================
 
     enum class pixel_format : uint8_t {
@@ -25,11 +24,9 @@ namespace alia {
         gray_f32,
         rgba_f32,
         rgb_f32,
-        custom, // for user-defined formats outside this list
     };
 
-    // Returns the number of bytes per pixel for a built-in pixel_format.
-	// Returns 0 for pixel_format::custom (size is unknown without the concrete type).
+    // Returns the number of bytes per pixel for a pixel_format.
 	[[nodiscard]] inline constexpr int bytes_per_pixel_for_format(pixel_format fmt) noexcept {
 		switch (fmt) {
 			case pixel_format::rgb888:   return 3;
@@ -45,12 +42,36 @@ namespace alia {
 		}
 	}
 
+    struct px_rgb888;
+    struct px_rgba8888;
+    struct px_rgb565;
+    struct px_bgr888;
+    struct px_bgra8888;
+    struct px_gray_u8;
+    struct px_gray_f32;
+    struct px_rgba_f32;
+    struct px_rgb_f32;
+
+    template <typename T>
+    struct is_pixel_type : std::false_type {};
+    template <> struct is_pixel_type<px_rgb888> : std::true_type {};
+    template <> struct is_pixel_type<px_rgba8888> : std::true_type {};
+    template <> struct is_pixel_type<px_rgb565> : std::true_type {};
+    template <> struct is_pixel_type<px_bgr888> : std::true_type {};
+    template <> struct is_pixel_type<px_bgra8888> : std::true_type {};
+    template <> struct is_pixel_type<px_gray_u8> : std::true_type {};
+    template <> struct is_pixel_type<px_gray_f32> : std::true_type {};
+    template <> struct is_pixel_type<px_rgba_f32> : std::true_type {};
+    template <> struct is_pixel_type<px_rgb_f32> : std::true_type {};
+
+    template <typename T>
+    inline constexpr bool is_pixel_type_v = is_pixel_type<std::remove_cv_t<T>>::value;
+
     // ============================================================================
     // Channel presence traits
     //
-    // Default: detect via nested type alias inside the pixel struct
-    // (e.g. `using has_red = void;`). Explicitly specialize for library types
-    // you cannot modify.
+    // Detect via nested type aliases inside the pixel struct
+    // (e.g. `using has_red = void;`).
     // ============================================================================
 
     template <typename T>
@@ -88,9 +109,8 @@ namespace alia {
     // ============================================================================
     // channel_type — the natural numeric type for individual channel values
     //
-    // Default: reads T::channel_type. For bit-field formats (px_rgb565) this is the
+    // Reads T::channel_type. For bit-field formats (px_rgb565) this is the
     // logical value type (uint8_t), not the backing storage type.
-    // Explicitly specialize for library types you cannot modify.
     // ============================================================================
 
     template <typename T, typename = void>
@@ -107,8 +127,7 @@ namespace alia {
     // ============================================================================
     // Additional traits
     //
-    // All default correctly from struct-embedded info. Specialize as variable
-    // templates for library types you cannot modify.
+    // Derived from struct-embedded info.
     // ============================================================================
 
     // bits_per_pixel — valid for no-padding types (all sizeof * 8 == logical bits).
@@ -126,15 +145,16 @@ namespace alia {
     // ============================================================================
     // pixel concept
     //
-    // Satisfied by any type that:
-    //   - is trivially copyable and standard-layout (safe to memcpy / cast),
-    //   - has a channel_type::type (via T::channel_type or explicit specialization),
+    // Satisfied by pixel types that:
+    //   - are trivially copyable and standard-layout (safe to memcpy / cast),
+    //   - have a channel_type::type,
     //   - has at least one logical channel (color or grayscale).
     // ============================================================================
 
     template <typename T>
     concept pixel =
         std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T> &&
+        is_pixel_type_v<T> &&
         requires { typename channel_type<T>::type; } &&
         (has_red_v<T> || has_gray_v<T>) &&
         requires { requires std::is_same_v<std::remove_cv_t<decltype(T::format_id)>, pixel_format>; };
@@ -143,11 +163,11 @@ namespace alia {
     // Channel getters
     //
     // Dispatch order for each channel:
-    //   1. T::get_<channel>() method  — for custom accessor logic
-    //   2. T::<member>  (.r/.g/.b/.a/.v)  — for plain struct fields / bitfields
-    //   3. static_assert  — clear error if the type advertises a channel it lacks
+    //   1. T::get_<channel>() method
+    //   2. T::<member>  (.r/.g/.b/.a/.v)
+    //   3. static_assert
     //
-    // User types must follow the convention above OR define the matching method.
+
     // ============================================================================
 
     template <pixel PixelT>

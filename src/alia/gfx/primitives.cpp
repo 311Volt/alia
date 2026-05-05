@@ -2,14 +2,6 @@
 
 namespace alia {
 
-void clear(color c) {
-    current_swapchain().clear(c);
-}
-
-void present() {
-    current_swapchain().present();
-}
-
 void fill_rect(rect_f r, color c) {
     colored_vertex v0{{r.left(), r.top()}, c};
     colored_vertex v1{{r.right(), r.top()}, c};

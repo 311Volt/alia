@@ -1,7 +1,7 @@
 {
   "name": "alia",
   "version": "0.1.0",
-  "description": "alia library",
+  "description": "a game-oriented multimedia library",
   "dependencies": [
     "mdspan",
     "gtest",

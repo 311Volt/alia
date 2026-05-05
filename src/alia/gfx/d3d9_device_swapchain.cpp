@@ -55,10 +55,15 @@ static D3DMATRIX make_identity() {
 }
 
 void d3d9_swapchain_impl::setup_render_states() {
-    device->SetTransform(D3DTS_WORLD,      (const D3DMATRIX*)transform_);
+    float transform[16];
+    float projection[16];
+    get_current_transform_matrix(std::span<float, 16>(transform, 16));
+    get_current_projection_matrix(std::span<float, 16>(projection, 16));
+
+    device->SetTransform(D3DTS_WORLD,      (const D3DMATRIX*)transform);
     D3DMATRIX view = make_identity();
     device->SetTransform(D3DTS_VIEW,       &view);
-    device->SetTransform(D3DTS_PROJECTION, (const D3DMATRIX*)projection_);
+    device->SetTransform(D3DTS_PROJECTION, (const D3DMATRIX*)projection);
 
     device->SetRenderState(D3DRS_LIGHTING,        FALSE);
     device->SetRenderState(D3DRS_CULLMODE,        D3DCULL_NONE);
@@ -68,11 +73,6 @@ void d3d9_swapchain_impl::setup_render_states() {
     D3DVIEWPORT9 vp = {0, 0, (DWORD)size.x, (DWORD)size.y, 0.0f, 1.0f};
     device->SetViewport(&vp);
 }
-
-void d3d9_swapchain_impl::set_transform(std::span<const float, 16> m) { std::copy(m.begin(), m.end(), transform_); }
-void d3d9_swapchain_impl::get_transform(std::span<float, 16> m) const { std::copy(std::begin(transform_), std::end(transform_), m.begin()); }
-void d3d9_swapchain_impl::set_projection(std::span<const float, 16> m) { std::copy(m.begin(), m.end(), projection_); }
-void d3d9_swapchain_impl::get_projection(std::span<float, 16> m) const { std::copy(std::begin(projection_), std::end(projection_), m.begin()); }
 
 void d3d9_swapchain_impl::clear(color c) {
     set_render_target_to_back_buffer();
@@ -139,10 +139,9 @@ static std::unique_ptr<gfx_device_impl> create_d3d9_device() {
     return impl;
 }
 
-static std::unique_ptr<swapchain_impl> create_d3d9_swapchain(
-    gfx_device_impl& dev, void* native_handle, vec2i initial_size)
+std::unique_ptr<swapchain_impl>
+d3d9_device_impl::create_swapchain(void* native_handle, vec2i initial_size)
 {
-    auto& d3d_dev = static_cast<d3d9_device_impl&>(dev);
     HWND hwnd = static_cast<HWND>(native_handle);
 
     D3DPRESENT_PARAMETERS pp = {};
@@ -154,11 +153,11 @@ static std::unique_ptr<swapchain_impl> create_d3d9_swapchain(
     pp.hDeviceWindow    = hwnd;
 
     IDirect3DSwapChain9* sc = nullptr;
-    HRESULT hr = d3d_dev.device->CreateAdditionalSwapChain(&pp, &sc);
+    HRESULT hr = device->CreateAdditionalSwapChain(&pp, &sc);
     if (FAILED(hr)) return nullptr;
 
     auto impl         = std::make_unique<d3d9_swapchain_impl>();
-    impl->device      = d3d_dev.device;
+    impl->device      = device;
     impl->swap_chain  = sc;
     impl->hwnd        = hwnd;
     impl->size        = initial_size;
@@ -169,10 +168,14 @@ static std::unique_ptr<swapchain_impl> create_d3d9_swapchain(
 
 void register_d3d9_backend() {
     register_gfx_backend({
-        "d3d9",
         gfx_backend::d3d9,
         create_d3d9_device,
-        create_d3d9_swapchain,
+        {
+            d3d9_draw_prim,
+            d3d9_draw_indexed_prim,
+            d3d9_draw_textured_prim,
+            d3d9_draw_textured_indexed_prim,
+        },
     });
 }
 

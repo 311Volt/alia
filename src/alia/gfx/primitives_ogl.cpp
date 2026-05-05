@@ -118,34 +118,42 @@ namespace alia {
 
     // ── Drawing ──────────────────────────────────────────────────────────
 
-    void ogl_swapchain_impl::draw_prim(
+    void ogl_draw_prim(
         prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements
     ) {
         if (count < 3)
             return;
 
-        setup_matrices(projection_, transform_);
+        float transform[16];
+        float projection[16];
+        get_current_transform_matrix(std::span<float, 16>(transform, 16));
+        get_current_projection_matrix(std::span<float, 16>(projection, 16));
+        setup_matrices(projection, transform);
         const auto &compiled = get_or_compile(vtx_type, elements);
         compiled.setup(vertices, stride);
         glDrawArrays(to_gl_mode(type), 0, count);
         compiled.teardown();
     }
 
-    void ogl_swapchain_impl::draw_indexed_prim(
+    void ogl_draw_indexed_prim(
         prim_type type, const void *vertices, int count, int stride, std::span<const uint32_t> indices, std::type_index vtx_type,
         std::span<const vertex_element> elements
     ) {
         if (indices.size() < 3 || count == 0)
             return;
 
-        setup_matrices(projection_, transform_);
+        float transform[16];
+        float projection[16];
+        get_current_transform_matrix(std::span<float, 16>(transform, 16));
+        get_current_projection_matrix(std::span<float, 16>(projection, 16));
+        setup_matrices(projection, transform);
         const auto &compiled = get_or_compile(vtx_type, elements);
         compiled.setup(vertices, stride);
         glDrawElements(to_gl_mode(type), static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, indices.data());
         compiled.teardown();
     }
 
-    void ogl_swapchain_impl::draw_textured_prim(
+    void ogl_draw_textured_prim(
         prim_type type, const void* vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements,
         texture_impl* tex)
@@ -153,7 +161,11 @@ namespace alia {
         if (count < 3 || !tex) return;
         auto* ogl_tex = static_cast<ogl_texture_impl*>(tex);
 
-        setup_matrices(projection_, transform_);
+        float transform[16];
+        float projection[16];
+        get_current_transform_matrix(std::span<float, 16>(transform, 16));
+        get_current_projection_matrix(std::span<float, 16>(projection, 16));
+        setup_matrices(projection, transform);
         const auto& compiled = get_or_compile(vtx_type, elements);
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, ogl_tex->tex_id);
@@ -164,7 +176,7 @@ namespace alia {
         glDisable(GL_TEXTURE_2D);
     }
 
-    void ogl_swapchain_impl::draw_textured_indexed_prim(
+    void ogl_draw_textured_indexed_prim(
         prim_type type, const void* vertices, int count, int stride,
         std::span<const uint32_t> indices,
         std::type_index vtx_type, std::span<const vertex_element> elements,
@@ -173,7 +185,11 @@ namespace alia {
         if (indices.size() < 3 || count == 0 || !tex) return;
         auto* ogl_tex = static_cast<ogl_texture_impl*>(tex);
 
-        setup_matrices(projection_, transform_);
+        float transform[16];
+        float projection[16];
+        get_current_transform_matrix(std::span<float, 16>(transform, 16));
+        get_current_projection_matrix(std::span<float, 16>(projection, 16));
+        setup_matrices(projection, transform);
         const auto& compiled = get_or_compile(vtx_type, elements);
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, ogl_tex->tex_id);

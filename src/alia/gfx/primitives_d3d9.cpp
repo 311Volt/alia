@@ -126,7 +126,7 @@ static UINT compute_prim_count(prim_type type, int vertex_count) {
 
 // ── Drawing ──────────────────────────────────────────────────────────
 
-void d3d9_swapchain_impl::draw_prim(
+void d3d9_draw_prim(
     prim_type type,
     const void* vertices, int count, int stride,
     std::type_index vtx_type,
@@ -134,6 +134,7 @@ void d3d9_swapchain_impl::draw_prim(
 {
     if (count < 3) return;
 
+    auto* device = static_cast<d3d9_device_impl*>(current_device().impl())->device;
     auto* decl = get_or_compile(device, vtx_type, elements);
     if (!decl) return;
 
@@ -144,7 +145,7 @@ void d3d9_swapchain_impl::draw_prim(
         static_cast<UINT>(stride));
 }
 
-void d3d9_swapchain_impl::draw_indexed_prim(
+void d3d9_draw_indexed_prim(
     prim_type type,
     const void* vertices, int count, int stride,
     std::span<const uint32_t> indices,
@@ -154,6 +155,7 @@ void d3d9_swapchain_impl::draw_indexed_prim(
     const UINT ni = static_cast<UINT>(indices.size());
     if (ni < 3 || count == 0) return;
 
+    auto* device = static_cast<d3d9_device_impl*>(current_device().impl())->device;
     auto* decl = get_or_compile(device, vtx_type, elements);
     if (!decl) return;
 
@@ -168,7 +170,7 @@ void d3d9_swapchain_impl::draw_indexed_prim(
         static_cast<UINT>(stride));
 }
 
-void d3d9_swapchain_impl::draw_textured_prim(
+void d3d9_draw_textured_prim(
     prim_type type,
     const void* vertices, int count, int stride,
     std::type_index vtx_type,
@@ -177,6 +179,7 @@ void d3d9_swapchain_impl::draw_textured_prim(
 {
     if (count < 3 || !tex) return;
     auto* d3d_tex = static_cast<d3d9_texture_impl*>(tex);
+    auto* device = static_cast<d3d9_device_impl*>(current_device().impl())->device;
     auto* decl = get_or_compile(device, vtx_type, elements);
     if (!decl) return;
 
@@ -188,7 +191,7 @@ void d3d9_swapchain_impl::draw_textured_prim(
     device->SetTexture(0, nullptr);
 }
 
-void d3d9_swapchain_impl::draw_textured_indexed_prim(
+void d3d9_draw_textured_indexed_prim(
     prim_type type,
     const void* vertices, int count, int stride,
     std::span<const uint32_t> indices,
@@ -199,6 +202,7 @@ void d3d9_swapchain_impl::draw_textured_indexed_prim(
     const UINT ni = static_cast<UINT>(indices.size());
     if (ni < 3 || count == 0 || !tex) return;
     auto* d3d_tex = static_cast<d3d9_texture_impl*>(tex);
+    auto* device = static_cast<d3d9_device_impl*>(current_device().impl())->device;
     auto* decl = get_or_compile(device, vtx_type, elements);
     if (!decl) return;
 
