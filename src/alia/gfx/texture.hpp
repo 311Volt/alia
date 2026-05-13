@@ -116,18 +116,18 @@ namespace alia {
         // ── Construction ─────────────────────────────────────────────────
 
         /// Create an uninitialised texture.
-        texture(gfx_device &device, pixel_format fmt, vec2i size, int mip_levels = 1);
+        texture(gfx_device &device, pixel_format fmt, vec2i size, int mip_levels = 1, texture_role role = texture_role::color);
 
         /// Create and initialise level 0 from a type-erased CPU view.
-        texture(gfx_device &device, const any_bitmap_view &src, int mip_levels = 1);
+        texture(gfx_device &device, const any_bitmap_view &src, int mip_levels = 1, texture_role role = texture_role::color);
 
         /// Create and initialise level 0 from an owning bitmap.
-        texture(gfx_device &device, const bitmap &src, int mip_levels = 1);
+        texture(gfx_device &device, const bitmap &src, int mip_levels = 1, texture_role role = texture_role::color);
 
         /// Create and initialise level 0 from a typed CPU view.
         template <pixel TPixel>
-        texture(gfx_device &device, const bitmap_view<TPixel> &src, int mip_levels = 1)
-            : texture(device, bitmap(src), mip_levels) {}
+        texture(gfx_device &device, const bitmap_view<TPixel> &src, int mip_levels = 1, texture_role role = texture_role::color)
+            : texture(device, bitmap(src), mip_levels, role) {}
 
         // ── State queries ────────────────────────────────────────────────
 
@@ -138,6 +138,9 @@ namespace alia {
             return valid();
         }
         [[nodiscard]] pixel_format format() const noexcept;
+        [[nodiscard]] texture_role role() const noexcept {
+            return role_;
+        }
         [[nodiscard]] int width() const noexcept;
         [[nodiscard]] int height() const noexcept;
         [[nodiscard]] vec2i size() const noexcept {
@@ -188,11 +191,12 @@ namespace alia {
             const std::optional<rect_i> &region, int level, pixel_format expected_fmt
         );
 
-        explicit texture(texture_handle *handle, const graphics_backend_interface *backend) noexcept
-            : handle_(handle), backend_(backend) {}
+        explicit texture(texture_handle *handle, const graphics_backend_interface *backend, texture_role role) noexcept
+            : handle_(handle), backend_(backend), role_(role) {}
 
         texture_handle *handle_ = nullptr;
         const graphics_backend_interface *backend_ = nullptr;
+        texture_role role_ = texture_role::color;
     };
 
 } // namespace alia

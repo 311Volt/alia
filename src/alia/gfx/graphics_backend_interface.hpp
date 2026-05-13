@@ -57,6 +57,8 @@ namespace alia {
 
     enum class gfx_backend { auto_, d3d9, opengl };
 
+    enum class texture_role { color, alpha_mask };
+
     enum class texture_filter { nearest, linear };
     enum class texture_wrap { clamp, repeat, mirror };
 
@@ -94,7 +96,7 @@ namespace alia {
         graphics_backend_operation<void(device_handle *)> destroy_device;
 
         // ── Texture ─────────────────────────────────────────────────────
-        graphics_backend_operation<texture_handle *(device_handle *, pixel_format, vec2i, int)>
+        graphics_backend_operation<texture_handle *(device_handle *, pixel_format, vec2i, int, texture_role)>
             create_texture;
         graphics_backend_operation<void(texture_handle *)>
             destroy_texture;
@@ -141,6 +143,9 @@ namespace alia {
         graphics_backend_operation<
             void(prim_type, const void *, int, int, std::type_index, std::span<const vertex_element>, texture_handle *)>
             draw_textured_prim;
+        graphics_backend_operation<
+            void(prim_type, const void *, int, int, std::type_index, std::span<const vertex_element>, texture_handle *)>
+            draw_alpha_masked_prim;
         graphics_backend_operation<
             void(prim_type, const void *, int, int, std::span<const uint32_t>, std::type_index, std::span<const vertex_element>, texture_handle *)>
             draw_textured_indexed_prim;

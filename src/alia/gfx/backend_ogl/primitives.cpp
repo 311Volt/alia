@@ -118,6 +118,18 @@ namespace alia {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
 
+    static void apply_ogl_alpha_mask_color() {
+        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
+        glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_REPLACE);
+        glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB, GL_PRIMARY_COLOR);
+        glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_RGB, GL_SRC_COLOR);
+        glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA, GL_MODULATE);
+        glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA, GL_TEXTURE);
+        glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_ALPHA);
+        glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_ALPHA, GL_PRIMARY_COLOR);
+        glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA, GL_SRC_ALPHA);
+    }
+
     // ── Drawing ──────────────────────────────────────────────────────────
 
     void ogl_draw_prim(
@@ -163,6 +175,28 @@ namespace alia {
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, ogl_tex->tex_id);
         glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, has_vertex_color(elements) ? GL_MODULATE : GL_REPLACE);
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+        compiled.setup(vertices, stride);
+        glDrawArrays(to_gl_mode(type), 0, count);
+        compiled.teardown();
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glDisable(GL_TEXTURE_2D);
+    }
+
+    void ogl_draw_alpha_masked_prim(
+        prim_type type, const void *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture_handle *tex
+    ) {
+        if (count < 3 || !tex)
+            return;
+        auto *ogl_tex = as_ogl_texture(tex);
+        setup_matrices();
+        apply_ogl_alpha_blend();
+        const auto &compiled = get_or_compile(vtx_type, elements);
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, ogl_tex->tex_id);
+        apply_ogl_alpha_mask_color();
         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
         compiled.setup(vertices, stride);
         glDrawArrays(to_gl_mode(type), 0, count);

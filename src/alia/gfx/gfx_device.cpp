@@ -227,6 +227,14 @@ namespace alia {
         current_device().backend()->draw_textured_prim.get_or_throw()(type, vertices, count, stride, vtx_type, elements, tex.impl());
     }
 
+    void draw_alpha_masked_prim(
+        prim_type type, const void *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture &tex
+    ) {
+        current_device().backend()->draw_alpha_masked_prim.get_or_throw()(type, vertices, count, stride, vtx_type, elements, tex.impl());
+    }
+
     void draw_textured_indexed_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::span<const uint32_t> indices,

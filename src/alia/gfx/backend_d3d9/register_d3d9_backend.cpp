@@ -54,6 +54,7 @@ namespace alia {
         iface.draw_prim                  = {d3d9_draw_prim};
         iface.draw_indexed_prim          = {d3d9_draw_indexed_prim};
         iface.draw_textured_prim         = {d3d9_draw_textured_prim};
+        iface.draw_alpha_masked_prim     = {d3d9_draw_alpha_masked_prim};
         iface.draw_textured_indexed_prim = {d3d9_draw_textured_indexed_prim};
 
         return {raw, std::move(iface)};

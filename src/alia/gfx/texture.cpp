@@ -115,7 +115,8 @@ namespace alia {
 
     texture::texture(texture &&other) noexcept
         : handle_(std::exchange(other.handle_, nullptr))
-        , backend_(std::exchange(other.backend_, nullptr)) {}
+        , backend_(std::exchange(other.backend_, nullptr))
+        , role_(std::exchange(other.role_, texture_role::color)) {}
 
     texture &texture::operator=(texture &&other) noexcept {
         if (this != &other) {
@@ -123,36 +124,41 @@ namespace alia {
                 backend_->destroy_texture.get_or_throw()(handle_);
             handle_ = std::exchange(other.handle_, nullptr);
             backend_ = std::exchange(other.backend_, nullptr);
+            role_ = std::exchange(other.role_, texture_role::color);
         }
         return *this;
     }
 
     // ── Constructors ──────────────────────────────────────────────────────
 
-    texture::texture(gfx_device &device, pixel_format fmt, vec2i size, int mip_levels) {
+    texture::texture(gfx_device &device, pixel_format fmt, vec2i size, int mip_levels, texture_role role) {
         const auto *b = device.backend();
-        handle_ = b->create_texture.get_or_throw()(device.device(), fmt, size, mip_levels);
-        if (handle_)
+        handle_ = b->create_texture.get_or_throw()(device.device(), fmt, size, mip_levels, role);
+        if (handle_) {
             backend_ = b;
+            role_ = role;
+        }
     }
 
-    texture::texture(gfx_device &device, const any_bitmap_view &src, int mip_levels) {
+    texture::texture(gfx_device &device, const any_bitmap_view &src, int mip_levels, texture_role role) {
         const auto *b = device.backend();
         handle_ = b->create_texture.get_or_throw()(
-            device.device(), src.format(), {src.width(), src.height()}, mip_levels
+            device.device(), src.format(), {src.width(), src.height()}, mip_levels, role
         );
         if (!handle_)
             return;
         backend_ = b;
+        role_ = role;
         if (!upload_bitmap_view(handle_, backend_, src)) {
             backend_->destroy_texture.get_or_throw()(handle_);
             handle_ = nullptr;
             backend_ = nullptr;
+            role_ = texture_role::color;
         }
     }
 
-    texture::texture(gfx_device &device, const bitmap &src, int mip_levels)
-        : texture(device, src.view(), mip_levels) {}
+    texture::texture(gfx_device &device, const bitmap &src, int mip_levels, texture_role role)
+        : texture(device, src.view(), mip_levels, role) {}
 
     // ── Accessors ────────────────────────────────────────────────────────
 
@@ -224,7 +230,7 @@ namespace alia {
 
     texture texture::clone() const {
         texture_handle *cloned = backend_->texture_clone.get_or_throw()(handle_);
-        return texture(cloned, backend_);
+        return texture(cloned, backend_, role_);
     }
 
 } // namespace alia

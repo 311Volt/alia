@@ -7,13 +7,13 @@
 
 namespace alia {
 
-    static D3DFORMAT to_d3d_format(pixel_format fmt) noexcept {
+    static D3DFORMAT to_d3d_format(pixel_format fmt, texture_role role) noexcept {
         switch (fmt) {
         case pixel_format::bgra8888: return D3DFMT_A8R8G8B8;
         case pixel_format::rgba8888: return D3DFMT_A8B8G8R8;
         case pixel_format::bgr888:   return D3DFMT_R8G8B8;
         case pixel_format::rgb565:   return D3DFMT_R5G6B5;
-        case pixel_format::gray_u8:  return D3DFMT_L8;
+        case pixel_format::gray_u8:  return role == texture_role::alpha_mask ? D3DFMT_A8 : D3DFMT_L8;
         case pixel_format::gray_f32: return D3DFMT_R32F;
         case pixel_format::rgba_f32: return D3DFMT_A32B32G32R32F;
         default:                     return D3DFMT_UNKNOWN;
@@ -42,9 +42,12 @@ namespace alia {
         return supported;
     }
 
-    static pixel_format choose_d3d9_texture_format(IDirect3DDevice9 *device, pixel_format requested, DWORD usage) {
-        const D3DFORMAT requested_fmt = to_d3d_format(requested);
+    static pixel_format choose_d3d9_texture_format(IDirect3DDevice9 *device, pixel_format requested, DWORD usage, texture_role role) {
+        const D3DFORMAT requested_fmt = to_d3d_format(requested, role);
         if (d3d9_supports_texture_format(device, requested_fmt, usage))
+            return requested;
+
+        if (role == texture_role::alpha_mask)
             return requested;
 
         switch (requested) {
@@ -63,13 +66,13 @@ namespace alia {
         return requested;
     }
 
-    texture_handle *d3d9_create_texture(device_handle *dev_h, pixel_format fmt, vec2i size, int mip_levels) {
+    texture_handle *d3d9_create_texture(device_handle *dev_h, pixel_format fmt, vec2i size, int mip_levels, texture_role role) {
         auto *dev = as_d3d9_device(dev_h);
         const bool autogen = (mip_levels != 1);
         const DWORD usage = autogen ? D3DUSAGE_AUTOGENMIPMAP : 0u;
         const UINT mips = autogen ? 0u : 1u;
-        const pixel_format actual_fmt = choose_d3d9_texture_format(dev->device, fmt, usage);
-        const D3DFORMAT d3dfmt = to_d3d_format(actual_fmt);
+        const pixel_format actual_fmt = choose_d3d9_texture_format(dev->device, fmt, usage, role);
+        const D3DFORMAT d3dfmt = to_d3d_format(actual_fmt, role);
         if (!d3d9_supports_texture_format(dev->device, d3dfmt, usage))
             return nullptr;
 
@@ -88,6 +91,7 @@ namespace alia {
         t->height = size.y;
         t->autogen = autogen;
         t->mip_levels = static_cast<int>(tex->GetLevelCount());
+        t->role = role;
         return t;
     }
 
@@ -154,7 +158,7 @@ namespace alia {
 
     texture_handle *d3d9_texture_clone(const texture_handle *h) {
         const auto *src = as_d3d9_texture(h);
-        const D3DFORMAT d3dfmt = to_d3d_format(src->fmt);
+        const D3DFORMAT d3dfmt = to_d3d_format(src->fmt, src->role);
         if (d3dfmt == D3DFMT_UNKNOWN)
             return nullptr;
 
@@ -211,6 +215,7 @@ namespace alia {
         t->mip_levels = src->mip_levels;
         t->autogen = src->autogen;
         t->sampler = src->sampler;
+        t->role = src->role;
         return t;
     }
 

@@ -112,6 +112,20 @@ namespace alia {
     }
 
     template <vertex_type TVertex>
+    void draw_alpha_masked_triangles(texture &tex, std::span<const TVertex> vertices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_alpha_masked_prim(
+            prim_type::triangle_list,
+            vertices.data(),
+            static_cast<int>(vertices.size()),
+            static_cast<int>(sizeof(TVertex)),
+            typeid(TVertex),
+            elems,
+            tex
+        );
+    }
+
+    template <vertex_type TVertex>
     void draw_textured_triangle_strip(texture &tex, std::span<const TVertex> vertices) {
         static constexpr auto elems = TVertex::elements();
         draw_textured_prim(

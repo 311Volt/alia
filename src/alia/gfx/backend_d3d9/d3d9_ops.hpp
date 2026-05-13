@@ -32,6 +32,7 @@ namespace alia {
         int mip_levels = 1;
         bool autogen = false;
         pixel_format fmt = pixel_format::bgra8888;
+        texture_role role = texture_role::color;
         sampler_state sampler = {};
     };
 
@@ -76,7 +77,7 @@ namespace alia {
 
     // ── Texture ops ───────────────────────────────────────────────────────
 
-    texture_handle *d3d9_create_texture(device_handle *dev, pixel_format fmt, vec2i size, int mip_levels);
+    texture_handle *d3d9_create_texture(device_handle *dev, pixel_format fmt, vec2i size, int mip_levels, texture_role role);
     void d3d9_destroy_texture(texture_handle *h);
     pixel_format d3d9_texture_format(const texture_handle *h);
     int d3d9_texture_width(const texture_handle *h);
@@ -109,6 +110,11 @@ namespace alia {
         std::type_index vtx_type, std::span<const vertex_element> elements
     );
     void d3d9_draw_textured_prim(
+        prim_type type, const void *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture_handle *tex
+    );
+    void d3d9_draw_alpha_masked_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements,
         texture_handle *tex

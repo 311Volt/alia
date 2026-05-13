@@ -20,14 +20,16 @@ namespace alia {
         GLenum type;
     };
 
-    static ogl_pixel_fmt to_ogl_format(pixel_format fmt) noexcept {
+    static ogl_pixel_fmt to_ogl_format(pixel_format fmt, texture_role role) noexcept {
         switch (fmt) {
         case pixel_format::rgba8888: return {GL_RGBA8,   GL_RGBA,            GL_UNSIGNED_BYTE};
         case pixel_format::rgb888:   return {GL_RGB8,    GL_RGB,             GL_UNSIGNED_BYTE};
         case pixel_format::bgra8888: return {GL_RGBA8,   GL_BGRA,            GL_UNSIGNED_BYTE};
         case pixel_format::bgr888:   return {GL_RGB8,    GL_BGR,             GL_UNSIGNED_BYTE};
         case pixel_format::rgb565:   return {GL_RGB,     GL_RGB,             GL_UNSIGNED_SHORT_5_6_5};
-        case pixel_format::gray_u8:  return {GL_R8,      GL_RED,             GL_UNSIGNED_BYTE};
+        case pixel_format::gray_u8:  return role == texture_role::alpha_mask
+                                                ? ogl_pixel_fmt{GL_ALPHA8, GL_ALPHA, GL_UNSIGNED_BYTE}
+                                                : ogl_pixel_fmt{GL_R8, GL_RED, GL_UNSIGNED_BYTE};
         case pixel_format::gray_f32: return {GL_R32F,    GL_RED,             GL_FLOAT};
         case pixel_format::rgba_f32: return {GL_RGBA32F, GL_RGBA,            GL_FLOAT};
         case pixel_format::rgb_f32:  return {GL_RGB32F,  GL_RGB,             GL_FLOAT};
@@ -68,12 +70,12 @@ namespace alia {
 
     // ── Texture ops ───────────────────────────────────────────────────────
 
-    texture_handle *ogl_create_texture(device_handle * /*dev*/, pixel_format fmt, vec2i size, int mip_levels) {
+    texture_handle *ogl_create_texture(device_handle * /*dev*/, pixel_format fmt, vec2i size, int mip_levels, texture_role role) {
         const int bpp = bytes_per_pixel_for_format(fmt);
         if (bpp == 0)
             return nullptr;
 
-        const auto [internal, external, type] = to_ogl_format(fmt);
+        const auto [internal, external, type] = to_ogl_format(fmt, role);
         if (internal == 0)
             return nullptr;
 
@@ -93,6 +95,7 @@ namespace alia {
         t->width = size.x;
         t->height = size.y;
         t->mip_levels = actual_mips;
+        t->role = role;
 
         glGenTextures(1, &t->tex_id);
         glBindTexture(GL_TEXTURE_2D, t->tex_id);
@@ -151,7 +154,7 @@ namespace alia {
             t->stage_buf_bytes = needed;
         }
 
-        const auto [internal, external, type] = to_ogl_format(t->fmt);
+        const auto [internal, external, type] = to_ogl_format(t->fmt, t->role);
         glBindTexture(GL_TEXTURE_2D, t->tex_id);
         glGetTexImage(GL_TEXTURE_2D, level, external, type, t->stage_buf.get());
 
@@ -171,7 +174,7 @@ namespace alia {
 
         const int bpp = bytes_per_pixel_for_format(t->fmt);
         const int lw = std::max(1, t->width >> info.level);
-        const auto [internal, external, type] = to_ogl_format(t->fmt);
+        const auto [internal, external, type] = to_ogl_format(t->fmt, t->role);
 
         glBindTexture(GL_TEXTURE_2D, t->tex_id);
         glPixelStorei(GL_UNPACK_ROW_LENGTH, lw);
@@ -194,13 +197,14 @@ namespace alia {
     texture_handle *ogl_texture_clone(const texture_handle *h) {
         const auto *src = as_ogl_texture(h);
         const int bpp = bytes_per_pixel_for_format(src->fmt);
-        const auto [internal, external, type] = to_ogl_format(src->fmt);
+        const auto [internal, external, type] = to_ogl_format(src->fmt, src->role);
 
         auto *dst = new ogl_texture;
         dst->fmt = src->fmt;
         dst->width = src->width;
         dst->height = src->height;
         dst->mip_levels = src->mip_levels;
+        dst->role = src->role;
         dst->sampler = src->sampler;
 
         glGenTextures(1, &dst->tex_id);

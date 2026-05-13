@@ -45,6 +45,7 @@ namespace alia {
     namespace detail {
         struct ttf_font_impl;
         struct hardware_glyph_buffer_impl;
+        struct text_impl;
     } // namespace detail
 
     class ttf_font final : public font {
@@ -87,6 +88,33 @@ namespace alia {
         friend void draw_text(font &source, std::string_view text, color color, vec2f position, hardware_glyph_buffer *glyph_buffer);
 
         std::unique_ptr<detail::hardware_glyph_buffer_impl> impl_;
+    };
+
+    enum class text_align {
+        left,
+        center,
+        right,
+    };
+
+    class text {
+    public:
+        explicit text(font &source);
+        ~text();
+
+        text(text &&) noexcept;
+        text &operator=(text &&) noexcept;
+        text(const text &) = delete;
+        text &operator=(const text &) = delete;
+
+        text &set_text(std::string_view text);
+        text &set_align(text_align align);
+        text &set_antialiasing(bool enabled);
+        text &set_kerning(bool enabled);
+
+        void draw(vec2i position, color text_color = color::white);
+
+    private:
+        std::unique_ptr<detail::text_impl> impl_;
     };
 
     [[nodiscard]] ttf_font load_ttf_font(std::string_view filename, int pixel_height = 32);

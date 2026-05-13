@@ -129,6 +129,16 @@ namespace alia {
         device->SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
     }
 
+    static void apply_d3d9_alpha_mask_color(IDirect3DDevice9 *device) {
+        device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+        device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
+        device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+        device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+        device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        device->SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+        device->SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
+    }
+
     static D3DPRIMITIVETYPE to_d3d_prim(prim_type type) {
         switch (type) {
         case prim_type::triangle_list:  return D3DPT_TRIANGLELIST;
@@ -206,6 +216,28 @@ namespace alia {
         device->SetTexture(0, d3d_tex->texture);
         apply_d3d9_sampler(device, 0, d3d_tex->sampler);
         apply_d3d9_texture_color(device, has_vertex_color(elements));
+        device->SetVertexDeclaration(decl);
+        device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
+        apply_d3d9_vertex_color(device);
+    }
+
+    void d3d9_draw_alpha_masked_prim(
+        prim_type type, const void *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture_handle *tex
+    ) {
+        if (count < 3 || !tex)
+            return;
+        auto *d3d_tex = as_d3d9_texture(tex);
+        auto *device = as_d3d9_device(current_device().device())->device;
+        auto *decl = get_or_compile(device, vtx_type, elements);
+        if (!decl)
+            return;
+
+        apply_d3d9_alpha_blend(device);
+        device->SetTexture(0, d3d_tex->texture);
+        apply_d3d9_sampler(device, 0, d3d_tex->sampler);
+        apply_d3d9_alpha_mask_color(device);
         device->SetVertexDeclaration(decl);
         device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
         apply_d3d9_vertex_color(device);
