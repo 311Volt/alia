@@ -19,6 +19,7 @@ namespace alia {
     struct px_rgb888 {
         uint8_t r, g, b;
 
+        using is_pixel_type = void;
         using has_red = void;
         using has_green = void;
         using has_blue = void;
@@ -37,6 +38,7 @@ namespace alia {
     struct px_rgba8888 {
         uint8_t r, g, b, a;
 
+        using is_pixel_type = void;
         using has_red = void;
         using has_green = void;
         using has_blue = void;
@@ -60,6 +62,7 @@ namespace alia {
         uint16_t g : 6;
         uint16_t r : 5;
 
+        using is_pixel_type = void;
         using has_red = void;
         using has_green = void;
         using has_blue = void;
@@ -80,6 +83,7 @@ namespace alia {
     struct px_bgr888 {
         uint8_t b, g, r;
 
+        using is_pixel_type = void;
         using has_red = void;
         using has_green = void;
         using has_blue = void;
@@ -98,6 +102,7 @@ namespace alia {
     struct px_bgra8888 {
         uint8_t b, g, r, a;
 
+        using is_pixel_type = void;
         using has_red = void;
         using has_green = void;
         using has_blue = void;
@@ -117,6 +122,7 @@ namespace alia {
     struct px_gray_u8 {
         uint8_t v;
 
+        using is_pixel_type = void;
         using has_gray = void;
         using channel_type = uint8_t;
         static constexpr pixel_format format_id = pixel_format::gray_u8;
@@ -128,6 +134,7 @@ namespace alia {
     struct px_gray_f32 {
         float v;
 
+        using is_pixel_type = void;
         using has_gray = void;
         using channel_type = float;
         static constexpr pixel_format format_id = pixel_format::gray_f32;
@@ -139,6 +146,7 @@ namespace alia {
     struct px_rgba_f32 {
         float r, g, b, a;
 
+        using is_pixel_type = void;
         using has_red = void;
         using has_green = void;
         using has_blue = void;
@@ -153,6 +161,7 @@ namespace alia {
     struct px_rgb_f32 {
         float r, g, b;
 
+        using is_pixel_type = void;
         using has_red = void;
         using has_green = void;
         using has_blue = void;
@@ -162,5 +171,43 @@ namespace alia {
     static_assert(sizeof(px_rgb_f32) == 12, "px_rgb_f32 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_rgb_f32>);
     static_assert(std::is_standard_layout_v<px_rgb_f32>);
+
+    struct px_xy_u8 {
+        uint8_t x, y;
+
+        using is_pixel_type = void;
+        using has_x = void;
+        using has_y = void;
+        using channel_type = uint8_t;
+        static constexpr pixel_format format_id = pixel_format::xy_u8;
+    };
+    static_assert(sizeof(px_xy_u8) == 2, "px_xy_u8 must not have padding");
+    static_assert(std::is_trivially_copyable_v<px_xy_u8>);
+    static_assert(std::is_standard_layout_v<px_xy_u8>);
+
+    struct px_xy_f32 {
+        float x, y;
+
+        using is_pixel_type = void;
+        using has_x = void;
+        using has_y = void;
+        using channel_type = float;
+        static constexpr pixel_format format_id = pixel_format::xy_f32;
+    };
+    static_assert(sizeof(px_xy_f32) == 8, "px_xy_f32 must not have padding");
+    static_assert(std::is_trivially_copyable_v<px_xy_f32>);
+    static_assert(std::is_standard_layout_v<px_xy_f32>);
+
+    struct px_palette_u8 {
+        uint8_t palette_index;
+
+        using is_pixel_type = void;
+        using has_palette_index = void;
+        using channel_type = uint8_t;
+        static constexpr pixel_format format_id = pixel_format::palette_u8;
+    };
+    static_assert(sizeof(px_palette_u8) == 1, "px_palette_u8 must not have padding");
+    static_assert(std::is_trivially_copyable_v<px_palette_u8>);
+    static_assert(std::is_standard_layout_v<px_palette_u8>);
 
 } // namespace alia

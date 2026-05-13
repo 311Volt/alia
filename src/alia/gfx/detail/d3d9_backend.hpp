@@ -73,6 +73,10 @@ namespace alia {
 
         ~d3d9_device_impl() override;
 
+        vec2f pixel_center_offset() const noexcept override {
+            return {-0.5f, -0.5f};
+        }
+
         std::unique_ptr<texture_impl> create_texture(pixel_format fmt, vec2i size, int mip_levels) override;
 
         std::unique_ptr<swapchain_impl> create_swapchain(void *native_handle, vec2i initial_size) override;

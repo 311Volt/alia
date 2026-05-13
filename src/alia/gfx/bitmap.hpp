@@ -1,14 +1,16 @@
 #ifndef BITMAP_AB97234D_69C8_4EC9_B9FC_3800633E0EEC
 #define BITMAP_AB97234D_69C8_4EC9_B9FC_3800633E0EEC
 
-#include "pixel.hpp"
+#include "pixel_format_conversions.hpp"
 #include <alia/core/vec.hpp>
 #include <alia/core/rect.hpp>
-#include <memory>
-#include <span>
 #include <cstddef>
 #include <cstring>
+#include <functional>
+#include <memory>
+#include <span>
 #include <stdexcept>
+#include <string>
 
 namespace alia {
 
@@ -54,6 +56,14 @@ namespace alia {
         /// @returns Height of the view in pixels.
         [[nodiscard]] int height() const noexcept {
             return height_;
+        }
+        /// @returns Dimensions of the view in pixels.
+        [[nodiscard]] vec2i size() const noexcept {
+            return {width_, height_};
+        }
+        /// @returns Bounds of the view in its own coordinate space.
+        [[nodiscard]] rect_i rect() const noexcept {
+            return rect_i{{0, 0}, size()};
         }
         /// @returns Row stride in bytes.
         [[nodiscard]] int stride_bytes() const noexcept {
@@ -133,6 +143,14 @@ namespace alia {
         /// @returns Height of the view in pixels.
         [[nodiscard]] int height() const noexcept {
             return height_;
+        }
+        /// @returns Dimensions of the view in pixels.
+        [[nodiscard]] vec2i size() const noexcept {
+            return {width_, height_};
+        }
+        /// @returns Bounds of the view in its own coordinate space.
+        [[nodiscard]] rect_i rect() const noexcept {
+            return rect_i{{0, 0}, size()};
         }
         /// @returns Row stride in bytes.
         [[nodiscard]] int stride_bytes() const noexcept {
@@ -312,6 +330,14 @@ namespace alia {
         [[nodiscard]] int height() const noexcept {
             return height_;
         }
+        /// @returns Dimensions of the bitmap in pixels.
+        [[nodiscard]] vec2i size() const noexcept {
+            return {width_, height_};
+        }
+        /// @returns Bounds of the bitmap in its own coordinate space.
+        [[nodiscard]] rect_i rect() const noexcept {
+            return rect_i{{0, 0}, size()};
+        }
         /// @returns Row stride in bytes.
         [[nodiscard]] int stride_bytes() const noexcept {
             return stride_bytes_;
@@ -375,6 +401,105 @@ namespace alia {
         int stride_bytes_ = 0;
         std::unique_ptr<std::byte[]> data_;
     };
+
+    namespace detail {
+
+        struct blit_rects {
+            rect_i dst;
+            rect_i src;
+        };
+
+        inline void validate_blit_size(vec2i dst_size, vec2i src_size, const char *operation) {
+            if (dst_size != src_size)
+                throw std::invalid_argument(std::string(operation) + ": source and destination sizes differ");
+        }
+
+        [[nodiscard]] inline blit_rects resolve_blit_rects(rect_i dst_bounds, rect_i src_bounds, rect_i src_rect, vec2i dst_pos) {
+            if (src_rect.width() <= 0 || src_rect.height() <= 0)
+                return {};
+
+            const rect_i requested_dst = rect_i::pos_size(dst_pos, src_rect.size());
+            const rect_i dst_clip = requested_dst.intersection_with(dst_bounds);
+            if (dst_clip.width() <= 0 || dst_clip.height() <= 0)
+                return {dst_clip, {}};
+
+            const vec2i src_pos = src_rect.p1 + (dst_clip.p1 - requested_dst.p1);
+            const rect_i resolved_src = rect_i::pos_size(src_pos, dst_clip.size());
+            if (!src_bounds.contains(resolved_src))
+                throw std::invalid_argument("blit: source rectangle is outside source bounds");
+
+            return {dst_clip, resolved_src};
+        }
+
+    } // namespace detail
+
+    template <pixel TPixel>
+    void blit(bitmap_view<TPixel> dst, bitmap_view<TPixel> src) {
+        detail::validate_blit_size(dst.size(), src.size(), "blit");
+
+        const auto row_bytes = static_cast<std::size_t>(dst.width()) * sizeof(TPixel);
+        for (int y = 0; y < dst.height(); ++y)
+            std::memcpy(dst.line(y).data(), src.line(y).data(), row_bytes);
+    }
+
+    template <pixel TPixel>
+    void blit(bitmap_view<TPixel> dst, bitmap_view<TPixel> src, rect_i src_rect, vec2i dst_pos) {
+        const detail::blit_rects rects = detail::resolve_blit_rects(dst.rect(), src.rect(), src_rect, dst_pos);
+        if (rects.dst.width() <= 0 || rects.dst.height() <= 0)
+            return;
+
+        const auto row_bytes = static_cast<std::size_t>(rects.dst.width()) * sizeof(TPixel);
+        for (int y = 0; y < rects.dst.height(); ++y) {
+            auto dst_row = dst.line(rects.dst.top() + y);
+            auto src_row = src.line(rects.src.top() + y);
+            std::memcpy(dst_row.data() + rects.dst.left(), src_row.data() + rects.src.left(), row_bytes);
+        }
+    }
+
+    template <pixel TDstPixel, pixel TSrcPixel, typename Conv>
+    void converting_blit(bitmap_view<TDstPixel> dst, bitmap_view<TSrcPixel> src, Conv &&converter) {
+        detail::validate_blit_size(dst.size(), src.size(), "converting_blit");
+
+        for (int y = 0; y < dst.height(); ++y) {
+            auto dst_row = dst.line(y);
+            auto src_row = src.line(y);
+            for (int x = 0; x < dst.width(); ++x)
+                dst_row[x] = std::invoke(converter, src_row[x]);
+        }
+    }
+
+    template <pixel TDstPixel, pixel TSrcPixel>
+        requires is_convert_pixel_allowed_v<TSrcPixel, TDstPixel>
+    void converting_blit(bitmap_view<TDstPixel> dst, bitmap_view<TSrcPixel> src) {
+        converting_blit(dst, src, [](TSrcPixel px) {
+            return convert_pixel<TDstPixel>(px);
+        });
+    }
+
+    template <pixel TDstPixel, pixel TSrcPixel, typename Conv>
+    void converting_blit(bitmap_view<TDstPixel> dst, bitmap_view<TSrcPixel> src, rect_i src_rect, vec2i dst_pos, Conv &&converter) {
+        const detail::blit_rects rects = detail::resolve_blit_rects(dst.rect(), src.rect(), src_rect, dst_pos);
+        if (rects.dst.width() <= 0 || rects.dst.height() <= 0)
+            return;
+
+        for (int y = 0; y < rects.dst.height(); ++y) {
+            auto dst_row = dst.line(rects.dst.top() + y);
+            auto src_row = src.line(rects.src.top() + y);
+            for (int x = 0; x < rects.dst.width(); ++x)
+                dst_row[rects.dst.left() + x] = std::invoke(converter, src_row[rects.src.left() + x]);
+        }
+    }
+
+    template <pixel TDstPixel, pixel TSrcPixel>
+        requires is_convert_pixel_allowed_v<TSrcPixel, TDstPixel>
+    void converting_blit(bitmap_view<TDstPixel> dst, bitmap_view<TSrcPixel> src, rect_i src_rect, vec2i dst_pos) {
+        converting_blit(dst, src, src_rect, dst_pos, [](TSrcPixel px) {
+            return convert_pixel<TDstPixel>(px);
+        });
+    }
+
+    void converting_blit(any_bitmap_view dst, any_bitmap_view src);
+    void converting_blit(any_bitmap_view dst, any_bitmap_view src, rect_i src_rect, vec2i dst_pos);
 
 } // namespace alia
 

@@ -141,6 +141,12 @@ namespace alia {
         return *this;
     }
 
+    vec2f gfx_device::pixel_center_offset() const {
+        if (!valid())
+            throw std::runtime_error("gfx_device::pixel_center_offset: device is not valid");
+        return impl_->pixel_center_offset();
+    }
+
     gfx_device gfx_device::create(gfx_backend pref) {
         init_gfx_backends();
 
@@ -167,6 +173,10 @@ namespace alia {
         }
 
         throw std::runtime_error("gfx_device: no graphics backend available");
+    }
+
+    vec2f current_pixel_center_offset() {
+        return current_device().pixel_center_offset();
     }
 
     swapchain gfx_device::create_swapchain(const swapchain_config &config) {

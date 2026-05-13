@@ -53,6 +53,15 @@ struct transform {
         return res;
     }
 
+    // Top-left UI projection with backend-specific pixel-center correction.
+    static transform ortho_ui(float width, float height);
+    static transform ortho_ui(vec2f size) {
+        return ortho_ui(size.x, size.y);
+    }
+    static transform ortho_ui(vec2i size) {
+        return ortho_ui(static_cast<float>(size.x), static_cast<float>(size.y));
+    }
+
     transform operator*(const transform& o) const {
         transform res = {};
         for (int i = 0; i < 4; ++i) {

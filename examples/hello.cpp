@@ -38,8 +38,7 @@ int main() {
     alia::gfx_device device = alia::gfx_device::create(alia::gfx_backend::d3d9);
     auto swapchain = device.create_swapchain({.target = win});
 
-    alia::set_current_projection(
-        alia::transform::ortho(0, 800, 600, 0));
+    alia::set_current_projection(alia::transform::ortho_ui(win.size()));
 
     alia::event_queue events;
     events.register_source(&win.get_event_source());
@@ -73,6 +72,7 @@ int main() {
                 running = false;
             } else if (auto* e = ev.get_if<alia::window_resize_event>()) {
                 alia::on_resize(e->new_size);
+                alia::set_current_projection(alia::transform::ortho_ui(e->new_size));
             } else if (auto* e = ev.get_if<alia::window_key_down_event>()) {
                 if (e->key == alia::key::escape)
                     running = false;
@@ -89,13 +89,13 @@ int main() {
         if (demo_font && glyphs) {
             alia::draw_text(
                 *demo_font,
-                "hwdp jp 100%",
+                "The quick brown fox jumps over the lazy dog",
                 alia::color::white,
                 {310.0f, 58.0f},
                 &*glyphs);
             alia::draw_text(
                 *demo_font,
-                "jp 100% hwdp",
+                "1234567890!@#$%^&*()",
                 alia::color(0.05f, 0.08f, 0.12f, 1.0f),
                 {310.0f, 98.0f},
                 &*glyphs);

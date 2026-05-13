@@ -77,6 +77,9 @@ namespace alia {
     struct gfx_device_impl {
         virtual ~gfx_device_impl() = default;
 
+        // Screen-space position bias needed for pixel-aligned UI rendering.
+        [[nodiscard]] virtual vec2f pixel_center_offset() const noexcept = 0;
+
         virtual std::unique_ptr<texture_impl> create_texture(pixel_format fmt, vec2i size, int mip_levels) = 0;
 
         virtual std::unique_ptr<swapchain_impl> create_swapchain(void *native_handle, vec2i initial_size) = 0;
@@ -141,6 +144,7 @@ namespace alia {
         [[nodiscard]] explicit operator bool() const noexcept { return valid(); }
 
         gfx_device_impl *impl() const noexcept { return impl_.get(); }
+        [[nodiscard]] vec2f pixel_center_offset() const;
 
     private:
         std::unique_ptr<gfx_device_impl> impl_;
@@ -176,6 +180,7 @@ namespace alia {
     void make_current(swapchain &s);
     void make_current(window &w);
     gfx_device &current_device();
+    [[nodiscard]] vec2f current_pixel_center_offset();
     swapchain &current_swapchain();
     window &current_window();
 

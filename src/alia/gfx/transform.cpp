@@ -12,6 +12,11 @@ namespace alia {
 
     static thread_local std::array<float, 16> current_projection_matrix = identity_matrix;
 
+    transform transform::ortho_ui(float width, float height) {
+        const vec2f offset = current_pixel_center_offset();
+        return ortho(-offset.x, width - offset.x, height - offset.y, -offset.y);
+    }
+
     transform get_current_transform() {
         transform t;
         get_current_transform_matrix(std::span<float, 16>(&t.m[0][0], 16));
