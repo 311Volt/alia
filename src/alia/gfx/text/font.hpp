@@ -111,7 +111,7 @@ namespace alia {
         text &set_antialiasing(bool enabled);
         text &set_kerning(bool enabled);
 
-        void draw(vec2i position, color text_color = color::white);
+        void draw(vec2i position, color text_color = white);
 
     private:
         std::unique_ptr<detail::text_impl> impl_;

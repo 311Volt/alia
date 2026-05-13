@@ -102,7 +102,7 @@ int main() {
             fps_frames = 0;
         }
 
-        alia::clear(alia::color::cornflower_blue);
+        alia::clear(alia::light_blue);
         alia::draw_triangle(tri[0], tri[1], tri[2]);
         
         alia::draw_textured_rect(alia::rect_f::pos_size({50, 250}, {256, 256}), checker_tex);
@@ -114,7 +114,7 @@ int main() {
             demo_numbers->draw({310, 98}, alia::color(0.05f, 0.08f, 0.12f, 1.0f));
         }
         if (fps_text)
-            fps_text->draw({10, 10}, alia::color::white);
+            fps_text->draw({10, 10}, alia::white);
 
         alia::present();
     }

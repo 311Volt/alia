@@ -2,7 +2,9 @@
 #define PIXEL_FORMAT_CONVERSIONS_A5403053_FECF_4593_B185_70E123769583
 
 #include "pixel_types.hpp"
+#include "../core/color.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -244,7 +246,36 @@ namespace alia {
             }
         }
 
+        template <pixel TDstPixel, typename TDstChannel>
+        [[nodiscard]] constexpr channel_type_t<TDstPixel> float_to_channel(float value) noexcept {
+            using dst_channel_type = channel_type_t<TDstPixel>;
+            if constexpr (std::is_floating_point_v<dst_channel_type>) {
+                return static_cast<dst_channel_type>(value);
+            } else {
+                constexpr auto dst_max = integer_channel_max_v<TDstPixel, TDstChannel>;
+                return static_cast<dst_channel_type>(static_cast<float>(dst_max) * value + 0.5f);
+            }
+        }
+
     } // namespace detail
+
+    template <pixel TDstPixel>
+    [[nodiscard]] constexpr TDstPixel color_to_pixel(const color& c) noexcept {
+        static_assert(has_color_v<TDstPixel> || has_gray_v<TDstPixel>,
+                      "color_to_pixel only supports RGB, RGBA, and grayscale pixel types");
+        TDstPixel dst{};
+        if constexpr (has_color_v<TDstPixel>) {
+            detail::set_red(dst,   detail::float_to_channel<TDstPixel, detail::red_channel>  (std::clamp(c.r, 0.0f, 1.0f)));
+            detail::set_green(dst, detail::float_to_channel<TDstPixel, detail::green_channel>(std::clamp(c.g, 0.0f, 1.0f)));
+            detail::set_blue(dst,  detail::float_to_channel<TDstPixel, detail::blue_channel> (std::clamp(c.b, 0.0f, 1.0f)));
+            if constexpr (has_alpha_v<TDstPixel>)
+                detail::set_alpha(dst, detail::float_to_channel<TDstPixel, detail::alpha_channel>(std::clamp(c.a, 0.0f, 1.0f)));
+        } else if constexpr (has_gray_v<TDstPixel>) {
+            const float lum = std::clamp(0.299f * c.r + 0.587f * c.g + 0.114f * c.b, 0.0f, 1.0f);
+            detail::set_gray(dst, detail::float_to_channel<TDstPixel, detail::gray_channel>(lum));
+        }
+        return dst;
+    }
 
     template <typename TSrcPixel, typename TDstPixel>
     struct is_convert_pixel_allowed
