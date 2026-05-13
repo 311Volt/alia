@@ -5,7 +5,6 @@
 
 namespace alia {
 
-
     // ============================================================================
     // Pixel format identifier
     //
@@ -26,20 +25,20 @@ namespace alia {
     };
 
     // Returns the number of bytes per pixel for a pixel_format.
-	[[nodiscard]] inline constexpr int bytes_per_pixel_for_format(pixel_format fmt) noexcept {
-		switch (fmt) {
-			case pixel_format::rgb888:   return 3;
-			case pixel_format::rgba8888: return 4;
-			case pixel_format::rgb565:   return 2;
-			case pixel_format::bgr888:   return 3;
-			case pixel_format::bgra8888: return 4;
-			case pixel_format::gray_u8:  return 1;
-			case pixel_format::gray_f32: return 4;
-			case pixel_format::rgba_f32: return 16;
-			case pixel_format::rgb_f32:  return 12;
-			default:                     return 0;
-		}
-	}
+    [[nodiscard]] inline constexpr int bytes_per_pixel_for_format(pixel_format fmt) noexcept {
+        switch (fmt) {
+        case pixel_format::rgb888:   return 3;
+        case pixel_format::rgba8888: return 4;
+        case pixel_format::rgb565:   return 2;
+        case pixel_format::bgr888:   return 3;
+        case pixel_format::bgra8888: return 4;
+        case pixel_format::gray_u8:  return 1;
+        case pixel_format::gray_f32: return 4;
+        case pixel_format::rgba_f32: return 16;
+        case pixel_format::rgb_f32:  return 12;
+        default:                     return 0;
+        }
+    }
 
     struct px_rgb888;
     struct px_rgba8888;
@@ -53,15 +52,24 @@ namespace alia {
 
     template <typename T>
     struct is_pixel_type : std::false_type {};
-    template <> struct is_pixel_type<px_rgb888> : std::true_type {};
-    template <> struct is_pixel_type<px_rgba8888> : std::true_type {};
-    template <> struct is_pixel_type<px_rgb565> : std::true_type {};
-    template <> struct is_pixel_type<px_bgr888> : std::true_type {};
-    template <> struct is_pixel_type<px_bgra8888> : std::true_type {};
-    template <> struct is_pixel_type<px_gray_u8> : std::true_type {};
-    template <> struct is_pixel_type<px_gray_f32> : std::true_type {};
-    template <> struct is_pixel_type<px_rgba_f32> : std::true_type {};
-    template <> struct is_pixel_type<px_rgb_f32> : std::true_type {};
+    template <>
+    struct is_pixel_type<px_rgb888> : std::true_type {};
+    template <>
+    struct is_pixel_type<px_rgba8888> : std::true_type {};
+    template <>
+    struct is_pixel_type<px_rgb565> : std::true_type {};
+    template <>
+    struct is_pixel_type<px_bgr888> : std::true_type {};
+    template <>
+    struct is_pixel_type<px_bgra8888> : std::true_type {};
+    template <>
+    struct is_pixel_type<px_gray_u8> : std::true_type {};
+    template <>
+    struct is_pixel_type<px_gray_f32> : std::true_type {};
+    template <>
+    struct is_pixel_type<px_rgba_f32> : std::true_type {};
+    template <>
+    struct is_pixel_type<px_rgb_f32> : std::true_type {};
 
     template <typename T>
     inline constexpr bool is_pixel_type_v = is_pixel_type<std::remove_cv_t<T>>::value;
@@ -74,23 +82,23 @@ namespace alia {
     // ============================================================================
 
     template <typename T>
-    struct has_red : std::bool_constant < requires {
+        struct has_red : std::bool_constant < requires {
         typename T::has_red;
     } > {};
     template <typename T>
-    struct has_green : std::bool_constant < requires {
+        struct has_green : std::bool_constant < requires {
         typename T::has_green;
     } > {};
     template <typename T>
-    struct has_blue : std::bool_constant < requires {
+        struct has_blue : std::bool_constant < requires {
         typename T::has_blue;
     } > {};
     template <typename T>
-    struct has_alpha : std::bool_constant < requires {
+        struct has_alpha : std::bool_constant < requires {
         typename T::has_alpha;
     } > {};
     template <typename T>
-    struct has_gray : std::bool_constant < requires {
+        struct has_gray : std::bool_constant < requires {
         typename T::has_gray;
     } > {};
 
@@ -135,7 +143,8 @@ namespace alia {
 
     // is_floating_point_pixel — derived from channel_type.
     template <typename T>
-    inline constexpr bool is_floating_point_pixel_v = requires { typename channel_type<T>::type; } && std::is_floating_point_v<channel_type_t<T>>;
+    inline constexpr bool is_floating_point_pixel_v =
+        requires { typename channel_type<T>::type; } && std::is_floating_point_v<channel_type_t<T>>;
 
     // has_color — true when R, G, B channels are all present.
     template <typename T>
@@ -151,12 +160,9 @@ namespace alia {
     // ============================================================================
 
     template <typename T>
-    concept pixel =
-        std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T> &&
-        is_pixel_type_v<T> &&
-        requires { typename channel_type<T>::type; } &&
-        (has_red_v<T> || has_gray_v<T>) &&
-        requires { requires std::is_same_v<std::remove_cv_t<decltype(T::format_id)>, pixel_format>; };
+    concept pixel = std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T> && is_pixel_type_v<T> && requires {
+        typename channel_type<T>::type;
+    } && (has_red_v<T> || has_gray_v<T>) && requires { requires std::is_same_v<std::remove_cv_t<decltype(T::format_id)>, pixel_format>; };
 
     // ============================================================================
     // Channel getters

@@ -27,7 +27,9 @@ namespace alia {
         glyph_metrics metrics;
         std::vector<unsigned char> coverage;
 
-        [[nodiscard]] bool has_bitmap() const noexcept { return metrics.bitmap_size.x > 0 && metrics.bitmap_size.y > 0; }
+        [[nodiscard]] bool has_bitmap() const noexcept {
+            return metrics.bitmap_size.x > 0 && metrics.bitmap_size.y > 0;
+        }
     };
 
     class font {

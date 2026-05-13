@@ -13,89 +13,92 @@
 
 namespace alia {
 
-// ── OpenGL texture impl ──────────────────────────────────────────────
+    // ── OpenGL texture impl ──────────────────────────────────────────────
 
-struct ogl_texture_impl : texture_impl {
-    GLuint       tex_id          = 0;
-    int          width_          = 0;
-    int          height_         = 0;
-    int          mip_levels_     = 1;
-    pixel_format fmt_            = pixel_format::rgba8888;
-    sampler_state sampler_       = {};
+    struct ogl_texture_impl : texture_impl {
+        GLuint tex_id = 0;
+        int width_ = 0;
+        int height_ = 0;
+        int mip_levels_ = 1;
+        pixel_format fmt_ = pixel_format::rgba8888;
+        sampler_state sampler_ = {};
 
-    // CPU staging buffer for lock/unlock (glGetTexImage / glTexSubImage2D)
-    std::unique_ptr<std::byte[]> stage_buf_;
-    std::size_t                  stage_buf_bytes_ = 0;
+        // CPU staging buffer for lock/unlock (glGetTexImage / glTexSubImage2D)
+        std::unique_ptr<std::byte[]> stage_buf_;
+        std::size_t stage_buf_bytes_ = 0;
 
-    ~ogl_texture_impl() override;
+        ~ogl_texture_impl() override;
 
-    pixel_format  format()     const noexcept override { return fmt_; }
-    int           width()      const noexcept override { return width_; }
-    int           height()     const noexcept override { return height_; }
-    int           mip_levels() const noexcept override { return mip_levels_; }
-    sampler_state sampler()    const noexcept override { return sampler_; }
+        pixel_format format() const noexcept override {
+            return fmt_;
+        }
+        int width() const noexcept override {
+            return width_;
+        }
+        int height() const noexcept override {
+            return height_;
+        }
+        int mip_levels() const noexcept override {
+            return mip_levels_;
+        }
+        sampler_state sampler() const noexcept override {
+            return sampler_;
+        }
 
-    void set_sampler(const sampler_state& s) override;
-    bool lock(rect_i region, int level, texture_lock_info& out) override;
-    void unlock(const texture_lock_info& info, bool wrote) override;
-    void generate_mipmaps() override;
-    std::unique_ptr<texture_impl> clone() const override;
+        void set_sampler(const sampler_state &s) override;
+        bool lock(rect_i region, int level, texture_lock_info &out) override;
+        void unlock(const texture_lock_info &info, bool wrote) override;
+        void generate_mipmaps() override;
+        std::unique_ptr<texture_impl> clone() const override;
 
-    void apply_sampler() noexcept;
-};
+        void apply_sampler() noexcept;
+    };
 
-// ── OpenGL device impl ──────────────────────────────────────────────
+    // ── OpenGL device impl ──────────────────────────────────────────────
 
-struct ogl_device_impl : gfx_device_impl {
-    void* ctx = nullptr;  // opaque context handle (HGLRC on Win32)
+    struct ogl_device_impl : gfx_device_impl {
+        void *ctx = nullptr; // opaque context handle (HGLRC on Win32)
 
-    ~ogl_device_impl() override;
+        ~ogl_device_impl() override;
 
-    std::unique_ptr<texture_impl> create_texture(
-        pixel_format fmt, vec2i size, int mip_levels) override;
+        std::unique_ptr<texture_impl> create_texture(pixel_format fmt, vec2i size, int mip_levels) override;
 
-    std::unique_ptr<swapchain_impl> create_swapchain(
-        void* native_handle, vec2i initial_size) override;
-};
+        std::unique_ptr<swapchain_impl> create_swapchain(void *native_handle, vec2i initial_size) override;
+    };
 
-// ── OpenGL swapchain impl ───────────────────────────────────────────
+    // ── OpenGL swapchain impl ───────────────────────────────────────────
 
-struct ogl_swapchain_impl : swapchain_impl {
-    void*  native  = nullptr;  // native window handle (for destroy_surface)
-    void*  surface = nullptr;  // opaque surface handle (HDC on Win32)
-    void*  ctx     = nullptr;  // non-owning ref to device context
-    vec2i  size    = {};
+    struct ogl_swapchain_impl : swapchain_impl {
+        void *native = nullptr;  // native window handle (for destroy_surface)
+        void *surface = nullptr; // opaque surface handle (HDC on Win32)
+        void *ctx = nullptr;     // non-owning ref to device context
+        vec2i size = {};
 
-    ~ogl_swapchain_impl() override;
+        ~ogl_swapchain_impl() override;
 
-    void clear(color c) override;
-    void present() override;
-    void on_resize(vec2i new_size) override;
-};
+        void clear(color c) override;
+        void present() override;
+        void on_resize(vec2i new_size) override;
+    };
 
-void ogl_draw_prim(prim_type type,
-                   const void* vertices, int count, int stride,
-                   std::type_index vtx_type,
-                   std::span<const vertex_element> elements);
+    void ogl_draw_prim(
+        prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements
+    );
 
-void ogl_draw_indexed_prim(prim_type type,
-                           const void* vertices, int count, int stride,
-                           std::span<const uint32_t> indices,
-                           std::type_index vtx_type,
-                           std::span<const vertex_element> elements);
+    void ogl_draw_indexed_prim(
+        prim_type type, const void *vertices, int count, int stride, std::span<const uint32_t> indices, std::type_index vtx_type,
+        std::span<const vertex_element> elements
+    );
 
-void ogl_draw_textured_prim(prim_type type,
-                            const void* vertices, int count, int stride,
-                            std::type_index vtx_type,
-                            std::span<const vertex_element> elements,
-                            texture_impl* tex);
+    void ogl_draw_textured_prim(
+        prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture_impl *tex
+    );
 
-void ogl_draw_textured_indexed_prim(prim_type type,
-                                    const void* vertices, int count, int stride,
-                                    std::span<const uint32_t> indices,
-                                    std::type_index vtx_type,
-                                    std::span<const vertex_element> elements,
-                                    texture_impl* tex);
+    void ogl_draw_textured_indexed_prim(
+        prim_type type, const void *vertices, int count, int stride, std::span<const uint32_t> indices, std::type_index vtx_type,
+        std::span<const vertex_element> elements, texture_impl *tex
+    );
 
 } // namespace alia
 

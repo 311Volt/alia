@@ -2,57 +2,50 @@
 #include "gfx_device.hpp"
 #include <algorithm>
 #include <span>
+#include <array>
 
 namespace alia {
 
-static thread_local float current_transform_matrix[16] = {
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1
-};
+    static constexpr std::array<float, 16> identity_matrix = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
-static thread_local float current_projection_matrix[16] = {
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1
-};
+    static thread_local std::array<float, 16> current_transform_matrix = identity_matrix;
 
-transform get_current_transform() {
-    transform t;
-    get_current_transform_matrix(std::span<float, 16>(&t.m[0][0], 16));
-    return t;
-}
+    static thread_local std::array<float, 16> current_projection_matrix = identity_matrix;
 
-void set_current_transform(const transform& t) {
-    set_current_transform_matrix(std::span<const float, 16>(&t.m[0][0], 16));
-}
+    transform get_current_transform() {
+        transform t;
+        get_current_transform_matrix(std::span<float, 16>(&t.m[0][0], 16));
+        return t;
+    }
 
-transform get_current_projection() {
-    transform t;
-    get_current_projection_matrix(std::span<float, 16>(&t.m[0][0], 16));
-    return t;
-}
+    void set_current_transform(const transform &t) {
+        set_current_transform_matrix(std::span<const float, 16>(&t.m[0][0], 16));
+    }
 
-void set_current_projection(const transform& t) {
-    set_current_projection_matrix(std::span<const float, 16>(&t.m[0][0], 16));
-}
+    transform get_current_projection() {
+        transform t;
+        get_current_projection_matrix(std::span<float, 16>(&t.m[0][0], 16));
+        return t;
+    }
 
-void set_current_transform_matrix(std::span<const float, 16> m) {
-    std::copy(m.begin(), m.end(), current_transform_matrix);
-}
+    void set_current_projection(const transform &t) {
+        set_current_projection_matrix(std::span<const float, 16>(&t.m[0][0], 16));
+    }
 
-void get_current_transform_matrix(std::span<float, 16> m) {
-    std::copy(current_transform_matrix, current_transform_matrix + 16, m.begin());
-}
+    void set_current_transform_matrix(std::span<const float, 16> m) {
+        std::copy(m.begin(), m.end(), current_transform_matrix.begin());
+    }
 
-void set_current_projection_matrix(std::span<const float, 16> m) {
-    std::copy(m.begin(), m.end(), current_projection_matrix);
-}
+    void get_current_transform_matrix(std::span<float, 16> m) {
+        std::copy(current_transform_matrix.begin(), current_transform_matrix.end(), m.begin());
+    }
 
-void get_current_projection_matrix(std::span<float, 16> m) {
-    std::copy(current_projection_matrix, current_projection_matrix + 16, m.begin());
-}
+    void set_current_projection_matrix(std::span<const float, 16> m) {
+        std::copy(m.begin(), m.end(), current_projection_matrix.begin());
+    }
+
+    void get_current_projection_matrix(std::span<float, 16> m) {
+        std::copy(current_projection_matrix.begin(), current_projection_matrix.end(), m.begin());
+    }
 
 } // namespace alia

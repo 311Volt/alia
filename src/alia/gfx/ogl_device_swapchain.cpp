@@ -15,7 +15,9 @@ namespace alia {
 
     // ── OpenGL swapchain impl ─────────────────────────────────────────────
 
-    ogl_swapchain_impl::~ogl_swapchain_impl() { get_ogl_platform().destroy_surface(native, surface); }
+    ogl_swapchain_impl::~ogl_swapchain_impl() {
+        get_ogl_platform().destroy_surface(native, surface);
+    }
 
     void ogl_swapchain_impl::clear(color c) {
         get_ogl_platform().make_current(surface, ctx);
@@ -24,9 +26,13 @@ namespace alia {
         glClear(GL_COLOR_BUFFER_BIT);
     }
 
-    void ogl_swapchain_impl::present() { get_ogl_platform().swap_buffers(surface); }
+    void ogl_swapchain_impl::present() {
+        get_ogl_platform().swap_buffers(surface);
+    }
 
-    void ogl_swapchain_impl::on_resize(vec2i new_size) { size = new_size; }
+    void ogl_swapchain_impl::on_resize(vec2i new_size) {
+        size = new_size;
+    }
 
     // ── Factory functions ─────────────────────────────────────────────────
 
@@ -40,8 +46,7 @@ namespace alia {
         return impl;
     }
 
-    std::unique_ptr<swapchain_impl>
-    ogl_device_impl::create_swapchain(void *native_handle, vec2i initial_size) {
+    std::unique_ptr<swapchain_impl> ogl_device_impl::create_swapchain(void *native_handle, vec2i initial_size) {
         void *surface = get_ogl_platform().create_surface(native_handle, ctx);
         if (!surface)
             return nullptr;
