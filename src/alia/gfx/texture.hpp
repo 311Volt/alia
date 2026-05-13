@@ -1,7 +1,7 @@
 #ifndef TEXTURE_B1D24750_1005_447A_9A4B_D0DF4C2E7AD7
 #define TEXTURE_B1D24750_1005_447A_9A4B_D0DF4C2E7AD7
 
-#include "bitmap.hpp"
+#include "bitmap/bitmap.hpp"
 #include "gfx_device.hpp"
 #include <optional>
 

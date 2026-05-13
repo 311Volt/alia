@@ -4,7 +4,7 @@
 #include "../core/color.hpp"
 #include "../core/rect.hpp"
 #include "../core/vec.hpp"
-#include "pixel.hpp"
+#include "bitmap/pixel.hpp"
 #include "vertex.hpp"
 #include <cstddef>
 #include <cstdint>

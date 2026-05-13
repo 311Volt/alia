@@ -2,7 +2,7 @@
 #define PIXEL_FORMAT_CONVERSIONS_A5403053_FECF_4593_B185_70E123769583
 
 #include "pixel_types.hpp"
-#include "../core/color.hpp"
+#include "../../core/color.hpp"
 
 #include <algorithm>
 #include <cstddef>

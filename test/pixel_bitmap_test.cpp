@@ -1,4 +1,4 @@
-#include "alia/gfx/bitmap.hpp"
+#include "alia/gfx/bitmap/bitmap.hpp"
 
 #include <array>
 #include <cstddef>

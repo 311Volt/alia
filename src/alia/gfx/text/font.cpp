@@ -1,6 +1,6 @@
 #include "font.hpp"
 
-#include "alia/gfx/pixel_types.hpp"
+#include "alia/gfx/bitmap/pixel_types.hpp"
 #include "alia/gfx/primitives.hpp"
 #include "alia/gfx/texture.hpp"
 #include "alia/util/utf8.hpp"

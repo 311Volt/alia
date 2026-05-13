@@ -2,8 +2,8 @@
 #include "alia/gfx/gfx_device.hpp"
 #include "alia/gfx/transform.hpp"
 #include "alia/gfx/primitives.hpp"
-#include "alia/gfx/bitmap.hpp"
-#include "alia/gfx/image_io.hpp"
+#include "alia/gfx/bitmap/bitmap.hpp"
+#include "alia/gfx/bitmap/image_io.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/events/event_queue.hpp"
 
@@ -34,7 +34,7 @@ int main() {
         {800, 600},
         { 
             .title = "Hello ALIA — colored triangle", 
-            .resizable = true 
+            .resizable = true,
         }
     );
     alia::gfx_device device = alia::gfx_device::create(alia::gfx_backend::d3d9);
