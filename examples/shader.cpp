@@ -161,12 +161,16 @@ int main() {
         );
         auto projection_constant =
             shader.allocate_constant<alia::transform>("u_projection", alia::shader_type::vertex);
+
         auto transform_constant =
             shader.allocate_constant<alia::transform>("u_transform", alia::shader_type::vertex);
+
         auto tint_constant =
             shader.allocate_constant<alia::color>("u_tint", alia::shader_type::pixel);
+
         auto texture_sampler =
             shader.allocate_sampler("u_texture", alia::shader_type::pixel);
+            
         texture_sampler.set_texture(checker_tex);
 
         alia::event_queue events;

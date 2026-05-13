@@ -1,5 +1,5 @@
-#ifndef GRAPHICS_BACKEND_OPS_A6ED0D03_4A82_48C9_99BB_A6C8BFA288C4
-#define GRAPHICS_BACKEND_OPS_A6ED0D03_4A82_48C9_99BB_A6C8BFA288C4
+#ifndef GRAPHICS_BACKEND_INTERFACE_B17C3B83_2C66_4D0F_908A_037719970A33
+#define GRAPHICS_BACKEND_INTERFACE_B17C3B83_2C66_4D0F_908A_037719970A33
 
 #include "../core/color.hpp"
 #include "../core/rect.hpp"
@@ -30,10 +30,10 @@ namespace alia {
     // ── graphics_backend_operation ─────────────────────────────────────────
 
     template <class R, class... Args>
-    struct graphics_backend_operation;
+    struct gfx_backend_op;
 
     template <class R, class... Args>
-    struct graphics_backend_operation<R(Args...)> {
+    struct gfx_backend_op<R(Args...)> {
         R (*operation)(Args...) = nullptr;
         std::optional<std::string> reason_unsupported;
 
@@ -44,9 +44,7 @@ namespace alia {
         auto get_or_throw() const -> R (*)(Args...) {
             if (operation)
                 return operation;
-            throw unsupported_operation_exception(
-                reason_unsupported.value_or("operation not supported by this backend")
-            );
+            throw unsupported_operation_exception(reason_unsupported.value_or("operation not supported by this backend"));
         }
     };
 
@@ -68,10 +66,7 @@ namespace alia {
     enum class texture_filter { nearest, linear };
     enum class texture_wrap { clamp, repeat, mirror };
 
-    enum class shader_type {
-        vertex,
-        pixel
-    };
+    enum class shader_type { vertex, pixel };
 
     struct shader_source {
         gfx_backend backend = gfx_backend::auto_;
@@ -164,74 +159,70 @@ namespace alia {
         vec2f pixel_center_offset = {};
 
         // ── Device ──────────────────────────────────────────────────────
-        graphics_backend_operation<void(device_handle *)> destroy_device;
+        gfx_backend_op<void(device_handle *device)> destroy_device;
 
         // ── Texture ─────────────────────────────────────────────────────
-        graphics_backend_operation<texture_handle *(device_handle *, pixel_format, vec2i, int, texture_role)>
+        gfx_backend_op<texture_handle *(device_handle *device, pixel_format format, vec2i size, int mip_levels, texture_role role)>
             create_texture;
-        graphics_backend_operation<void(texture_handle *)>
-            destroy_texture;
-        graphics_backend_operation<pixel_format(const texture_handle *)>
-            texture_format;
-        graphics_backend_operation<int(const texture_handle *)>
-            texture_width;
-        graphics_backend_operation<int(const texture_handle *)>
-            texture_height;
-        graphics_backend_operation<int(const texture_handle *)>
-            texture_mip_levels;
-        graphics_backend_operation<sampler_state(const texture_handle *)>
-            texture_sampler;
-        graphics_backend_operation<void(texture_handle *, const sampler_state &)>
-            texture_set_sampler;
-        graphics_backend_operation<bool(texture_handle *, rect_i, int, texture_lock_info &)>
-            texture_lock;
-        graphics_backend_operation<void(texture_handle *, const texture_lock_info &, bool)>
-            texture_unlock;
-        graphics_backend_operation<void(texture_handle *)>
-            texture_generate_mipmaps;
-        graphics_backend_operation<texture_handle *(const texture_handle *)>
-            texture_clone;
+        gfx_backend_op<void(texture_handle *texture)> destroy_texture;
+        gfx_backend_op<pixel_format(const texture_handle *texture)> texture_format;
+        gfx_backend_op<int(const texture_handle *texture)> texture_width;
+        gfx_backend_op<int(const texture_handle *texture)> texture_height;
+        gfx_backend_op<int(const texture_handle *texture)> texture_mip_levels;
+        gfx_backend_op<sampler_state(const texture_handle *texture)> texture_sampler;
+        gfx_backend_op<void(texture_handle *texture, const sampler_state &sampler)> texture_set_sampler;
+        gfx_backend_op<bool(texture_handle *texture, rect_i region, int level, texture_lock_info &out)> texture_lock;
+        gfx_backend_op<void(texture_handle *texture, const texture_lock_info &info, bool wrote)> texture_unlock;
+        gfx_backend_op<void(texture_handle *texture)> texture_generate_mipmaps;
+        gfx_backend_op<texture_handle *(const texture_handle *texture)> texture_clone;
 
-        graphics_backend_operation<shader_program_handle *(device_handle *, const shader_program_desc &)>
-            create_shader_program;
-        graphics_backend_operation<void(shader_program_handle *)>
-            destroy_shader_program;
-        graphics_backend_operation<shader_constant_slot(shader_program_handle *, std::string_view, shader_type)>
+        gfx_backend_op<shader_program_handle *(device_handle *device, const shader_program_desc &desc)> create_shader_program;
+        gfx_backend_op<void(shader_program_handle *program)> destroy_shader_program;
+        gfx_backend_op<shader_constant_slot(shader_program_handle *program, std::string_view name, shader_type stage)>
             shader_lookup_constant;
-        graphics_backend_operation<void(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &)>
+
+        gfx_backend_op<void(shader_program_handle *program, const shader_constant_slot &slot, const shader_constant_payload &payload)>
             shader_set_constant;
-        graphics_backend_operation<shader_sampler_slot(shader_program_handle *, std::string_view, shader_type)>
-            shader_lookup_sampler;
-        graphics_backend_operation<void(shader_program_handle *, const shader_sampler_slot &, texture_handle *)>
-            shader_set_sampler;
+			
+        gfx_backend_op<shader_sampler_slot(shader_program_handle *program, std::string_view name, shader_type stage)> shader_lookup_sampler;
+        gfx_backend_op<void(shader_program_handle *program, const shader_sampler_slot &slot, texture_handle *texture)> shader_set_sampler;
 
         // ── Swapchain ────────────────────────────────────────────────────
-        graphics_backend_operation<swapchain_handle *(device_handle *, void *, vec2i)>
-            create_swapchain;
-        graphics_backend_operation<void(swapchain_handle *)>
-            destroy_swapchain;
-        graphics_backend_operation<void(swapchain_handle *, color)>
-            swapchain_clear;
-        graphics_backend_operation<void(swapchain_handle *)>
-            swapchain_present;
-        graphics_backend_operation<void(swapchain_handle *, vec2i)>
-            swapchain_on_resize;
+        gfx_backend_op<swapchain_handle *(device_handle *device, void *window, vec2i size)> create_swapchain;
+        gfx_backend_op<void(swapchain_handle *swapchain)> destroy_swapchain;
+        gfx_backend_op<void(swapchain_handle *swapchain, color clear_color)> swapchain_clear;
+        gfx_backend_op<void(swapchain_handle *swapchain)> swapchain_present;
+        gfx_backend_op<void(swapchain_handle *swapchain, vec2i size)> swapchain_on_resize;
 
         // ── Drawing ───────────────────────────────────────────────────────
-        graphics_backend_operation<
-            void(prim_type, const void *, int, int, std::type_index, std::span<const vertex_element>, shader_program_handle *)>
+        gfx_backend_op<void(
+            prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements,
+            shader_program_handle *shader
+        )>
             draw_prim;
-        graphics_backend_operation<
-            void(prim_type, const void *, int, int, std::span<const uint32_t>, std::type_index, std::span<const vertex_element>, shader_program_handle *)>
+
+        gfx_backend_op<void(
+            prim_type type, const void *vertices, int count, int stride, std::span<const uint32_t> indices, std::type_index vtx_type,
+            std::span<const vertex_element> elements, shader_program_handle *shader
+        )>
             draw_indexed_prim;
-        graphics_backend_operation<
-            void(prim_type, const void *, int, int, std::type_index, std::span<const vertex_element>, texture_handle *, shader_program_handle *)>
+
+        gfx_backend_op<void(
+            prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements,
+            texture_handle *texture, shader_program_handle *shader
+        )>
             draw_textured_prim;
-        graphics_backend_operation<
-            void(prim_type, const void *, int, int, std::type_index, std::span<const vertex_element>, texture_handle *, shader_program_handle *)>
+
+        gfx_backend_op<void(
+            prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements,
+            texture_handle *texture, shader_program_handle *shader
+        )>
             draw_alpha_masked_prim;
-        graphics_backend_operation<
-            void(prim_type, const void *, int, int, std::span<const uint32_t>, std::type_index, std::span<const vertex_element>, texture_handle *, shader_program_handle *)>
+
+        gfx_backend_op<void(
+            prim_type type, const void *vertices, int count, int stride, std::span<const uint32_t> indices, std::type_index vtx_type,
+            std::span<const vertex_element> elements, texture_handle *texture, shader_program_handle *shader
+        )>
             draw_textured_indexed_prim;
     };
 
@@ -251,4 +242,4 @@ namespace alia {
 
 } // namespace alia
 
-#endif /* GRAPHICS_BACKEND_OPS_A6ED0D03_4A82_48C9_99BB_A6C8BFA288C4 */
+#endif /* GRAPHICS_BACKEND_INTERFACE_B17C3B83_2C66_4D0F_908A_037719970A33 */
