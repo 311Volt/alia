@@ -3,6 +3,7 @@
 #include "alia/gfx/pixel_types.hpp"
 #include "alia/gfx/primitives.hpp"
 #include "alia/gfx/texture.hpp"
+#include "alia/util/utf8.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -13,6 +14,8 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+
+#include <stdint.h>
 
 namespace alia {
 
@@ -26,61 +29,8 @@ namespace {
     return static_cast<int>(std::ceil(from_26_6(value)));
 }
 
-[[nodiscard]] bool is_continuation(unsigned char c) noexcept {
-    return (c & 0xc0) == 0x80;
-}
-
-[[nodiscard]] uint32_t next_codepoint(std::string_view text, std::size_t& offset) noexcept {
-    constexpr uint32_t replacement = 0xfffd;
-    if (offset >= text.size())
-        return 0;
-
-    const auto byte = [](char c) { return static_cast<unsigned char>(c); };
-    const unsigned char c0 = byte(text[offset++]);
-    if (c0 < 0x80)
-        return c0;
-
-    auto fail = [&]() noexcept {
-        return replacement;
-    };
-
-    if ((c0 & 0xe0) == 0xc0) {
-        if (offset >= text.size() || !is_continuation(byte(text[offset])))
-            return fail();
-        const unsigned char c1 = byte(text[offset++]);
-        const uint32_t cp = ((c0 & 0x1f) << 6) | (c1 & 0x3f);
-        return cp >= 0x80 ? cp : replacement;
-    }
-
-    if ((c0 & 0xf0) == 0xe0) {
-        if (offset + 1 >= text.size()
-            || !is_continuation(byte(text[offset]))
-            || !is_continuation(byte(text[offset + 1])))
-            return fail();
-        const unsigned char c1 = byte(text[offset++]);
-        const unsigned char c2 = byte(text[offset++]);
-        const uint32_t cp = ((c0 & 0x0f) << 12) | ((c1 & 0x3f) << 6) | (c2 & 0x3f);
-        if (cp < 0x800 || (cp >= 0xd800 && cp <= 0xdfff))
-            return replacement;
-        return cp;
-    }
-
-    if ((c0 & 0xf8) == 0xf0) {
-        if (offset + 2 >= text.size()
-            || !is_continuation(byte(text[offset]))
-            || !is_continuation(byte(text[offset + 1]))
-            || !is_continuation(byte(text[offset + 2])))
-            return fail();
-        const unsigned char c1 = byte(text[offset++]);
-        const unsigned char c2 = byte(text[offset++]);
-        const unsigned char c3 = byte(text[offset++]);
-        const uint32_t cp =
-            ((c0 & 0x07) << 18) | ((c1 & 0x3f) << 12) | ((c2 & 0x3f) << 6) | (c3 & 0x3f);
-        return cp >= 0x10000 && cp <= 0x10ffff ? cp : replacement;
-    }
-
-    return replacement;
-}
+// Transparent texel border sampled by linear filtering around each glyph.
+constexpr int glyph_atlas_border = 1;
 
 void copy_bitmap_coverage(const FT_Bitmap& bitmap, std::vector<unsigned char>& out) {
     const int width = static_cast<int>(bitmap.width);
@@ -141,8 +91,8 @@ struct cached_glyph {
 
 struct glyph_page {
     texture atlas;
-    int cursor_x = 1;
-    int cursor_y = 1;
+    int cursor_x = 0;
+    int cursor_y = 0;
     int row_height = 0;
 };
 
@@ -155,7 +105,7 @@ struct hardware_glyph_buffer_impl {
     hardware_glyph_buffer_impl(font& source, vec2i page_size)
         : source(&source), page_size(page_size)
     {
-        if (page_size.x <= 2 || page_size.y <= 2)
+        if (page_size.x <= glyph_atlas_border * 2 || page_size.y <= glyph_atlas_border * 2)
             throw std::invalid_argument("hardware_glyph_buffer: page size is too small");
     }
 
@@ -183,21 +133,22 @@ struct hardware_glyph_buffer_impl {
     }
 
     glyph_page& page_with_space(vec2i size) {
-        constexpr int padding = 1;
-        if (size.x + padding * 2 > page_size.x || size.y + padding * 2 > page_size.y)
+        if (size.x + glyph_atlas_border * 2 > page_size.x
+            || size.y + glyph_atlas_border * 2 > page_size.y) {
             throw std::runtime_error("hardware_glyph_buffer: glyph is larger than the atlas page");
+        }
 
         if (pages.empty())
             return add_page();
 
         glyph_page* page = &pages.back();
-        if (page->cursor_x + size.x + padding > page_size.x) {
-            page->cursor_x = padding;
-            page->cursor_y += page->row_height + padding;
+        if (page->cursor_x + size.x + glyph_atlas_border * 2 > page_size.x) {
+            page->cursor_x = 0;
+            page->cursor_y += page->row_height + glyph_atlas_border * 2;
             page->row_height = 0;
         }
 
-        if (page->cursor_y + size.y + padding > page_size.y)
+        if (page->cursor_y + size.y + glyph_atlas_border * 2 > page_size.y)
             return add_page();
 
         return *page;
@@ -212,12 +163,14 @@ struct hardware_glyph_buffer_impl {
         glyph.metrics = rendered.metrics;
 
         if (rendered.has_bitmap()) {
-            constexpr int padding = 1;
             glyph_page& page = page_with_space(rendered.metrics.bitmap_size);
             glyph.page = static_cast<int>(pages.size()) - 1;
             glyph.atlas_rect = rect_i::pos_size(
                 {page.cursor_x, page.cursor_y},
-                rendered.metrics.bitmap_size);
+                {
+                    rendered.metrics.bitmap_size.x + glyph_atlas_border * 2,
+                    rendered.metrics.bitmap_size.y + glyph_atlas_border * 2,
+                });
 
             if (auto region = page.atlas.lock<px_bgra8888>(glyph.atlas_rect)) {
                 auto view = region.view();
@@ -225,14 +178,15 @@ struct hardware_glyph_buffer_impl {
                     for (int x = 0; x < rendered.metrics.bitmap_size.x; ++x) {
                         const auto alpha =
                             rendered.coverage[static_cast<std::size_t>(y) * rendered.metrics.bitmap_size.x + x];
-                        view[x, y] = px_bgra8888{255, 255, 255, alpha};
+                        view[x + glyph_atlas_border, y + glyph_atlas_border] =
+                            px_bgra8888{255, 255, 255, alpha};
                     }
                 }
             } else {
                 throw std::runtime_error("hardware_glyph_buffer: failed to lock atlas texture");
             }
 
-            page.cursor_x += rendered.metrics.bitmap_size.x + padding;
+            page.cursor_x += rendered.metrics.bitmap_size.x + glyph_atlas_border * 2;
             page.row_height = (std::max)(page.row_height, rendered.metrics.bitmap_size.y);
         }
 
@@ -368,7 +322,8 @@ vec2f measure_text(font& source, std::string_view text) {
 
     std::size_t offset = 0;
     while (offset < text.size()) {
-        const uint32_t cp = next_codepoint(text, offset);
+        const uint32_t cp =
+            utf8_read_next_codepoint(text, offset).value_or(utf8_replacement_codepoint);
         if (cp == '\r')
             continue;
         if (cp == '\n') {
@@ -417,7 +372,8 @@ void draw_text(
 
     std::size_t offset = 0;
     while (offset < text.size()) {
-        const uint32_t cp = next_codepoint(text, offset);
+        const uint32_t cp =
+            utf8_read_next_codepoint(text, offset).value_or(utf8_replacement_codepoint);
         if (cp == '\r')
             continue;
         if (cp == '\n') {
@@ -439,10 +395,12 @@ void draw_text(
         if (glyph.page >= 0) {
             detail::glyph_page& page = buffer.impl_->pages[static_cast<std::size_t>(glyph.page)];
             const rect_i r = glyph.atlas_rect;
-            const float x0 = position.x + pen_x + static_cast<float>(glyph.metrics.bearing.x);
-            const float y0 = baseline - static_cast<float>(glyph.metrics.bearing.y);
-            const float x1 = x0 + static_cast<float>(glyph.metrics.bitmap_size.x);
-            const float y1 = y0 + static_cast<float>(glyph.metrics.bitmap_size.y);
+            const float x0 =
+                position.x + pen_x + static_cast<float>(glyph.metrics.bearing.x - glyph_atlas_border);
+            const float y0 =
+                baseline - static_cast<float>(glyph.metrics.bearing.y + glyph_atlas_border);
+            const float x1 = x0 + static_cast<float>(r.width());
+            const float y1 = y0 + static_cast<float>(r.height());
             const float u0 = static_cast<float>(r.left()) / static_cast<float>(buffer.impl_->page_size.x);
             const float v0 = static_cast<float>(r.top()) / static_cast<float>(buffer.impl_->page_size.y);
             const float u1 = static_cast<float>(r.right()) / static_cast<float>(buffer.impl_->page_size.x);

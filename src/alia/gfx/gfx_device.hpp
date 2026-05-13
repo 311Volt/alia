@@ -1,5 +1,5 @@
-#ifndef GFX_DEVICE_EEFA16EE_8C09_453F_9EBB_D094DD1124EA
-#define GFX_DEVICE_EEFA16EE_8C09_453F_9EBB_D094DD1124EA
+#ifndef GFX_DEVICE_DE00092E_67EA_4FA0_99D4_7315A97F7B9B
+#define GFX_DEVICE_DE00092E_67EA_4FA0_99D4_7315A97F7B9B
 
 #include "../core/color.hpp"
 #include "../core/rect.hpp"
@@ -224,4 +224,4 @@ void get_current_projection_matrix(std::span<float, 16> m);
 
 } // namespace alia
 
-#endif /* GFX_DEVICE_EEFA16EE_8C09_453F_9EBB_D094DD1124EA */
+#endif /* GFX_DEVICE_DE00092E_67EA_4FA0_99D4_7315A97F7B9B */
