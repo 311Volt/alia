@@ -1,4 +1,5 @@
 #include "gfx_device.hpp"
+#include "shader.hpp"
 #include "texture.hpp"
 #include "../os/window.hpp"
 #include <mutex>
@@ -208,7 +209,9 @@ namespace alia {
         prim_type type, const void *vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements
     ) {
-        current_device().backend()->draw_prim.get_or_throw()(type, vertices, count, stride, vtx_type, elements);
+        current_device().backend()->draw_prim.get_or_throw()(
+            type, vertices, count, stride, vtx_type, elements, current_shader_program_handle()
+        );
     }
 
     void draw_indexed_prim(
@@ -216,7 +219,9 @@ namespace alia {
         std::span<const uint32_t> indices,
         std::type_index vtx_type, std::span<const vertex_element> elements
     ) {
-        current_device().backend()->draw_indexed_prim.get_or_throw()(type, vertices, count, stride, indices, vtx_type, elements);
+        current_device().backend()->draw_indexed_prim.get_or_throw()(
+            type, vertices, count, stride, indices, vtx_type, elements, current_shader_program_handle()
+        );
     }
 
     void draw_textured_prim(
@@ -224,7 +229,9 @@ namespace alia {
         std::type_index vtx_type, std::span<const vertex_element> elements,
         texture &tex
     ) {
-        current_device().backend()->draw_textured_prim.get_or_throw()(type, vertices, count, stride, vtx_type, elements, tex.impl());
+        current_device().backend()->draw_textured_prim.get_or_throw()(
+            type, vertices, count, stride, vtx_type, elements, tex.impl(), current_shader_program_handle()
+        );
     }
 
     void draw_alpha_masked_prim(
@@ -232,7 +239,9 @@ namespace alia {
         std::type_index vtx_type, std::span<const vertex_element> elements,
         texture &tex
     ) {
-        current_device().backend()->draw_alpha_masked_prim.get_or_throw()(type, vertices, count, stride, vtx_type, elements, tex.impl());
+        current_device().backend()->draw_alpha_masked_prim.get_or_throw()(
+            type, vertices, count, stride, vtx_type, elements, tex.impl(), current_shader_program_handle()
+        );
     }
 
     void draw_textured_indexed_prim(
@@ -241,7 +250,9 @@ namespace alia {
         std::type_index vtx_type, std::span<const vertex_element> elements,
         texture &tex
     ) {
-        current_device().backend()->draw_textured_indexed_prim.get_or_throw()(type, vertices, count, stride, indices, vtx_type, elements, tex.impl());
+        current_device().backend()->draw_textured_indexed_prim.get_or_throw()(
+            type, vertices, count, stride, indices, vtx_type, elements, tex.impl(), current_shader_program_handle()
+        );
     }
 
 } // namespace alia

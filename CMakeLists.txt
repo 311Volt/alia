@@ -99,7 +99,7 @@ endif()
 
 if(ALIA_COMPILE_GFX_BACKEND_D3D9)
   target_compile_definitions(alia PUBLIC ALIA_COMPILE_GFX_BACKEND_D3D9)
-  target_link_libraries(alia PRIVATE d3d9)
+  target_link_libraries(alia PRIVATE d3d9 d3dcompiler)
 endif()
 
 if(ALIA_COMPILE_GFX_BACKEND_OPENGL)

@@ -8,9 +8,13 @@
 #include <windows.h>
 #include <d3d9.h>
 
+#include <algorithm>
 #include <cstddef>
+#include <string>
+#include <unordered_map>
 #include <memory>
 #include <span>
+#include <vector>
 
 #include "../graphics_backend_interface.hpp"
 
@@ -22,6 +26,7 @@ namespace alia {
         IDirect3D9 *d3d = nullptr;
         IDirect3DDevice9 *device = nullptr;
         HWND dummy = nullptr;
+        D3DCAPS9 caps = {};
     };
 
     struct d3d9_texture : texture_handle {
@@ -43,6 +48,23 @@ namespace alia {
         vec2i size = {};
     };
 
+    struct d3d9_stored_shader_constant {
+        shader_constant_slot slot = {};
+        shader_constant_value_type type = shader_constant_value_type::float_1;
+        std::vector<float> floats;
+        std::vector<int> ints;
+    };
+
+    struct d3d9_shader_program : shader_program_handle {
+        IDirect3DDevice9 *device = nullptr; // non-owning
+        IDirect3DVertexShader9 *vertex_shader = nullptr;
+        IDirect3DPixelShader9 *pixel_shader = nullptr;
+        std::unordered_map<std::string, shader_constant_slot> constants;
+        std::unordered_map<std::string, shader_sampler_slot> samplers;
+        std::vector<d3d9_stored_shader_constant> stored_constants;
+        std::unordered_map<int, texture_handle *> sampler_textures;
+    };
+
     // ── Cast helpers ──────────────────────────────────────────────────────
 
     inline d3d9_device *as_d3d9_device(device_handle *h) {
@@ -59,6 +81,12 @@ namespace alia {
     }
     inline d3d9_swapchain *as_d3d9_swapchain(swapchain_handle *h) {
         return static_cast<d3d9_swapchain *>(h);
+    }
+    inline d3d9_shader_program *as_d3d9_shader_program(shader_program_handle *h) {
+        return static_cast<d3d9_shader_program *>(h);
+    }
+    inline const d3d9_shader_program *as_d3d9_shader_program(const shader_program_handle *h) {
+        return static_cast<const d3d9_shader_program *>(h);
     }
 
     // ── Helper ────────────────────────────────────────────────────────────
@@ -90,6 +118,16 @@ namespace alia {
     void d3d9_texture_generate_mipmaps(texture_handle *h);
     texture_handle *d3d9_texture_clone(const texture_handle *h);
 
+    // â”€â”€ Shader ops â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    shader_program_handle *d3d9_create_shader_program(device_handle *dev, const shader_program_desc &desc);
+    void d3d9_destroy_shader_program(shader_program_handle *h);
+    shader_constant_slot d3d9_shader_lookup_constant(shader_program_handle *h, std::string_view name, shader_type stage);
+    void d3d9_shader_set_constant(shader_program_handle *h, const shader_constant_slot &slot, const shader_constant_payload &payload);
+    shader_sampler_slot d3d9_shader_lookup_sampler(shader_program_handle *h, std::string_view name, shader_type stage);
+    void d3d9_shader_set_sampler(shader_program_handle *h, const shader_sampler_slot &slot, texture_handle *tex);
+    void d3d9_apply_shader_program(shader_program_handle *h, texture_handle *primary_texture);
+
     // ── Swapchain ops ─────────────────────────────────────────────────────
 
     swapchain_handle *d3d9_create_swapchain(device_handle *dev, void *native_handle, vec2i size);
@@ -102,28 +140,33 @@ namespace alia {
 
     void d3d9_draw_prim(
         prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        shader_program_handle *shader
     );
     void d3d9_draw_indexed_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        shader_program_handle *shader
     );
     void d3d9_draw_textured_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex
+        texture_handle *tex,
+        shader_program_handle *shader
     );
     void d3d9_draw_alpha_masked_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex
+        texture_handle *tex,
+        shader_program_handle *shader
     );
     void d3d9_draw_textured_indexed_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::span<const uint32_t> indices,
         std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex
+        texture_handle *tex,
+        shader_program_handle *shader
     );
 
 } // namespace alia

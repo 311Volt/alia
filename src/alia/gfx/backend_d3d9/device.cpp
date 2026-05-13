@@ -62,6 +62,7 @@ namespace alia {
         dev->d3d = d3d;
         dev->device = device;
         dev->dummy = dummy;
+        device->GetDeviceCaps(&dev->caps);
         return dev;
     }
 

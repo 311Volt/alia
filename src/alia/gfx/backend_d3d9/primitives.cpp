@@ -161,7 +161,8 @@ namespace alia {
 
     void d3d9_draw_prim(
         prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        shader_program_handle *shader
     ) {
         if (count < 3)
             return;
@@ -171,15 +172,24 @@ namespace alia {
             return;
 
         apply_d3d9_alpha_blend(device);
-        apply_d3d9_vertex_color(device);
         device->SetVertexDeclaration(decl);
+        if (shader) {
+            d3d9_apply_shader_program(shader, nullptr);
+            device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
+            return;
+        }
+
+        device->SetVertexShader(nullptr);
+        device->SetPixelShader(nullptr);
+        apply_d3d9_vertex_color(device);
         device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
     }
 
     void d3d9_draw_indexed_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        shader_program_handle *shader
     ) {
         const UINT ni = static_cast<UINT>(indices.size());
         if (ni < 3 || count == 0)
@@ -190,8 +200,20 @@ namespace alia {
             return;
 
         apply_d3d9_alpha_blend(device);
-        apply_d3d9_vertex_color(device);
         device->SetVertexDeclaration(decl);
+        if (shader) {
+            d3d9_apply_shader_program(shader, nullptr);
+            device->DrawIndexedPrimitiveUP(
+                to_d3d_prim(type), 0, static_cast<UINT>(count),
+                compute_prim_count(type, static_cast<int>(ni)),
+                indices.data(), D3DFMT_INDEX32, vertices, static_cast<UINT>(stride)
+            );
+            return;
+        }
+
+        device->SetVertexShader(nullptr);
+        device->SetPixelShader(nullptr);
+        apply_d3d9_vertex_color(device);
         device->DrawIndexedPrimitiveUP(
             to_d3d_prim(type), 0, static_cast<UINT>(count),
             compute_prim_count(type, static_cast<int>(ni)),
@@ -202,7 +224,8 @@ namespace alia {
     void d3d9_draw_textured_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex
+        texture_handle *tex,
+        shader_program_handle *shader
     ) {
         if (count < 3 || !tex)
             return;
@@ -213,10 +236,18 @@ namespace alia {
             return;
 
         apply_d3d9_alpha_blend(device);
+        device->SetVertexDeclaration(decl);
+        if (shader) {
+            d3d9_apply_shader_program(shader, tex);
+            device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
+            return;
+        }
+
+        device->SetVertexShader(nullptr);
+        device->SetPixelShader(nullptr);
         device->SetTexture(0, d3d_tex->texture);
         apply_d3d9_sampler(device, 0, d3d_tex->sampler);
         apply_d3d9_texture_color(device, has_vertex_color(elements));
-        device->SetVertexDeclaration(decl);
         device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
         apply_d3d9_vertex_color(device);
     }
@@ -224,7 +255,8 @@ namespace alia {
     void d3d9_draw_alpha_masked_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex
+        texture_handle *tex,
+        shader_program_handle *shader
     ) {
         if (count < 3 || !tex)
             return;
@@ -235,10 +267,18 @@ namespace alia {
             return;
 
         apply_d3d9_alpha_blend(device);
+        device->SetVertexDeclaration(decl);
+        if (shader) {
+            d3d9_apply_shader_program(shader, tex);
+            device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
+            return;
+        }
+
+        device->SetVertexShader(nullptr);
+        device->SetPixelShader(nullptr);
         device->SetTexture(0, d3d_tex->texture);
         apply_d3d9_sampler(device, 0, d3d_tex->sampler);
         apply_d3d9_alpha_mask_color(device);
-        device->SetVertexDeclaration(decl);
         device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
         apply_d3d9_vertex_color(device);
     }
@@ -247,7 +287,8 @@ namespace alia {
         prim_type type, const void *vertices, int count, int stride,
         std::span<const uint32_t> indices,
         std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex
+        texture_handle *tex,
+        shader_program_handle *shader
     ) {
         const UINT ni = static_cast<UINT>(indices.size());
         if (ni < 3 || count == 0 || !tex)
@@ -259,10 +300,22 @@ namespace alia {
             return;
 
         apply_d3d9_alpha_blend(device);
+        device->SetVertexDeclaration(decl);
+        if (shader) {
+            d3d9_apply_shader_program(shader, tex);
+            device->DrawIndexedPrimitiveUP(
+                to_d3d_prim(type), 0, static_cast<UINT>(count),
+                compute_prim_count(type, static_cast<int>(ni)),
+                indices.data(), D3DFMT_INDEX32, vertices, static_cast<UINT>(stride)
+            );
+            return;
+        }
+
+        device->SetVertexShader(nullptr);
+        device->SetPixelShader(nullptr);
         device->SetTexture(0, d3d_tex->texture);
         apply_d3d9_sampler(device, 0, d3d_tex->sampler);
         apply_d3d9_texture_color(device, has_vertex_color(elements));
-        device->SetVertexDeclaration(decl);
         device->DrawIndexedPrimitiveUP(
             to_d3d_prim(type), 0, static_cast<UINT>(count),
             compute_prim_count(type, static_cast<int>(ni)),

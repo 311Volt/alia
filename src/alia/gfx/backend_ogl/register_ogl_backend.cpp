@@ -4,6 +4,7 @@
 #include "../gfx_device.hpp"
 
 #include <GL/gl.h>
+#include <cstdint>
 #include <cstring>
 
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
@@ -47,6 +48,60 @@ namespace alia {
         return false;
     }
 
+    static void *load_gl_proc_raw(const char *name) {
+#ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
+        void *p = reinterpret_cast<void *>(wglGetProcAddress(name));
+        if (p == reinterpret_cast<void *>(0x1) ||
+            p == reinterpret_cast<void *>(0x2) ||
+            p == reinterpret_cast<void *>(0x3) ||
+            p == reinterpret_cast<void *>(static_cast<std::intptr_t>(-1)))
+            return nullptr;
+        return p;
+#else
+        (void)name;
+        return nullptr;
+#endif
+    }
+
+    template <typename T>
+    static bool load_gl_proc(T &target, const char *name) {
+        target = reinterpret_cast<T>(load_gl_proc_raw(name));
+        return target != nullptr;
+    }
+
+    static bool load_shader_procs() {
+        bool ok = true;
+        ok = load_gl_proc(ogl_s_glCreateShader, "glCreateShader") && ok;
+        ok = load_gl_proc(ogl_s_glShaderSource, "glShaderSource") && ok;
+        ok = load_gl_proc(ogl_s_glCompileShader, "glCompileShader") && ok;
+        ok = load_gl_proc(ogl_s_glGetShaderiv, "glGetShaderiv") && ok;
+        ok = load_gl_proc(ogl_s_glGetShaderInfoLog, "glGetShaderInfoLog") && ok;
+        ok = load_gl_proc(ogl_s_glDeleteShader, "glDeleteShader") && ok;
+        ok = load_gl_proc(ogl_s_glCreateProgram, "glCreateProgram") && ok;
+        ok = load_gl_proc(ogl_s_glAttachShader, "glAttachShader") && ok;
+        ok = load_gl_proc(ogl_s_glBindAttribLocation, "glBindAttribLocation") && ok;
+        ok = load_gl_proc(ogl_s_glLinkProgram, "glLinkProgram") && ok;
+        ok = load_gl_proc(ogl_s_glGetProgramiv, "glGetProgramiv") && ok;
+        ok = load_gl_proc(ogl_s_glGetProgramInfoLog, "glGetProgramInfoLog") && ok;
+        ok = load_gl_proc(ogl_s_glDeleteProgram, "glDeleteProgram") && ok;
+        ok = load_gl_proc(ogl_s_glUseProgram, "glUseProgram") && ok;
+        ok = load_gl_proc(ogl_s_glGetUniformLocation, "glGetUniformLocation") && ok;
+        ok = load_gl_proc(ogl_s_glUniform1f, "glUniform1f") && ok;
+        ok = load_gl_proc(ogl_s_glUniform2f, "glUniform2f") && ok;
+        ok = load_gl_proc(ogl_s_glUniform3f, "glUniform3f") && ok;
+        ok = load_gl_proc(ogl_s_glUniform4f, "glUniform4f") && ok;
+        ok = load_gl_proc(ogl_s_glUniform1i, "glUniform1i") && ok;
+        ok = load_gl_proc(ogl_s_glUniform2i, "glUniform2i") && ok;
+        ok = load_gl_proc(ogl_s_glUniform3i, "glUniform3i") && ok;
+        ok = load_gl_proc(ogl_s_glUniform4i, "glUniform4i") && ok;
+        ok = load_gl_proc(ogl_s_glUniformMatrix4fv, "glUniformMatrix4fv") && ok;
+        ok = load_gl_proc(ogl_s_glActiveTexture, "glActiveTexture") && ok;
+        ok = load_gl_proc(ogl_s_glEnableVertexAttribArray, "glEnableVertexAttribArray") && ok;
+        ok = load_gl_proc(ogl_s_glDisableVertexAttribArray, "glDisableVertexAttribArray") && ok;
+        ok = load_gl_proc(ogl_s_glVertexAttribPointer, "glVertexAttribPointer") && ok;
+        return ok;
+    }
+
     static created_device create_ogl_device_and_interface() {
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
         register_win32_ogl_platform();
@@ -67,6 +122,7 @@ namespace alia {
 
         // For GL 3.0+ core, glGenerateMipmap is always available
         const bool gl30_or_later = (gl_major > 3 || (gl_major == 3 && gl_minor >= 0));
+        const bool gl20_or_later = (gl_major > 2 || (gl_major == 2 && gl_minor >= 0));
 
         if (gl30_or_later || has_generate_mipmap) {
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
@@ -83,6 +139,8 @@ namespace alia {
             }
 #endif
         }
+
+        const bool has_shaders = gl20_or_later && load_shader_procs();
 
         graphics_backend_interface iface;
         iface.id = gfx_backend::opengl;
@@ -110,6 +168,20 @@ namespace alia {
                 "glGenerateMipmap requires GL 3.0+ or GL_EXT_framebuffer_object"
             };
         }
+
+        if (has_shaders) {
+            iface.create_shader_program = {ogl_create_shader_program};
+        } else {
+            iface.create_shader_program = {
+                nullptr,
+                "shader programs require OpenGL 2.0 and shader entry points"
+            };
+        }
+        iface.destroy_shader_program = {ogl_destroy_shader_program};
+        iface.shader_lookup_constant = {ogl_shader_lookup_constant};
+        iface.shader_set_constant    = {ogl_shader_set_constant};
+        iface.shader_lookup_sampler  = {ogl_shader_lookup_sampler};
+        iface.shader_set_sampler     = {ogl_shader_set_sampler};
 
         iface.create_swapchain    = {ogl_create_swapchain};
         iface.destroy_swapchain   = {ogl_destroy_swapchain};

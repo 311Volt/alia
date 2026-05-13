@@ -8,6 +8,9 @@
 #include <cstddef>
 #include <memory>
 #include <span>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "../graphics_backend_interface.hpp"
 #include "ogl_platform.hpp"
@@ -41,6 +44,20 @@ namespace alia {
         vec2i size = {};
     };
 
+    struct ogl_stored_shader_constant {
+        shader_constant_slot slot = {};
+        shader_constant_value_type type = shader_constant_value_type::float_1;
+        std::vector<float> floats;
+        std::vector<int> ints;
+    };
+
+    struct ogl_shader_program : shader_program_handle {
+        GLuint program = 0;
+        std::unordered_map<std::string, int> sampler_units;
+        std::vector<ogl_stored_shader_constant> stored_constants;
+        std::unordered_map<int, texture_handle *> sampler_textures;
+    };
+
     // ── Cast helpers ──────────────────────────────────────────────────────
 
     inline ogl_device *as_ogl_device(device_handle *h) {
@@ -54,6 +71,12 @@ namespace alia {
     }
     inline ogl_swapchain *as_ogl_swapchain(swapchain_handle *h) {
         return static_cast<ogl_swapchain *>(h);
+    }
+    inline ogl_shader_program *as_ogl_shader_program(shader_program_handle *h) {
+        return static_cast<ogl_shader_program *>(h);
+    }
+    inline const ogl_shader_program *as_ogl_shader_program(const shader_program_handle *h) {
+        return static_cast<const ogl_shader_program *>(h);
     }
 
     // ── Device ops ────────────────────────────────────────────────────────
@@ -76,6 +99,14 @@ namespace alia {
     void ogl_texture_generate_mipmaps(texture_handle *h);
     texture_handle *ogl_texture_clone(const texture_handle *h);
 
+    shader_program_handle *ogl_create_shader_program(device_handle *dev, const shader_program_desc &desc);
+    void ogl_destroy_shader_program(shader_program_handle *h);
+    shader_constant_slot ogl_shader_lookup_constant(shader_program_handle *h, std::string_view name, shader_type stage);
+    void ogl_shader_set_constant(shader_program_handle *h, const shader_constant_slot &slot, const shader_constant_payload &payload);
+    shader_sampler_slot ogl_shader_lookup_sampler(shader_program_handle *h, std::string_view name, shader_type stage);
+    void ogl_shader_set_sampler(shader_program_handle *h, const shader_sampler_slot &slot, texture_handle *tex);
+    void ogl_apply_shader_program(shader_program_handle *h, texture_handle *primary_texture);
+
     // ── Swapchain ops ─────────────────────────────────────────────────────
 
     swapchain_handle *ogl_create_swapchain(device_handle *dev, void *native_handle, vec2i size);
@@ -88,32 +119,65 @@ namespace alia {
 
     void ogl_draw_prim(
         prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        shader_program_handle *shader
     );
     void ogl_draw_indexed_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        shader_program_handle *shader
     );
     void ogl_draw_textured_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex
+        texture_handle *tex,
+        shader_program_handle *shader
     );
     void ogl_draw_alpha_masked_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex
+        texture_handle *tex,
+        shader_program_handle *shader
     );
     void ogl_draw_textured_indexed_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::span<const uint32_t> indices,
         std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex
+        texture_handle *tex,
+        shader_program_handle *shader
     );
 
     // ── glGenerateMipmap function pointer (loaded during device creation) ─
     extern PFNGLGENERATEMIPMAPPROC ogl_s_glGenerateMipmap;
+    extern PFNGLCREATESHADERPROC ogl_s_glCreateShader;
+    extern PFNGLSHADERSOURCEPROC ogl_s_glShaderSource;
+    extern PFNGLCOMPILESHADERPROC ogl_s_glCompileShader;
+    extern PFNGLGETSHADERIVPROC ogl_s_glGetShaderiv;
+    extern PFNGLGETSHADERINFOLOGPROC ogl_s_glGetShaderInfoLog;
+    extern PFNGLDELETESHADERPROC ogl_s_glDeleteShader;
+    extern PFNGLCREATEPROGRAMPROC ogl_s_glCreateProgram;
+    extern PFNGLATTACHSHADERPROC ogl_s_glAttachShader;
+    extern PFNGLBINDATTRIBLOCATIONPROC ogl_s_glBindAttribLocation;
+    extern PFNGLLINKPROGRAMPROC ogl_s_glLinkProgram;
+    extern PFNGLGETPROGRAMIVPROC ogl_s_glGetProgramiv;
+    extern PFNGLGETPROGRAMINFOLOGPROC ogl_s_glGetProgramInfoLog;
+    extern PFNGLDELETEPROGRAMPROC ogl_s_glDeleteProgram;
+    extern PFNGLUSEPROGRAMPROC ogl_s_glUseProgram;
+    extern PFNGLGETUNIFORMLOCATIONPROC ogl_s_glGetUniformLocation;
+    extern PFNGLUNIFORM1FPROC ogl_s_glUniform1f;
+    extern PFNGLUNIFORM2FPROC ogl_s_glUniform2f;
+    extern PFNGLUNIFORM3FPROC ogl_s_glUniform3f;
+    extern PFNGLUNIFORM4FPROC ogl_s_glUniform4f;
+    extern PFNGLUNIFORM1IPROC ogl_s_glUniform1i;
+    extern PFNGLUNIFORM2IPROC ogl_s_glUniform2i;
+    extern PFNGLUNIFORM3IPROC ogl_s_glUniform3i;
+    extern PFNGLUNIFORM4IPROC ogl_s_glUniform4i;
+    extern PFNGLUNIFORMMATRIX4FVPROC ogl_s_glUniformMatrix4fv;
+    extern PFNGLACTIVETEXTUREPROC ogl_s_glActiveTexture;
+    extern PFNGLENABLEVERTEXATTRIBARRAYPROC ogl_s_glEnableVertexAttribArray;
+    extern PFNGLDISABLEVERTEXATTRIBARRAYPROC ogl_s_glDisableVertexAttribArray;
+    extern PFNGLVERTEXATTRIBPOINTERPROC ogl_s_glVertexAttribPointer;
 
 } // namespace alia
 

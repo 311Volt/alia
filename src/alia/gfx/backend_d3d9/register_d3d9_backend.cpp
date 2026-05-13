@@ -11,9 +11,11 @@ namespace alia {
             return {nullptr, {}};
 
         // Probe hardware capabilities for conditional op support.
-        D3DCAPS9 caps = {};
-        raw->device->GetDeviceCaps(&caps);
+        D3DCAPS9 caps = raw->caps;
         const bool can_autogen_mipmaps = (caps.Caps2 & D3DCAPS2_CANAUTOGENMIPMAP) != 0;
+        const bool can_use_shaders =
+            D3DSHADER_VERSION_MAJOR(caps.VertexShaderVersion) >= 2 &&
+            D3DSHADER_VERSION_MAJOR(caps.PixelShaderVersion) >= 2;
 
         // Example of how reason_unsupported is used for a future backend-level op:
         // .some_future_op = { nullptr, "D3D9 backend does not support <op>" }
@@ -44,6 +46,20 @@ namespace alia {
                 "device lacks D3DCAPS2_CANAUTOGENMIPMAP"
             };
         }
+
+        if (can_use_shaders) {
+            iface.create_shader_program = {d3d9_create_shader_program};
+        } else {
+            iface.create_shader_program = {
+                nullptr,
+                "device lacks D3D9 vertex/pixel shader model 2.0 support"
+            };
+        }
+        iface.destroy_shader_program = {d3d9_destroy_shader_program};
+        iface.shader_lookup_constant = {d3d9_shader_lookup_constant};
+        iface.shader_set_constant    = {d3d9_shader_set_constant};
+        iface.shader_lookup_sampler  = {d3d9_shader_lookup_sampler};
+        iface.shader_set_sampler     = {d3d9_shader_set_sampler};
 
         iface.create_swapchain   = {d3d9_create_swapchain};
         iface.destroy_swapchain  = {d3d9_destroy_swapchain};
