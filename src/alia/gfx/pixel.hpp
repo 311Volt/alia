@@ -47,19 +47,6 @@ namespace alia {
         }
     }
 
-    struct px_rgb888;
-    struct px_rgba8888;
-    struct px_rgb565;
-    struct px_bgr888;
-    struct px_bgra8888;
-    struct px_gray_u8;
-    struct px_gray_f32;
-    struct px_rgba_f32;
-    struct px_rgb_f32;
-    struct px_xy_u8;
-    struct px_xy_f32;
-    struct px_palette_u8;
-
     template <typename T>
     inline constexpr bool is_pixel_type_v = requires {
         typename std::remove_cvref_t<T>::is_pixel_type;

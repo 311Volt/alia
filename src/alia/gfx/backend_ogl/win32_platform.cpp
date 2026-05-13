@@ -6,7 +6,7 @@
 #include <windows.h>
 #include <GL/gl.h>
 
-#include "gfx_device.hpp"
+#include "ogl_platform.hpp"
 
 namespace alia {
 
@@ -45,7 +45,6 @@ namespace alia {
     }
 
     // ── Opaque context struct ─────────────────────────────────────────────
-    // The "context" handle exposed to the OpenGL device code is a pointer to this.
 
     struct win_ogl_ctx {
         HWND dummy_hwnd = nullptr;

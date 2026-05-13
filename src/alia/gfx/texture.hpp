@@ -15,7 +15,8 @@ namespace alia {
 
     namespace detail {
         struct texture_lock_state {
-            texture_impl *tex = nullptr; // non-owning; must outlive this struct
+            texture_handle *handle = nullptr;
+            const graphics_backend_interface *backend = nullptr;
             texture_lock_info info = {};
         };
     } // namespace detail
@@ -25,8 +26,7 @@ namespace alia {
     /// @brief RAII handle granting CPU read/write access to a texture mip level.
     ///
     /// Obtained from @c texture::lock<TPixel>(). On destruction (or when
-    /// @c release() is called) the modified region is committed back to GPU
-    /// memory (for backends that stage through CPU, e.g. OpenGL).
+    /// @c release() is called) the modified region is committed back to GPU memory.
     ///
     /// Evaluates to @c true if the lock succeeded. Use:
     /// @code
@@ -66,7 +66,10 @@ namespace alia {
 
         /// @returns A typed view over the locked region. Undefined if @c !*this.
         [[nodiscard]] bitmap_view<TPixel> view() noexcept {
-            return bitmap_view<TPixel>(impl_->info.extent.x, impl_->info.extent.y, impl_->info.stride_bytes, impl_->info.data);
+            return bitmap_view<TPixel>(
+                impl_->info.extent.x, impl_->info.extent.y,
+                impl_->info.stride_bytes, impl_->info.data
+            );
         }
 
         /// Shorthand for @c view().
@@ -83,7 +86,7 @@ namespace alia {
         /// The destructor calls this automatically; safe to call more than once.
         void release() {
             if (impl_) {
-                impl_->tex->unlock(impl_->info, true);
+                impl_->backend->texture_unlock.get_or_throw()(impl_->handle, impl_->info, true);
                 impl_.reset();
             }
         }
@@ -91,8 +94,8 @@ namespace alia {
     private:
         friend class texture;
         std::unique_ptr<detail::texture_lock_state> impl_;
-        explicit locked_texture_region(std::unique_ptr<detail::texture_lock_state> s) noexcept : impl_(std::move(s)) {
-        }
+        explicit locked_texture_region(std::unique_ptr<detail::texture_lock_state> s) noexcept
+            : impl_(std::move(s)) {}
     };
 
     // ── texture ───────────────────────────────────────────────────────────
@@ -104,17 +107,15 @@ namespace alia {
     class texture {
     public:
         texture() = default;
-        ~texture() = default;
-        texture(texture &&) noexcept = default;
-        texture &operator=(texture &&) noexcept = default;
+        ~texture();
+        texture(texture &&) noexcept;
+        texture &operator=(texture &&) noexcept;
         texture(const texture &) = delete;
         texture &operator=(const texture &) = delete;
 
         // ── Construction ─────────────────────────────────────────────────
 
         /// Create an uninitialised texture.
-        /// @param mip_levels  @c 1 = no mipmaps, @c full_mip_chain = compute full
-        ///                    chain, or an explicit positive count.
         texture(gfx_device &device, pixel_format fmt, vec2i size, int mip_levels = 1);
 
         /// Create and initialise level 0 from a type-erased CPU view.
@@ -125,13 +126,13 @@ namespace alia {
 
         /// Create and initialise level 0 from a typed CPU view.
         template <pixel TPixel>
-        texture(gfx_device &device, const bitmap_view<TPixel> &src, int mip_levels = 1) : texture(device, bitmap(src), mip_levels) {
-        }
+        texture(gfx_device &device, const bitmap_view<TPixel> &src, int mip_levels = 1)
+            : texture(device, bitmap(src), mip_levels) {}
 
         // ── State queries ────────────────────────────────────────────────
 
         [[nodiscard]] bool valid() const noexcept {
-            return impl_ != nullptr;
+            return handle_ != nullptr;
         }
         [[nodiscard]] explicit operator bool() const noexcept {
             return valid();
@@ -175,22 +176,23 @@ namespace alia {
 
         // ── Backend access (internal) ────────────────────────────────────
 
-        texture_impl *impl() noexcept {
-            return impl_.get();
+        texture_handle *impl() noexcept {
+            return handle_;
         }
-        const texture_impl *impl() const noexcept {
-            return impl_.get();
+        const texture_handle *impl() const noexcept {
+            return handle_;
         }
 
     private:
-        // Non-template core of lock<TPixel>(); validates the format and delegates
-        // to the backend. Returns nullptr on format mismatch or backend failure.
-        std::unique_ptr<detail::texture_lock_state> lock_impl(const std::optional<rect_i> &region, int level, pixel_format expected_fmt);
+        std::unique_ptr<detail::texture_lock_state> lock_impl(
+            const std::optional<rect_i> &region, int level, pixel_format expected_fmt
+        );
 
-        explicit texture(std::unique_ptr<texture_impl> impl) noexcept : impl_(std::move(impl)) {
-        }
+        explicit texture(texture_handle *handle, const graphics_backend_interface *backend) noexcept
+            : handle_(handle), backend_(backend) {}
 
-        std::unique_ptr<texture_impl> impl_;
+        texture_handle *handle_ = nullptr;
+        const graphics_backend_interface *backend_ = nullptr;
     };
 
 } // namespace alia

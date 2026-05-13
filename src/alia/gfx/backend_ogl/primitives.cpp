@@ -1,10 +1,12 @@
 #ifdef ALIA_COMPILE_GFX_BACKEND_OPENGL
 
-#include "detail/ogl_backend.hpp"
-#include <unordered_map>
-#include <typeindex>
+#include "ogl_ops.hpp"
+#include "../gfx_device.hpp"
+#include <GL/gl.h>
 #include <any>
 #include <functional>
+#include <typeindex>
+#include <unordered_map>
 #include <vector>
 
 namespace alia {
@@ -12,11 +14,7 @@ namespace alia {
     // ── Compiled vertex setup cache ──────────────────────────────────────
 
     struct ogl_compiled_vtx {
-        // Sets up vertex array pointers given base address and stride.
-        // Also enables the appropriate client states.
         std::function<void(const void *base, int stride)> setup;
-
-        // Disables client states that were enabled by setup.
         std::function<void()> teardown;
     };
 
@@ -25,7 +23,6 @@ namespace alia {
         return cache;
     }
 
-    // Single-slot cache: avoids the map lookup when the same type is used consecutively.
     static std::type_index s_last_type{typeid(void)};
     static const ogl_compiled_vtx *s_last_compiled = nullptr;
 
@@ -41,7 +38,6 @@ namespace alia {
             return *s_last_compiled;
         }
 
-        // Collect setup/teardown actions from element descriptors
         struct attr_action {
             vertex_attr attribute;
             vertex_storage storage;
@@ -76,8 +72,8 @@ namespace alia {
         auto teardown = [actions]() {
             for (const auto &a : actions) {
                 switch (a.attribute) {
-                case vertex_attr::position:   glDisableClientState(GL_VERTEX_ARRAY); break;
-                case vertex_attr::color_attr: glDisableClientState(GL_COLOR_ARRAY); break;
+                case vertex_attr::position:   glDisableClientState(GL_VERTEX_ARRAY);        break;
+                case vertex_attr::color_attr: glDisableClientState(GL_COLOR_ARRAY);         break;
                 case vertex_attr::tex_coord:  glDisableClientState(GL_TEXTURE_COORD_ARRAY); break;
                 }
             }
@@ -91,11 +87,14 @@ namespace alia {
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
-    static void setup_matrices(const float *proj, const float *xform) {
+    static void setup_matrices() {
+        float transform[16], projection[16];
+        get_current_transform_matrix(std::span<float, 16>(transform, 16));
+        get_current_projection_matrix(std::span<float, 16>(projection, 16));
         glMatrixMode(GL_PROJECTION);
-        glLoadMatrixf(proj);
+        glLoadMatrixf(projection);
         glMatrixMode(GL_MODELVIEW);
-        glLoadMatrixf(xform);
+        glLoadMatrixf(transform);
     }
 
     static GLenum to_gl_mode(prim_type type) {
@@ -108,10 +107,9 @@ namespace alia {
     }
 
     static bool has_vertex_color(std::span<const vertex_element> elements) {
-        for (const auto &e : elements) {
+        for (const auto &e : elements)
             if (e.attribute == vertex_attr::color_attr)
                 return true;
-        }
         return false;
     }
 
@@ -123,16 +121,12 @@ namespace alia {
     // ── Drawing ──────────────────────────────────────────────────────────
 
     void ogl_draw_prim(
-        prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements
+        prim_type type, const void *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements
     ) {
         if (count < 3)
             return;
-
-        float transform[16];
-        float projection[16];
-        get_current_transform_matrix(std::span<float, 16>(transform, 16));
-        get_current_projection_matrix(std::span<float, 16>(projection, 16));
-        setup_matrices(projection, transform);
+        setup_matrices();
         apply_ogl_alpha_blend();
         const auto &compiled = get_or_compile(vtx_type, elements);
         compiled.setup(vertices, stride);
@@ -141,17 +135,13 @@ namespace alia {
     }
 
     void ogl_draw_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride, std::span<const uint32_t> indices, std::type_index vtx_type,
-        std::span<const vertex_element> elements
+        prim_type type, const void *vertices, int count, int stride,
+        std::span<const uint32_t> indices,
+        std::type_index vtx_type, std::span<const vertex_element> elements
     ) {
         if (indices.size() < 3 || count == 0)
             return;
-
-        float transform[16];
-        float projection[16];
-        get_current_transform_matrix(std::span<float, 16>(transform, 16));
-        get_current_projection_matrix(std::span<float, 16>(projection, 16));
-        setup_matrices(projection, transform);
+        setup_matrices();
         apply_ogl_alpha_blend();
         const auto &compiled = get_or_compile(vtx_type, elements);
         compiled.setup(vertices, stride);
@@ -160,18 +150,14 @@ namespace alia {
     }
 
     void ogl_draw_textured_prim(
-        prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_impl *tex
+        prim_type type, const void *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture_handle *tex
     ) {
         if (count < 3 || !tex)
             return;
-        auto *ogl_tex = static_cast<ogl_texture_impl *>(tex);
-
-        float transform[16];
-        float projection[16];
-        get_current_transform_matrix(std::span<float, 16>(transform, 16));
-        get_current_projection_matrix(std::span<float, 16>(projection, 16));
-        setup_matrices(projection, transform);
+        auto *ogl_tex = as_ogl_texture(tex);
+        setup_matrices();
         apply_ogl_alpha_blend();
         const auto &compiled = get_or_compile(vtx_type, elements);
         glEnable(GL_TEXTURE_2D);
@@ -186,18 +172,15 @@ namespace alia {
     }
 
     void ogl_draw_textured_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride, std::span<const uint32_t> indices, std::type_index vtx_type,
-        std::span<const vertex_element> elements, texture_impl *tex
+        prim_type type, const void *vertices, int count, int stride,
+        std::span<const uint32_t> indices,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture_handle *tex
     ) {
         if (indices.size() < 3 || count == 0 || !tex)
             return;
-        auto *ogl_tex = static_cast<ogl_texture_impl *>(tex);
-
-        float transform[16];
-        float projection[16];
-        get_current_transform_matrix(std::span<float, 16>(transform, 16));
-        get_current_projection_matrix(std::span<float, 16>(projection, 16));
-        setup_matrices(projection, transform);
+        auto *ogl_tex = as_ogl_texture(tex);
+        setup_matrices();
         apply_ogl_alpha_blend();
         const auto &compiled = get_or_compile(vtx_type, elements);
         glEnable(GL_TEXTURE_2D);

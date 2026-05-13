@@ -3,7 +3,6 @@
 #include "../os/window.hpp"
 #include <mutex>
 #include <stdexcept>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -17,14 +16,34 @@ namespace alia {
 namespace alia {
     void register_ogl_backend();
 }
-#ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
-namespace alia {
-    void register_win32_ogl_platform();
-}
-#endif
 #endif
 
 namespace alia {
+
+    // ── Backend registry ──────────────────────────────────────────────────
+
+    static std::vector<gfx_backend_factory> &backend_registry() {
+        static std::vector<gfx_backend_factory> reg;
+        return reg;
+    }
+
+    void register_gfx_backend(gfx_backend_factory factory) {
+        backend_registry().push_back(factory);
+    }
+
+    static void init_gfx_backends() {
+        static std::once_flag flag;
+        std::call_once(flag, []() {
+#ifdef ALIA_COMPILE_GFX_BACKEND_D3D9
+            register_d3d9_backend();
+#endif
+#ifdef ALIA_COMPILE_GFX_BACKEND_OPENGL
+            register_ogl_backend();
+#endif
+        });
+    }
+
+    // ── Thread-local current-object setters ───────────────────────────────
 
     void make_current(gfx_device &d) {
         tl_current_device = &d;
@@ -54,122 +73,65 @@ namespace alia {
         return *tl_current_window;
     }
 
-    static std::vector<gfx_backend_entry> &backend_registry() {
-        static std::vector<gfx_backend_entry> reg;
-        return reg;
-    }
-
-    static std::unordered_map<gfx_device_impl *, const gfx_draw_ops *> &device_draw_ops() {
-        static std::unordered_map<gfx_device_impl *, const gfx_draw_ops *> ops;
-        return ops;
-    }
-
-    static const gfx_draw_ops &current_draw_ops() {
-        auto &device = current_device();
-        auto it = device_draw_ops().find(device.impl());
-        if (it == device_draw_ops().end())
-            throw std::runtime_error("No draw operations registered for current gfx_device");
-        return *it->second;
-    }
-
-    void register_gfx_backend(gfx_backend_entry entry) {
-        backend_registry().push_back(std::move(entry));
-    }
-
-    static ogl_platform_ops s_ogl_platform_ops = {};
-
-    void register_ogl_platform(ogl_platform_ops ops) {
-        s_ogl_platform_ops = ops;
-    }
-
-    const ogl_platform_ops &get_ogl_platform() {
-        return s_ogl_platform_ops;
-    }
-
-    static void init_gfx_backends() {
-        static std::once_flag flag;
-        std::call_once(flag, []() {
-#ifdef ALIA_COMPILE_GFX_BACKEND_OPENGL
-#ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
-            register_win32_ogl_platform();
-#endif
-#endif
-#ifdef ALIA_COMPILE_GFX_BACKEND_D3D9
-            register_d3d9_backend();
-#endif
-#ifdef ALIA_COMPILE_GFX_BACKEND_OPENGL
-            register_ogl_backend();
-#endif
-        });
-    }
+    // ── gfx_device ────────────────────────────────────────────────────────
 
     gfx_device::~gfx_device() {
-        if (impl_)
-            device_draw_ops().erase(impl_.get());
+        if (device_)
+            backend_->destroy_device.get_or_throw()(device_);
         if (tl_current_device == this)
             tl_current_device = nullptr;
     }
 
-    gfx_device::gfx_device(gfx_device &&other) noexcept {
-        auto *old_impl = other.impl_.get();
-        impl_ = std::move(other.impl_);
-        if (impl_) {
-            auto node = device_draw_ops().extract(old_impl);
-            if (!node.empty()) {
-                node.key() = impl_.get();
-                device_draw_ops().insert(std::move(node));
-            }
-        }
+    gfx_device::gfx_device(gfx_device &&other) noexcept
+        : device_(std::exchange(other.device_, nullptr))
+        , backend_(std::move(other.backend_)) {
         if (tl_current_device == &other)
             tl_current_device = this;
     }
 
     gfx_device &gfx_device::operator=(gfx_device &&other) noexcept {
-        if (impl_)
-            device_draw_ops().erase(impl_.get());
-        auto *old_impl = other.impl_.get();
-        impl_ = std::move(other.impl_);
-        if (impl_) {
-            auto node = device_draw_ops().extract(old_impl);
-            if (!node.empty()) {
-                node.key() = impl_.get();
-                device_draw_ops().insert(std::move(node));
-            }
+        if (this != &other) {
+            if (device_)
+                backend_->destroy_device.get_or_throw()(device_);
+            device_ = std::exchange(other.device_, nullptr);
+            backend_ = std::move(other.backend_);
+            if (tl_current_device == &other)
+                tl_current_device = this;
         }
-        if (tl_current_device == &other)
-            tl_current_device = this;
         return *this;
     }
 
     vec2f gfx_device::pixel_center_offset() const {
         if (!valid())
             throw std::runtime_error("gfx_device::pixel_center_offset: device is not valid");
-        return impl_->pixel_center_offset();
+        return backend_->pixel_center_offset;
     }
 
     gfx_device gfx_device::create(gfx_backend pref) {
         init_gfx_backends();
 
+        auto try_factory = [](const gfx_backend_factory &f) -> gfx_device {
+            auto [handle, iface] = f.create();
+            if (!handle)
+                return {};
+            auto backend = std::make_unique<graphics_backend_interface>(std::move(iface));
+            gfx_device d(handle, std::move(backend));
+            make_current(d);
+            return d;
+        };
+
         if (pref != gfx_backend::auto_) {
-            for (const auto &e : backend_registry()) {
-                if (e.id != pref)
+            for (const auto &f : backend_registry()) {
+                if (f.id != pref)
                     continue;
-                if (auto dev = e.create_device()) {
-                    gfx_device d(std::move(dev));
-                    device_draw_ops()[d.impl()] = &e.draw_ops;
-                    make_current(d);
+                if (auto d = try_factory(f); d.valid())
                     return d;
-                }
             }
         }
 
-        for (const auto &e : backend_registry()) {
-            if (auto dev = e.create_device()) {
-                gfx_device d(std::move(dev));
-                device_draw_ops()[d.impl()] = &e.draw_ops;
-                make_current(d);
+        for (const auto &f : backend_registry()) {
+            if (auto d = try_factory(f); d.valid())
                 return d;
-            }
         }
 
         throw std::runtime_error("gfx_device: no graphics backend available");
@@ -183,70 +145,95 @@ namespace alia {
         if (!valid())
             throw std::runtime_error("gfx_device::create_swapchain: device is not valid");
 
-        if (auto sc = impl_->create_swapchain(config.target.native_handle(), config.target.size())) {
-            swapchain s(std::move(sc));
-            make_current(s);
-            make_current(config.target);
-            return s;
-        }
+        swapchain_handle *sc = backend_->create_swapchain.get_or_throw()(
+            device_, config.target.native_handle(), config.target.size()
+        );
+        if (!sc)
+            throw std::runtime_error("gfx_device::create_swapchain: failed to create swapchain");
 
-        throw std::runtime_error("gfx_device::create_swapchain: failed to create swapchain");
+        swapchain s(sc, backend_.get());
+        make_current(s);
+        make_current(config.target);
+        return s;
     }
 
+    // ── swapchain ─────────────────────────────────────────────────────────
+
     swapchain::~swapchain() {
+        if (handle_)
+            backend_->destroy_swapchain.get_or_throw()(handle_);
         if (tl_current_swapchain == this)
             tl_current_swapchain = nullptr;
     }
 
-    swapchain::swapchain(swapchain &&other) noexcept : impl_(std::move(other.impl_)) {
+    swapchain::swapchain(swapchain &&other) noexcept
+        : handle_(std::exchange(other.handle_, nullptr))
+        , backend_(std::exchange(other.backend_, nullptr)) {
         if (tl_current_swapchain == &other)
             tl_current_swapchain = this;
     }
 
     swapchain &swapchain::operator=(swapchain &&other) noexcept {
-        impl_ = std::move(other.impl_);
-        if (tl_current_swapchain == &other)
-            tl_current_swapchain = this;
+        if (this != &other) {
+            if (handle_)
+                backend_->destroy_swapchain.get_or_throw()(handle_);
+            handle_ = std::exchange(other.handle_, nullptr);
+            backend_ = std::exchange(other.backend_, nullptr);
+            if (tl_current_swapchain == &other)
+                tl_current_swapchain = this;
+        }
         return *this;
     }
 
+    // ── Swapchain free functions ───────────────────────────────────────────
+
     void clear(color c) {
-        current_swapchain().impl()->clear(c);
+        auto &sc = current_swapchain();
+        sc.backend()->swapchain_clear.get_or_throw()(sc.handle(), c);
     }
 
     void present() {
-        current_swapchain().impl()->present();
+        auto &sc = current_swapchain();
+        sc.backend()->swapchain_present.get_or_throw()(sc.handle());
     }
 
     void on_resize(vec2i new_size) {
-        current_swapchain().impl()->on_resize(new_size);
+        auto &sc = current_swapchain();
+        sc.backend()->swapchain_on_resize.get_or_throw()(sc.handle(), new_size);
     }
 
+    // ── Draw free functions ───────────────────────────────────────────────
+
     void draw_prim(
-        prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements
+        prim_type type, const void *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements
     ) {
-        current_draw_ops().draw_prim(type, vertices, count, stride, vtx_type, elements);
+        current_device().backend()->draw_prim.get_or_throw()(type, vertices, count, stride, vtx_type, elements);
     }
 
     void draw_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride, std::span<const uint32_t> indices, std::type_index vtx_type,
-        std::span<const vertex_element> elements
+        prim_type type, const void *vertices, int count, int stride,
+        std::span<const uint32_t> indices,
+        std::type_index vtx_type, std::span<const vertex_element> elements
     ) {
-        current_draw_ops().draw_indexed_prim(type, vertices, count, stride, indices, vtx_type, elements);
+        current_device().backend()->draw_indexed_prim.get_or_throw()(type, vertices, count, stride, indices, vtx_type, elements);
     }
 
     void draw_textured_prim(
-        prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements,
+        prim_type type, const void *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
         texture &tex
     ) {
-        current_draw_ops().draw_textured_prim(type, vertices, count, stride, vtx_type, elements, tex.impl());
+        current_device().backend()->draw_textured_prim.get_or_throw()(type, vertices, count, stride, vtx_type, elements, tex.impl());
     }
 
     void draw_textured_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride, std::span<const uint32_t> indices, std::type_index vtx_type,
-        std::span<const vertex_element> elements, texture &tex
+        prim_type type, const void *vertices, int count, int stride,
+        std::span<const uint32_t> indices,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture &tex
     ) {
-        current_draw_ops().draw_textured_indexed_prim(type, vertices, count, stride, indices, vtx_type, elements, tex.impl());
+        current_device().backend()->draw_textured_indexed_prim.get_or_throw()(type, vertices, count, stride, indices, vtx_type, elements, tex.impl());
     }
 
 } // namespace alia
