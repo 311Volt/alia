@@ -201,7 +201,6 @@ namespace alia {
         state->handle = handle_;
         state->backend = backend_;
         state->info = info;
-        state->commit_on_release = (mode != texture_lock_mode::read_only);
         return state;
     }
 

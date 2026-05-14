@@ -4,6 +4,7 @@
 #include "bitmap/bitmap.hpp"
 #include "gfx_device.hpp"
 #include <optional>
+#include <utility>
 
 namespace alia {
 
@@ -18,16 +19,17 @@ namespace alia {
             texture_handle *handle = nullptr;
             const graphics_backend_interface *backend = nullptr;
             texture_lock_info info = {};
-            bool commit_on_release = true;
         };
     } // namespace detail
 
     // ── locked_texture_region ─────────────────────────────────────────────
 
-    /// @brief RAII handle granting CPU read/write access to a texture mip level.
+    /// @brief RAII handle granting CPU access to a texture mip level.
     ///
-    /// Obtained from @c texture::lock<TPixel>(). On destruction (or when
-    /// @c release() is called) the modified region is committed back to GPU memory.
+    /// Obtained from @c texture::lock<TPixel>() (read-write),
+    /// @c texture::lock_read_only<TPixel>(), or @c texture::lock_write_only<TPixel>().
+    /// On destruction (or when @c release() is called) the modified region is
+    /// committed back to GPU memory, unless this was a read-only lock.
     ///
     /// Evaluates to @c true if the lock succeeded. Use:
     /// @code
@@ -36,9 +38,12 @@ namespace alia {
     ///   } // committed on scope exit
     /// @endcode
     ///
+    /// For a read-only lock, @c view() returns a @c const reference, so writes
+    /// through the view are a compile error.
+    ///
     /// Format mismatch or an out-of-range region produces a falsy handle;
     /// no GPU access occurs.
-    template <pixel TPixel>
+    template <pixel TPixel, texture_lock_mode Mode = texture_lock_mode::read_write>
     class locked_texture_region {
     public:
         locked_texture_region() = default;
@@ -53,6 +58,8 @@ namespace alia {
             if (this != &o) {
                 release();
                 impl_ = std::move(o.impl_);
+                view_ = o.view_;
+                o.view_ = {};
             }
             return *this;
         }
@@ -65,16 +72,18 @@ namespace alia {
             return impl_ != nullptr;
         }
 
-        /// @returns A typed view over the locked region. Undefined if @c !*this.
-        [[nodiscard]] bitmap_view<TPixel> view() noexcept {
-            return bitmap_view<TPixel>(
-                impl_->info.extent.x, impl_->info.extent.y,
-                impl_->info.stride_bytes, impl_->info.data
-            );
+        /// @returns Reference to the typed view over the locked region.
+        /// For a read-only lock returns @c const, so subscript writes are a
+        /// compile error. Undefined if @c !*this.
+        [[nodiscard]] auto &view() noexcept {
+            if constexpr (Mode == texture_lock_mode::read_only)
+                return std::as_const(view_);
+            else
+                return view_;
         }
 
         /// Shorthand for @c view().
-        [[nodiscard]] bitmap_view<TPixel> operator*() noexcept {
+        [[nodiscard]] auto &operator*() noexcept {
             return view();
         }
 
@@ -87,16 +96,24 @@ namespace alia {
         /// The destructor calls this automatically; safe to call more than once.
         void release() {
             if (impl_) {
-                impl_->backend->texture_unlock.get_or_throw()(impl_->handle, impl_->info, impl_->commit_on_release);
+                constexpr bool wrote = (Mode != texture_lock_mode::read_only);
+                impl_->backend->texture_unlock.get_or_throw()(impl_->handle, impl_->info, wrote);
                 impl_.reset();
+                view_ = {};
             }
         }
 
     private:
         friend class texture;
         std::unique_ptr<detail::texture_lock_state> impl_;
+        bitmap_view<TPixel> view_{};
+
         explicit locked_texture_region(std::unique_ptr<detail::texture_lock_state> s) noexcept
-            : impl_(std::move(s)) {}
+            : impl_(std::move(s))
+            , view_(impl_
+                ? bitmap_view<TPixel>(impl_->info.extent.x, impl_->info.extent.y,
+                                      impl_->info.stride_bytes, impl_->info.data)
+                : bitmap_view<TPixel>{}) {}
     };
 
     // ── texture ───────────────────────────────────────────────────────────
@@ -165,8 +182,10 @@ namespace alia {
         ///                 Omit to lock the entire level.
         /// @param level    Mip level (0 = base).
         template <pixel TPixel>
-        [[nodiscard]] locked_texture_region<TPixel> lock(std::optional<rect_i> region = {}, int level = 0) {
-            return locked_texture_region<TPixel>(lock_impl(region, level, TPixel::format_id, texture_lock_mode::read_write));
+        [[nodiscard]] locked_texture_region<TPixel, texture_lock_mode::read_write>
+        lock(std::optional<rect_i> region = {}, int level = 0) {
+            return locked_texture_region<TPixel, texture_lock_mode::read_write>(
+                lock_impl(region, level, TPixel::format_id, texture_lock_mode::read_write));
         }
 
         /// Acquire a typed lock to inspect pixels without modifying them.
@@ -179,8 +198,10 @@ namespace alia {
         /// @param region   Sub-rectangle to lock (clamped to level bounds).
         /// @param level    Mip level (0 = base).
         template <pixel TPixel>
-        [[nodiscard]] locked_texture_region<TPixel> lock_read_only(std::optional<rect_i> region = {}, int level = 0) {
-            return locked_texture_region<TPixel>(lock_impl(region, level, TPixel::format_id, texture_lock_mode::read_only));
+        [[nodiscard]] locked_texture_region<TPixel, texture_lock_mode::read_only>
+        lock_read_only(std::optional<rect_i> region = {}, int level = 0) {
+            return locked_texture_region<TPixel, texture_lock_mode::read_only>(
+                lock_impl(region, level, TPixel::format_id, texture_lock_mode::read_only));
         }
 
         /// Acquire a typed lock for writing pixels without preserving current contents.
@@ -194,8 +215,10 @@ namespace alia {
         /// @param region   Sub-rectangle to lock (clamped to level bounds).
         /// @param level    Mip level (0 = base).
         template <pixel TPixel>
-        [[nodiscard]] locked_texture_region<TPixel> lock_write_only(std::optional<rect_i> region = {}, int level = 0) {
-            return locked_texture_region<TPixel>(lock_impl(region, level, TPixel::format_id, texture_lock_mode::write_only));
+        [[nodiscard]] locked_texture_region<TPixel, texture_lock_mode::write_only>
+        lock_write_only(std::optional<rect_i> region = {}, int level = 0) {
+            return locked_texture_region<TPixel, texture_lock_mode::write_only>(
+                lock_impl(region, level, TPixel::format_id, texture_lock_mode::write_only));
         }
 
         /// Regenerate all mip levels from level 0. No-op if @c mip_levels() == 1.

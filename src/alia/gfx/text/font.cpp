@@ -30,7 +30,10 @@ namespace alia {
         }
 
         // Transparent texel border sampled by linear filtering around each glyph.
-        constexpr int glyph_atlas_border = 1;
+        // Named constant for readability — not a knob; the atlas-write path
+        // below assumes a 1-pixel perimeter and changing this will silently
+        // produce sampling artifacts.
+        constexpr int glyph_atlas_border_size = 1;
         constexpr int text_texture_border = 1;
 
         void copy_bitmap_coverage(const FT_Bitmap &bitmap, std::vector<unsigned char> &out) {
@@ -101,7 +104,7 @@ namespace alia {
             std::vector<glyph_page> pages;
 
             hardware_glyph_buffer_impl(font &source, vec2i page_size) : source(&source), page_size(page_size) {
-                if (page_size.x <= glyph_atlas_border * 2 || page_size.y <= glyph_atlas_border * 2)
+                if (page_size.x <= glyph_atlas_border_size * 2 || page_size.y <= glyph_atlas_border_size * 2)
                     throw std::invalid_argument("hardware_glyph_buffer: page size is too small");
             }
 
@@ -129,7 +132,7 @@ namespace alia {
             }
 
             glyph_page &page_with_space(vec2i size) {
-                if (size.x + glyph_atlas_border * 2 > page_size.x || size.y + glyph_atlas_border * 2 > page_size.y) {
+                if (size.x + glyph_atlas_border_size * 2 > page_size.x || size.y + glyph_atlas_border_size * 2 > page_size.y) {
                     throw std::runtime_error("hardware_glyph_buffer: glyph is larger than the atlas page");
                 }
 
@@ -137,13 +140,13 @@ namespace alia {
                     return add_page();
 
                 glyph_page *page = &pages.back();
-                if (page->cursor_x + size.x + glyph_atlas_border * 2 > page_size.x) {
+                if (page->cursor_x + size.x + glyph_atlas_border_size * 2 > page_size.x) {
                     page->cursor_x = 0;
-                    page->cursor_y += page->row_height + glyph_atlas_border * 2;
+                    page->cursor_y += page->row_height + glyph_atlas_border_size * 2;
                     page->row_height = 0;
                 }
 
-                if (page->cursor_y + size.y + glyph_atlas_border * 2 > page_size.y)
+                if (page->cursor_y + size.y + glyph_atlas_border_size * 2 > page_size.y)
                     return add_page();
 
                 return *page;
@@ -163,24 +166,41 @@ namespace alia {
                     glyph.atlas_rect = rect_i::pos_size(
                         {page.cursor_x, page.cursor_y},
                         {
-                            rendered.metrics.bitmap_size.x + glyph_atlas_border * 2,
-                            rendered.metrics.bitmap_size.y + glyph_atlas_border * 2,
+                            rendered.metrics.bitmap_size.x + glyph_atlas_border_size * 2,
+                            rendered.metrics.bitmap_size.y + glyph_atlas_border_size * 2,
                         }
                     );
 
-                    if (auto region = page.atlas.lock<px_bgra8888>(glyph.atlas_rect)) {
-                        auto view = region.view();
+                    if (auto region = page.atlas.lock_write_only<px_bgra8888>(glyph.atlas_rect)) {
+                        auto &view = region.view();
+                        constexpr px_bgra8888 transparent{255, 255, 255, 0};
+
+                        // write_only contract: every pixel in the locked region
+                        // must be written. Fill the border with the atlas's
+                        // initial transparent value so linear sampling at glyph
+                        // edges still reads transparency.
+                        const int w = view.width();
+                        const int h = view.height();
+                        for (int x = 0; x < w; ++x) {
+                            view[x, 0]     = transparent;
+                            view[x, h - 1] = transparent;
+                        }
+                        for (int y = 1; y < h - 1; ++y) {
+                            view[0, y]     = transparent;
+                            view[w - 1, y] = transparent;
+                        }
+
                         for (int y = 0; y < rendered.metrics.bitmap_size.y; ++y) {
                             for (int x = 0; x < rendered.metrics.bitmap_size.x; ++x) {
                                 const auto alpha = rendered.coverage[static_cast<std::size_t>(y) * rendered.metrics.bitmap_size.x + x];
-                                view[x + glyph_atlas_border, y + glyph_atlas_border] = px_bgra8888{255, 255, 255, alpha};
+                                view[x + glyph_atlas_border_size, y + glyph_atlas_border_size] = px_bgra8888{255, 255, 255, alpha};
                             }
                         }
                     } else {
                         throw std::runtime_error("hardware_glyph_buffer: failed to lock atlas texture");
                     }
 
-                    page.cursor_x += rendered.metrics.bitmap_size.x + glyph_atlas_border * 2;
+                    page.cursor_x += rendered.metrics.bitmap_size.x + glyph_atlas_border_size * 2;
                     page.row_height = (std::max)(page.row_height, rendered.metrics.bitmap_size.y);
                 }
 
@@ -673,8 +693,8 @@ namespace alia {
             if (glyph.page >= 0) {
                 detail::glyph_page &page = buffer.impl_->pages[static_cast<std::size_t>(glyph.page)];
                 const rect_i r = glyph.atlas_rect;
-                const float x0 = position.x + pen_x + static_cast<float>(glyph.metrics.bearing.x - glyph_atlas_border);
-                const float y0 = baseline - static_cast<float>(glyph.metrics.bearing.y + glyph_atlas_border);
+                const float x0 = position.x + pen_x + static_cast<float>(glyph.metrics.bearing.x - glyph_atlas_border_size);
+                const float y0 = baseline - static_cast<float>(glyph.metrics.bearing.y + glyph_atlas_border_size);
                 const float x1 = x0 + static_cast<float>(r.width());
                 const float y1 = y0 + static_cast<float>(r.height());
                 const float u0 = static_cast<float>(r.left()) / static_cast<float>(buffer.impl_->page_size.x);
