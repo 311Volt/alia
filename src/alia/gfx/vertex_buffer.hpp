@@ -1,12 +1,6 @@
 #ifndef VERTEX_BUFFER_CFD82BF2_3937_4593_8A3E_673ABE370795
 #define VERTEX_BUFFER_CFD82BF2_3937_4593_8A3E_673ABE370795
 
-namespace alia {
-
-	class vertex_buffer {
-
-	};
-
-}
+#include "prim_buffers.hpp"
 
 #endif /* VERTEX_BUFFER_CFD82BF2_3937_4593_8A3E_673ABE370795 */

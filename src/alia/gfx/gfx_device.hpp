@@ -103,13 +103,27 @@ namespace alia {
         prim_type type, const void *vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements
     );
+    void draw_prim(
+        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements
+    );
     void draw_indexed_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::span<const uint32_t> indices,
         std::type_index vtx_type, std::span<const vertex_element> elements
     );
+    void draw_indexed_prim(
+        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
+        index_buffer_handle *indices, int index_count,
+        std::type_index vtx_type, std::span<const vertex_element> elements
+    );
     void draw_textured_prim(
         prim_type type, const void *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture &tex
+    );
+    void draw_textured_prim(
+        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements,
         texture &tex
     );
@@ -118,9 +132,20 @@ namespace alia {
         std::type_index vtx_type, std::span<const vertex_element> elements,
         texture &tex
     );
+    void draw_alpha_masked_prim(
+        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture &tex
+    );
     void draw_textured_indexed_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::span<const uint32_t> indices,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture &tex
+    );
+    void draw_textured_indexed_prim(
+        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
+        index_buffer_handle *indices, int index_count,
         std::type_index vtx_type, std::span<const vertex_element> elements,
         texture &tex
     );

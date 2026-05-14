@@ -3,6 +3,7 @@
 #include "ogl_ops.hpp"
 #include <GL/gl.h>
 #include <any>
+#include <cstdint>
 #include <functional>
 #include <typeindex>
 #include <unordered_map>
@@ -49,6 +50,7 @@ namespace alia {
             case vertex_attr::position:   return 0;
             case vertex_attr::color_attr: return 1;
             case vertex_attr::tex_coord:  return 2;
+            case vertex_attr::normal:     return 3;
             }
             return 0;
         };
@@ -64,7 +66,8 @@ namespace alia {
 
         auto setup = [actions, attr_index, component_count](const void *base, int stride, bool shader_active) {
             for (const auto &a : actions) {
-                const char *ptr = static_cast<const char *>(base) + a.offset;
+                const auto ptr_value = reinterpret_cast<std::uintptr_t>(base) + static_cast<std::uintptr_t>(a.offset);
+                const void *ptr = reinterpret_cast<const void *>(ptr_value);
                 if (shader_active) {
                     const GLuint idx = attr_index(a.attribute);
                     ogl_s_glEnableVertexAttribArray(idx);
@@ -80,6 +83,10 @@ namespace alia {
                     glVertexPointer(components, GL_FLOAT, stride, ptr);
                     break;
                 }
+                case vertex_attr::normal:
+                    glEnableClientState(GL_NORMAL_ARRAY);
+                    glNormalPointer(GL_FLOAT, stride, ptr);
+                    break;
                 case vertex_attr::color_attr:
                     glEnableClientState(GL_COLOR_ARRAY);
                     glColorPointer(4, GL_FLOAT, stride, ptr);
@@ -100,6 +107,7 @@ namespace alia {
                 }
                 switch (a.attribute) {
                 case vertex_attr::position:   glDisableClientState(GL_VERTEX_ARRAY);        break;
+                case vertex_attr::normal:     glDisableClientState(GL_NORMAL_ARRAY);        break;
                 case vertex_attr::color_attr: glDisableClientState(GL_COLOR_ARRAY);         break;
                 case vertex_attr::tex_coord:  glDisableClientState(GL_TEXTURE_COORD_ARRAY); break;
                 }
@@ -265,13 +273,22 @@ namespace alia {
     }
 
     void ogl_bind_vertex_input(device_handle *, const vertex_input_binding &binding) {
+        if (ogl_s_glBindBuffer) {
+            const GLuint buffer_id = binding.buffer ? as_ogl_vertex_buffer(binding.buffer)->buffer_id : 0;
+            ogl_s_glBindBuffer(GL_ARRAY_BUFFER, buffer_id);
+        }
         const auto &compiled = get_or_compile(binding.vertex_type, binding.elements);
-        compiled.setup(binding.vertices, binding.stride, binding.mode == vertex_input_mode::shader_attributes);
+        const void *base = binding.buffer
+            ? reinterpret_cast<const void *>(static_cast<std::uintptr_t>(binding.vertex_offset_bytes))
+            : binding.vertices;
+        compiled.setup(base, binding.stride, binding.mode == vertex_input_mode::shader_attributes);
     }
 
     void ogl_unbind_vertex_input(device_handle *, const vertex_input_binding &binding) {
         const auto &compiled = get_or_compile(binding.vertex_type, binding.elements);
         compiled.teardown(binding.mode == vertex_input_mode::shader_attributes);
+        if (ogl_s_glBindBuffer)
+            ogl_s_glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
     void ogl_draw_arrays_immediate(device_handle *, const draw_arrays_immediate &draw) {
@@ -279,12 +296,31 @@ namespace alia {
     }
 
     void ogl_draw_elements_immediate(device_handle *, const draw_elements_immediate &draw) {
+        if (ogl_s_glBindBuffer)
+            ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         glDrawElements(
             to_gl_mode(draw.type),
             static_cast<GLsizei>(draw.indices.size()),
             GL_UNSIGNED_INT,
             draw.indices.data()
         );
+    }
+
+    void ogl_draw_arrays_buffered(device_handle *, const draw_arrays_buffered &draw) {
+        glDrawArrays(to_gl_mode(draw.type), draw.first_vertex, draw.vertex_count);
+    }
+
+    void ogl_draw_elements_buffered(device_handle *, const draw_elements_buffered &draw) {
+        auto *indices = as_ogl_index_buffer(draw.indices);
+        ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices->buffer_id);
+        const auto offset = static_cast<std::uintptr_t>(draw.first_index) * sizeof(uint32_t);
+        glDrawElements(
+            to_gl_mode(draw.type),
+            static_cast<GLsizei>(draw.index_count),
+            GL_UNSIGNED_INT,
+            reinterpret_cast<const void *>(offset)
+        );
+        ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
 } // namespace alia

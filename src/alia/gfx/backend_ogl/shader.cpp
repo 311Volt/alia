@@ -42,6 +42,7 @@ namespace alia {
         constexpr GLuint attr_position = 0;
         constexpr GLuint attr_color = 1;
         constexpr GLuint attr_tex_coord = 2;
+        constexpr GLuint attr_normal = 3;
 
         const shader_source *
         select_source(const shader_program_desc &desc, shader_type type) {
@@ -174,6 +175,7 @@ namespace alia {
         ogl_s_glBindAttribLocation(program_id, attr_position, "a_position");
         ogl_s_glBindAttribLocation(program_id, attr_color, "a_color");
         ogl_s_glBindAttribLocation(program_id, attr_tex_coord, "a_tex_coord");
+        ogl_s_glBindAttribLocation(program_id, attr_normal, "a_normal");
         ogl_s_glLinkProgram(program_id);
 
         ogl_s_glDeleteShader(vertex_shader);

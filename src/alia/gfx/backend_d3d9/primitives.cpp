@@ -43,6 +43,7 @@ namespace alia {
 
             switch (e.attribute) {
             case vertex_attr::position:   d3d_e.Usage = D3DDECLUSAGE_POSITION; d3d_e.UsageIndex = 0; break;
+            case vertex_attr::normal:     d3d_e.Usage = D3DDECLUSAGE_NORMAL;   d3d_e.UsageIndex = 0; break;
             case vertex_attr::color_attr: d3d_e.Usage = D3DDECLUSAGE_COLOR;    d3d_e.UsageIndex = 0; break;
             case vertex_attr::tex_coord:  d3d_e.Usage = D3DDECLUSAGE_TEXCOORD; d3d_e.UsageIndex = 0; break;
             }
@@ -242,9 +243,24 @@ namespace alia {
         auto *device = as_d3d9_device(dev_h)->device;
         IDirect3DVertexDeclaration9 *decl = get_or_compile(device, binding.vertex_type, binding.elements);
         device->SetVertexDeclaration(decl);
+        if (binding.buffer) {
+            auto *buffer = as_d3d9_vertex_buffer(binding.buffer);
+            device->SetStreamSource(
+                0,
+                buffer->buffer,
+                static_cast<UINT>(binding.vertex_offset_bytes),
+                static_cast<UINT>(binding.stride)
+            );
+        } else {
+            device->SetStreamSource(0, nullptr, 0, 0);
+        }
     }
 
-    void d3d9_unbind_vertex_input(device_handle *, const vertex_input_binding &) {
+    void d3d9_unbind_vertex_input(device_handle *dev_h, const vertex_input_binding &binding) {
+        if (!binding.buffer)
+            return;
+        auto *device = as_d3d9_device(dev_h)->device;
+        device->SetStreamSource(0, nullptr, 0, 0);
     }
 
     void d3d9_draw_arrays_immediate(device_handle *dev_h, const draw_arrays_immediate &draw) {
@@ -269,6 +285,30 @@ namespace alia {
             draw.vertices,
             static_cast<UINT>(draw.vertex_stride)
         );
+    }
+
+    void d3d9_draw_arrays_buffered(device_handle *dev_h, const draw_arrays_buffered &draw) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        device->DrawPrimitive(
+            to_d3d_prim(draw.type),
+            static_cast<UINT>(draw.first_vertex),
+            static_cast<UINT>(draw.primitive_count)
+        );
+    }
+
+    void d3d9_draw_elements_buffered(device_handle *dev_h, const draw_elements_buffered &draw) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        auto *indices = as_d3d9_index_buffer(draw.indices);
+        device->SetIndices(indices->buffer);
+        device->DrawIndexedPrimitive(
+            to_d3d_prim(draw.type),
+            0,
+            0,
+            static_cast<UINT>(draw.vertex_count),
+            static_cast<UINT>(draw.first_index),
+            static_cast<UINT>(draw.primitive_count)
+        );
+        device->SetIndices(nullptr);
     }
 
 } // namespace alia

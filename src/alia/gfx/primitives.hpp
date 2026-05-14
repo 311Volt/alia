@@ -2,6 +2,7 @@
 #define PRIMITIVES_D9F74B98_135A_46B0_8FD9_AE94ABAE9905
 
 #include "gfx_device.hpp"
+#include "prim_buffers.hpp"
 #include "texture.hpp"
 #include "../core/rect.hpp"
 #include <cstdint>
@@ -30,6 +31,19 @@ namespace alia {
     }
 
     template <vertex_type TVertex>
+    void draw_triangles(vertex_buffer<TVertex> &vertices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_prim(
+            prim_type::triangle_list,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
+            typeid(TVertex),
+            elems
+        );
+    }
+
+    template <vertex_type TVertex>
     void draw_triangle_strip(std::span<const TVertex> vertices) {
         static constexpr auto elems = TVertex::elements();
         draw_prim(
@@ -43,6 +57,19 @@ namespace alia {
     }
 
     template <vertex_type TVertex>
+    void draw_triangle_strip(vertex_buffer<TVertex> &vertices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_prim(
+            prim_type::triangle_strip,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
+            typeid(TVertex),
+            elems
+        );
+    }
+
+    template <vertex_type TVertex>
     void draw_triangle_fan(std::span<const TVertex> vertices) {
         static constexpr auto elems = TVertex::elements();
         draw_prim(
@@ -50,6 +77,19 @@ namespace alia {
             vertices.data(),
             static_cast<int>(vertices.size()),
             static_cast<int>(sizeof(TVertex)),
+            typeid(TVertex),
+            elems
+        );
+    }
+
+    template <vertex_type TVertex>
+    void draw_triangle_fan(vertex_buffer<TVertex> &vertices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_prim(
+            prim_type::triangle_fan,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
             typeid(TVertex),
             elems
         );
@@ -70,6 +110,21 @@ namespace alia {
     }
 
     template <vertex_type TVertex>
+    void draw_triangles(vertex_buffer<TVertex> &vertices, index_buffer &indices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_indexed_prim(
+            prim_type::triangle_list,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
+            indices.impl(),
+            indices.count(),
+            typeid(TVertex),
+            elems
+        );
+    }
+
+    template <vertex_type TVertex>
     void draw_triangle_strip(std::span<const TVertex> vertices, std::span<const uint32_t> indices) {
         static constexpr auto elems = TVertex::elements();
         draw_indexed_prim(
@@ -78,6 +133,21 @@ namespace alia {
             static_cast<int>(vertices.size()),
             static_cast<int>(sizeof(TVertex)),
             indices,
+            typeid(TVertex),
+            elems
+        );
+    }
+
+    template <vertex_type TVertex>
+    void draw_triangle_strip(vertex_buffer<TVertex> &vertices, index_buffer &indices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_indexed_prim(
+            prim_type::triangle_strip,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
+            indices.impl(),
+            indices.count(),
             typeid(TVertex),
             elems
         );
@@ -98,6 +168,21 @@ namespace alia {
     }
 
     template <vertex_type TVertex>
+    void draw_triangle_fan(vertex_buffer<TVertex> &vertices, index_buffer &indices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_indexed_prim(
+            prim_type::triangle_fan,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
+            indices.impl(),
+            indices.count(),
+            typeid(TVertex),
+            elems
+        );
+    }
+
+    template <vertex_type TVertex>
     void draw_textured_triangles(texture &tex, std::span<const TVertex> vertices) {
         static constexpr auto elems = TVertex::elements();
         draw_textured_prim(
@@ -105,6 +190,20 @@ namespace alia {
             vertices.data(),
             static_cast<int>(vertices.size()),
             static_cast<int>(sizeof(TVertex)),
+            typeid(TVertex),
+            elems,
+            tex
+        );
+    }
+
+    template <vertex_type TVertex>
+    void draw_textured_triangles(texture &tex, vertex_buffer<TVertex> &vertices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_textured_prim(
+            prim_type::triangle_list,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
             typeid(TVertex),
             elems,
             tex
@@ -126,6 +225,20 @@ namespace alia {
     }
 
     template <vertex_type TVertex>
+    void draw_alpha_masked_triangles(texture &tex, vertex_buffer<TVertex> &vertices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_alpha_masked_prim(
+            prim_type::triangle_list,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
+            typeid(TVertex),
+            elems,
+            tex
+        );
+    }
+
+    template <vertex_type TVertex>
     void draw_textured_triangle_strip(texture &tex, std::span<const TVertex> vertices) {
         static constexpr auto elems = TVertex::elements();
         draw_textured_prim(
@@ -140,6 +253,20 @@ namespace alia {
     }
 
     template <vertex_type TVertex>
+    void draw_textured_triangle_strip(texture &tex, vertex_buffer<TVertex> &vertices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_textured_prim(
+            prim_type::triangle_strip,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
+            typeid(TVertex),
+            elems,
+            tex
+        );
+    }
+
+    template <vertex_type TVertex>
     void draw_textured_triangle_fan(texture &tex, std::span<const TVertex> vertices) {
         static constexpr auto elems = TVertex::elements();
         draw_textured_prim(
@@ -147,6 +274,20 @@ namespace alia {
             vertices.data(),
             static_cast<int>(vertices.size()),
             static_cast<int>(sizeof(TVertex)),
+            typeid(TVertex),
+            elems,
+            tex
+        );
+    }
+
+    template <vertex_type TVertex>
+    void draw_textured_triangle_fan(texture &tex, vertex_buffer<TVertex> &vertices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_textured_prim(
+            prim_type::triangle_fan,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
             typeid(TVertex),
             elems,
             tex
@@ -169,6 +310,22 @@ namespace alia {
     }
 
     template <vertex_type TVertex>
+    void draw_textured_triangles(texture &tex, vertex_buffer<TVertex> &vertices, index_buffer &indices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_textured_indexed_prim(
+            prim_type::triangle_list,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
+            indices.impl(),
+            indices.count(),
+            typeid(TVertex),
+            elems,
+            tex
+        );
+    }
+
+    template <vertex_type TVertex>
     void draw_textured_triangle_strip(texture &tex, std::span<const TVertex> vertices, std::span<const uint32_t> indices) {
         static constexpr auto elems = TVertex::elements();
         draw_textured_indexed_prim(
@@ -184,6 +341,22 @@ namespace alia {
     }
 
     template <vertex_type TVertex>
+    void draw_textured_triangle_strip(texture &tex, vertex_buffer<TVertex> &vertices, index_buffer &indices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_textured_indexed_prim(
+            prim_type::triangle_strip,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
+            indices.impl(),
+            indices.count(),
+            typeid(TVertex),
+            elems,
+            tex
+        );
+    }
+
+    template <vertex_type TVertex>
     void draw_textured_triangle_fan(texture &tex, std::span<const TVertex> vertices, std::span<const uint32_t> indices) {
         static constexpr auto elems = TVertex::elements();
         draw_textured_indexed_prim(
@@ -192,6 +365,22 @@ namespace alia {
             static_cast<int>(vertices.size()),
             static_cast<int>(sizeof(TVertex)),
             indices,
+            typeid(TVertex),
+            elems,
+            tex
+        );
+    }
+
+    template <vertex_type TVertex>
+    void draw_textured_triangle_fan(texture &tex, vertex_buffer<TVertex> &vertices, index_buffer &indices) {
+        static constexpr auto elems = TVertex::elements();
+        draw_textured_indexed_prim(
+            prim_type::triangle_fan,
+            vertices.impl(),
+            vertices.count(),
+            vertices.stride(),
+            indices.impl(),
+            indices.count(),
             typeid(TVertex),
             elems,
             tex

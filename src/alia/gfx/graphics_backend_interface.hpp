@@ -55,6 +55,8 @@ namespace alia {
 
     struct device_handle {};
     struct texture_handle {};
+    struct vertex_buffer_handle {};
+    struct index_buffer_handle {};
     struct swapchain_handle {};
     struct shader_program_handle {};
 
@@ -66,6 +68,17 @@ namespace alia {
 
     enum class texture_filter { nearest, linear };
     enum class texture_wrap { clamp, repeat, mirror };
+
+    enum class buffer_usage {
+        static_mesh,
+        dynamic_mesh,
+    };
+
+    enum class buffer_lock_mode {
+        read_write,
+        read_only,
+        write_only,
+    };
 
     enum class shader_type { vertex, pixel };
 
@@ -142,6 +155,12 @@ namespace alia {
         vec2i extent;
         int stride_bytes = 0;
         int level = 0;
+        std::byte *data = nullptr;
+    };
+
+    struct buffer_lock_info {
+        int offset_bytes = 0;
+        int size_bytes = 0;
         std::byte *data = nullptr;
     };
 
@@ -233,7 +252,9 @@ namespace alia {
 
     struct vertex_input_binding {
         vertex_input_mode mode = vertex_input_mode::fixed_function;
+        vertex_buffer_handle *buffer = nullptr;
         const void *vertices = nullptr;
+        int vertex_offset_bytes = 0;
         int stride = 0;
         std::type_index vertex_type = typeid(void);
         std::span<const vertex_element> elements;
@@ -253,6 +274,26 @@ namespace alia {
         int vertex_count = 0;
         int vertex_stride = 0;
         std::span<const uint32_t> indices;
+        int primitive_count = 0;
+    };
+
+    struct draw_arrays_buffered {
+        prim_type type = prim_type::triangle_list;
+        vertex_buffer_handle *vertices = nullptr;
+        int first_vertex = 0;
+        int vertex_count = 0;
+        int vertex_stride = 0;
+        int primitive_count = 0;
+    };
+
+    struct draw_elements_buffered {
+        prim_type type = prim_type::triangle_list;
+        vertex_buffer_handle *vertices = nullptr;
+        int vertex_count = 0;
+        int vertex_stride = 0;
+        index_buffer_handle *indices = nullptr;
+        int first_index = 0;
+        int index_count = 0;
         int primitive_count = 0;
     };
 
@@ -281,6 +322,35 @@ namespace alia {
         gfx_backend_op<void(texture_handle *texture, const texture_lock_info &info, bool wrote)> texture_unlock;
         gfx_backend_op<void(texture_handle *texture)> texture_generate_mipmaps;
         gfx_backend_op<texture_handle *(const texture_handle *texture)> texture_clone;
+
+        // -- Primitive buffers ------------------------------------------------
+        gfx_backend_op<vertex_buffer_handle *(
+            device_handle *device,
+            int vertex_stride,
+            int vertex_count,
+            buffer_usage usage,
+            const void *initial_data
+        )> create_vertex_buffer;
+        gfx_backend_op<void(vertex_buffer_handle *buffer)> destroy_vertex_buffer;
+        gfx_backend_op<int(const vertex_buffer_handle *buffer)> vertex_buffer_count;
+        gfx_backend_op<int(const vertex_buffer_handle *buffer)> vertex_buffer_stride;
+        gfx_backend_op<buffer_usage(const vertex_buffer_handle *buffer)> vertex_buffer_usage;
+        gfx_backend_op<bool(vertex_buffer_handle *buffer, int first_vertex, int vertex_count, buffer_lock_mode mode, buffer_lock_info &out)>
+            vertex_buffer_lock;
+        gfx_backend_op<void(vertex_buffer_handle *buffer, const buffer_lock_info &info, bool wrote)> vertex_buffer_unlock;
+
+        gfx_backend_op<index_buffer_handle *(
+            device_handle *device,
+            int index_count,
+            buffer_usage usage,
+            const uint32_t *initial_data
+        )> create_index_buffer;
+        gfx_backend_op<void(index_buffer_handle *buffer)> destroy_index_buffer;
+        gfx_backend_op<int(const index_buffer_handle *buffer)> index_buffer_count;
+        gfx_backend_op<buffer_usage(const index_buffer_handle *buffer)> index_buffer_usage;
+        gfx_backend_op<bool(index_buffer_handle *buffer, int first_index, int index_count, buffer_lock_mode mode, buffer_lock_info &out)>
+            index_buffer_lock;
+        gfx_backend_op<void(index_buffer_handle *buffer, const buffer_lock_info &info, bool wrote)> index_buffer_unlock;
 
         gfx_backend_op<shader_program_handle *(device_handle *device, const shader_program_desc &desc)> create_shader_program;
         gfx_backend_op<void(shader_program_handle *program)> destroy_shader_program;
@@ -321,6 +391,8 @@ namespace alia {
         gfx_backend_op<void(device_handle *device, const vertex_input_binding &binding)> unbind_vertex_input;
         gfx_backend_op<void(device_handle *device, const draw_arrays_immediate &draw)> draw_arrays_immediate;
         gfx_backend_op<void(device_handle *device, const draw_elements_immediate &draw)> draw_elements_immediate;
+        gfx_backend_op<void(device_handle *device, const draw_arrays_buffered &draw)> draw_arrays_buffered;
+        gfx_backend_op<void(device_handle *device, const draw_elements_buffered &draw)> draw_elements_buffered;
     };
 
     // ── Registration ─────────────────────────────────────────────────────

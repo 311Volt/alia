@@ -6,6 +6,7 @@
 #include <GL/gl.h>
 #include <GL/glext.h>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
@@ -35,6 +36,19 @@ namespace alia {
         // CPU staging buffer for lock/unlock
         std::unique_ptr<std::byte[]> stage_buf;
         std::size_t stage_buf_bytes = 0;
+    };
+
+    struct ogl_vertex_buffer : vertex_buffer_handle {
+        GLuint buffer_id = 0;
+        int stride = 0;
+        int count = 0;
+        buffer_usage usage = buffer_usage::static_mesh;
+    };
+
+    struct ogl_index_buffer : index_buffer_handle {
+        GLuint buffer_id = 0;
+        int count = 0;
+        buffer_usage usage = buffer_usage::static_mesh;
     };
 
     struct ogl_swapchain : swapchain_handle {
@@ -69,6 +83,18 @@ namespace alia {
     inline const ogl_texture *as_ogl_texture(const texture_handle *h) {
         return static_cast<const ogl_texture *>(h);
     }
+    inline ogl_vertex_buffer *as_ogl_vertex_buffer(vertex_buffer_handle *h) {
+        return static_cast<ogl_vertex_buffer *>(h);
+    }
+    inline const ogl_vertex_buffer *as_ogl_vertex_buffer(const vertex_buffer_handle *h) {
+        return static_cast<const ogl_vertex_buffer *>(h);
+    }
+    inline ogl_index_buffer *as_ogl_index_buffer(index_buffer_handle *h) {
+        return static_cast<ogl_index_buffer *>(h);
+    }
+    inline const ogl_index_buffer *as_ogl_index_buffer(const index_buffer_handle *h) {
+        return static_cast<const ogl_index_buffer *>(h);
+    }
     inline ogl_swapchain *as_ogl_swapchain(swapchain_handle *h) {
         return static_cast<ogl_swapchain *>(h);
     }
@@ -98,6 +124,25 @@ namespace alia {
     void ogl_texture_unlock(texture_handle *h, const texture_lock_info &info, bool wrote);
     void ogl_texture_generate_mipmaps(texture_handle *h);
     texture_handle *ogl_texture_clone(const texture_handle *h);
+
+    vertex_buffer_handle *ogl_create_vertex_buffer(
+        device_handle *dev, int vertex_stride, int vertex_count, buffer_usage usage, const void *initial_data
+    );
+    void ogl_destroy_vertex_buffer(vertex_buffer_handle *h);
+    int ogl_vertex_buffer_count(const vertex_buffer_handle *h);
+    int ogl_vertex_buffer_stride(const vertex_buffer_handle *h);
+    buffer_usage ogl_vertex_buffer_usage(const vertex_buffer_handle *h);
+    bool ogl_vertex_buffer_lock(vertex_buffer_handle *h, int first_vertex, int vertex_count, buffer_lock_mode mode, buffer_lock_info &out);
+    void ogl_vertex_buffer_unlock(vertex_buffer_handle *h, const buffer_lock_info &info, bool wrote);
+
+    index_buffer_handle *ogl_create_index_buffer(
+        device_handle *dev, int index_count, buffer_usage usage, const uint32_t *initial_data
+    );
+    void ogl_destroy_index_buffer(index_buffer_handle *h);
+    int ogl_index_buffer_count(const index_buffer_handle *h);
+    buffer_usage ogl_index_buffer_usage(const index_buffer_handle *h);
+    bool ogl_index_buffer_lock(index_buffer_handle *h, int first_index, int index_count, buffer_lock_mode mode, buffer_lock_info &out);
+    void ogl_index_buffer_unlock(index_buffer_handle *h, const buffer_lock_info &info, bool wrote);
 
     shader_program_handle *ogl_create_shader_program(device_handle *dev, const shader_program_desc &desc);
     void ogl_destroy_shader_program(shader_program_handle *h);
@@ -132,6 +177,8 @@ namespace alia {
     void ogl_unbind_vertex_input(device_handle *dev, const vertex_input_binding &binding);
     void ogl_draw_arrays_immediate(device_handle *dev, const draw_arrays_immediate &draw);
     void ogl_draw_elements_immediate(device_handle *dev, const draw_elements_immediate &draw);
+    void ogl_draw_arrays_buffered(device_handle *dev, const draw_arrays_buffered &draw);
+    void ogl_draw_elements_buffered(device_handle *dev, const draw_elements_buffered &draw);
 
     // ── glGenerateMipmap function pointer (loaded during device creation) ─
     extern PFNGLGENERATEMIPMAPPROC ogl_s_glGenerateMipmap;
@@ -163,6 +210,12 @@ namespace alia {
     extern PFNGLENABLEVERTEXATTRIBARRAYPROC ogl_s_glEnableVertexAttribArray;
     extern PFNGLDISABLEVERTEXATTRIBARRAYPROC ogl_s_glDisableVertexAttribArray;
     extern PFNGLVERTEXATTRIBPOINTERPROC ogl_s_glVertexAttribPointer;
+    extern PFNGLGENBUFFERSPROC ogl_s_glGenBuffers;
+    extern PFNGLDELETEBUFFERSPROC ogl_s_glDeleteBuffers;
+    extern PFNGLBINDBUFFERPROC ogl_s_glBindBuffer;
+    extern PFNGLBUFFERDATAPROC ogl_s_glBufferData;
+    extern PFNGLMAPBUFFERPROC ogl_s_glMapBuffer;
+    extern PFNGLUNMAPBUFFERPROC ogl_s_glUnmapBuffer;
 
 } // namespace alia
 

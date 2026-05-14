@@ -157,7 +157,9 @@ namespace alia {
                 shader ? vertex_input_mode::shader_attributes : vertex_input_mode::fixed_function;
             const vertex_input_binding input{
                 input_mode,
+                nullptr,
                 vertices,
+                0,
                 vertex_stride,
                 vertex_type,
                 elements
@@ -194,6 +196,108 @@ namespace alia {
                     draw_arrays_immediate{
                         type,
                         vertices,
+                        vertex_count,
+                        vertex_stride,
+                        primitive_count
+                    }
+                );
+            }
+            backend->unbind_vertex_input.get_or_throw()(dev, input);
+        }
+
+        void submit_buffered_draw(
+            prim_type type,
+            vertex_buffer_handle *vertices,
+            int vertex_count,
+            int vertex_stride,
+            index_buffer_handle *indices,
+            int index_count,
+            bool indexed,
+            std::type_index vertex_type,
+            std::span<const vertex_element> elements,
+            texture *primary_texture,
+            bool alpha_masked
+        ) {
+            if (!vertices || vertex_count <= 0 || vertex_stride <= 0)
+                return;
+
+            const int count_for_primitives = indexed ? index_count : vertex_count;
+            const int primitive_count = compute_primitive_count(type, count_for_primitives);
+            if (primitive_count <= 0)
+                return;
+            if (indexed && (!indices || index_count <= 0))
+                return;
+
+            texture_handle *texture_handle = primary_texture ? primary_texture->impl() : nullptr;
+            if (primary_texture && !texture_handle)
+                return;
+
+            sampler_state sampler = {};
+            if (primary_texture)
+                sampler = primary_texture->sampler();
+
+            auto &device = current_device();
+            const auto *backend = device.backend();
+            device_handle *dev = device.device();
+            shader_program_handle *shader = current_shader_program_handle();
+
+            backend->set_render_state.get_or_throw()(dev, render_state{});
+            backend->set_blend_state.get_or_throw()(
+                dev,
+                blend_state{
+                    true,
+                    blend_factor::src_alpha,
+                    blend_factor::inv_src_alpha,
+                    blend_op::add
+                }
+            );
+
+            const vertex_input_mode input_mode =
+                shader ? vertex_input_mode::shader_attributes : vertex_input_mode::fixed_function;
+            const vertex_input_binding input{
+                input_mode,
+                vertices,
+                nullptr,
+                0,
+                vertex_stride,
+                vertex_type,
+                elements
+            };
+
+            if (shader) {
+                apply_shader_state(backend, dev, shader, texture_handle, sampler);
+            } else {
+                apply_fixed_function_state(
+                    backend,
+                    dev,
+                    texture_handle,
+                    sampler,
+                    choose_fixed_function_texture_mode(texture_handle, alpha_masked, elements)
+                );
+            }
+
+            backend->bind_vertex_input.get_or_throw()(dev, input);
+            if (indexed) {
+                backend->draw_elements_buffered.get_or_throw()(
+                    dev,
+                    draw_elements_buffered{
+                        type,
+                        vertices,
+                        vertex_count,
+                        vertex_stride,
+                        indices,
+                        0,
+                        index_count,
+                        primitive_count
+                    }
+                );
+            } else {
+                backend->draw_arrays_buffered.get_or_throw()(
+                    dev,
+                    draw_arrays_buffered{
+                        type,
+                        vertices,
+                        0,
                         vertex_count,
                         vertex_stride,
                         primitive_count
@@ -428,12 +532,27 @@ namespace alia {
         submit_draw(type, vertices, count, stride, {}, false, vtx_type, elements, nullptr, false);
     }
 
+    void draw_prim(
+        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements
+    ) {
+        submit_buffered_draw(type, vertices, count, stride, nullptr, 0, false, vtx_type, elements, nullptr, false);
+    }
+
     void draw_indexed_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::span<const uint32_t> indices,
         std::type_index vtx_type, std::span<const vertex_element> elements
     ) {
         submit_draw(type, vertices, count, stride, indices, true, vtx_type, elements, nullptr, false);
+    }
+
+    void draw_indexed_prim(
+        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
+        index_buffer_handle *indices, int index_count,
+        std::type_index vtx_type, std::span<const vertex_element> elements
+    ) {
+        submit_buffered_draw(type, vertices, count, stride, indices, index_count, true, vtx_type, elements, nullptr, false);
     }
 
     void draw_textured_prim(
@@ -444,12 +563,28 @@ namespace alia {
         submit_draw(type, vertices, count, stride, {}, false, vtx_type, elements, &tex, false);
     }
 
+    void draw_textured_prim(
+        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture &tex
+    ) {
+        submit_buffered_draw(type, vertices, count, stride, nullptr, 0, false, vtx_type, elements, &tex, false);
+    }
+
     void draw_alpha_masked_prim(
         prim_type type, const void *vertices, int count, int stride,
         std::type_index vtx_type, std::span<const vertex_element> elements,
         texture &tex
     ) {
         submit_draw(type, vertices, count, stride, {}, false, vtx_type, elements, &tex, true);
+    }
+
+    void draw_alpha_masked_prim(
+        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture &tex
+    ) {
+        submit_buffered_draw(type, vertices, count, stride, nullptr, 0, false, vtx_type, elements, &tex, true);
     }
 
     void draw_textured_indexed_prim(
@@ -459,6 +594,15 @@ namespace alia {
         texture &tex
     ) {
         submit_draw(type, vertices, count, stride, indices, true, vtx_type, elements, &tex, false);
+    }
+
+    void draw_textured_indexed_prim(
+        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
+        index_buffer_handle *indices, int index_count,
+        std::type_index vtx_type, std::span<const vertex_element> elements,
+        texture &tex
+    ) {
+        submit_buffered_draw(type, vertices, count, stride, indices, index_count, true, vtx_type, elements, &tex, false);
     }
 
 } // namespace alia

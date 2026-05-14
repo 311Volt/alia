@@ -47,6 +47,20 @@ namespace alia {
             };
         }
 
+        iface.create_vertex_buffer  = {d3d9_create_vertex_buffer};
+        iface.destroy_vertex_buffer = {d3d9_destroy_vertex_buffer};
+        iface.vertex_buffer_count   = {d3d9_vertex_buffer_count};
+        iface.vertex_buffer_stride  = {d3d9_vertex_buffer_stride};
+        iface.vertex_buffer_usage   = {d3d9_vertex_buffer_usage};
+        iface.vertex_buffer_lock    = {d3d9_vertex_buffer_lock};
+        iface.vertex_buffer_unlock  = {d3d9_vertex_buffer_unlock};
+        iface.create_index_buffer   = {d3d9_create_index_buffer};
+        iface.destroy_index_buffer  = {d3d9_destroy_index_buffer};
+        iface.index_buffer_count    = {d3d9_index_buffer_count};
+        iface.index_buffer_usage    = {d3d9_index_buffer_usage};
+        iface.index_buffer_lock     = {d3d9_index_buffer_lock};
+        iface.index_buffer_unlock   = {d3d9_index_buffer_unlock};
+
         if (can_use_shaders) {
             iface.create_shader_program = {d3d9_create_shader_program};
         } else {
@@ -83,6 +97,8 @@ namespace alia {
         iface.unbind_vertex_input             = {d3d9_unbind_vertex_input};
         iface.draw_arrays_immediate           = {d3d9_draw_arrays_immediate};
         iface.draw_elements_immediate         = {d3d9_draw_elements_immediate};
+        iface.draw_arrays_buffered            = {d3d9_draw_arrays_buffered};
+        iface.draw_elements_buffered          = {d3d9_draw_elements_buffered};
 
         return {raw, std::move(iface)};
     }

@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <memory>
@@ -39,6 +40,21 @@ namespace alia {
         pixel_format fmt = pixel_format::bgra8888;
         texture_role role = texture_role::color;
         sampler_state sampler = {};
+    };
+
+    struct d3d9_vertex_buffer : vertex_buffer_handle {
+        IDirect3DDevice9 *device = nullptr; // non-owning
+        IDirect3DVertexBuffer9 *buffer = nullptr;
+        int stride = 0;
+        int count = 0;
+        buffer_usage usage = buffer_usage::static_mesh;
+    };
+
+    struct d3d9_index_buffer : index_buffer_handle {
+        IDirect3DDevice9 *device = nullptr; // non-owning
+        IDirect3DIndexBuffer9 *buffer = nullptr;
+        int count = 0;
+        buffer_usage usage = buffer_usage::static_mesh;
     };
 
     struct d3d9_swapchain : swapchain_handle {
@@ -79,6 +95,18 @@ namespace alia {
     inline const d3d9_texture *as_d3d9_texture(const texture_handle *h) {
         return static_cast<const d3d9_texture *>(h);
     }
+    inline d3d9_vertex_buffer *as_d3d9_vertex_buffer(vertex_buffer_handle *h) {
+        return static_cast<d3d9_vertex_buffer *>(h);
+    }
+    inline const d3d9_vertex_buffer *as_d3d9_vertex_buffer(const vertex_buffer_handle *h) {
+        return static_cast<const d3d9_vertex_buffer *>(h);
+    }
+    inline d3d9_index_buffer *as_d3d9_index_buffer(index_buffer_handle *h) {
+        return static_cast<d3d9_index_buffer *>(h);
+    }
+    inline const d3d9_index_buffer *as_d3d9_index_buffer(const index_buffer_handle *h) {
+        return static_cast<const d3d9_index_buffer *>(h);
+    }
     inline d3d9_swapchain *as_d3d9_swapchain(swapchain_handle *h) {
         return static_cast<d3d9_swapchain *>(h);
     }
@@ -118,6 +146,27 @@ namespace alia {
     void d3d9_texture_generate_mipmaps(texture_handle *h);
     texture_handle *d3d9_texture_clone(const texture_handle *h);
 
+    // -- Primitive buffer ops ----------------------------------------------
+
+    vertex_buffer_handle *d3d9_create_vertex_buffer(
+        device_handle *dev, int vertex_stride, int vertex_count, buffer_usage usage, const void *initial_data
+    );
+    void d3d9_destroy_vertex_buffer(vertex_buffer_handle *h);
+    int d3d9_vertex_buffer_count(const vertex_buffer_handle *h);
+    int d3d9_vertex_buffer_stride(const vertex_buffer_handle *h);
+    buffer_usage d3d9_vertex_buffer_usage(const vertex_buffer_handle *h);
+    bool d3d9_vertex_buffer_lock(vertex_buffer_handle *h, int first_vertex, int vertex_count, buffer_lock_mode mode, buffer_lock_info &out);
+    void d3d9_vertex_buffer_unlock(vertex_buffer_handle *h, const buffer_lock_info &info, bool wrote);
+
+    index_buffer_handle *d3d9_create_index_buffer(
+        device_handle *dev, int index_count, buffer_usage usage, const uint32_t *initial_data
+    );
+    void d3d9_destroy_index_buffer(index_buffer_handle *h);
+    int d3d9_index_buffer_count(const index_buffer_handle *h);
+    buffer_usage d3d9_index_buffer_usage(const index_buffer_handle *h);
+    bool d3d9_index_buffer_lock(index_buffer_handle *h, int first_index, int index_count, buffer_lock_mode mode, buffer_lock_info &out);
+    void d3d9_index_buffer_unlock(index_buffer_handle *h, const buffer_lock_info &info, bool wrote);
+
     // â”€â”€ Shader ops â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     shader_program_handle *d3d9_create_shader_program(device_handle *dev, const shader_program_desc &desc);
@@ -153,6 +202,8 @@ namespace alia {
     void d3d9_unbind_vertex_input(device_handle *dev, const vertex_input_binding &binding);
     void d3d9_draw_arrays_immediate(device_handle *dev, const draw_arrays_immediate &draw);
     void d3d9_draw_elements_immediate(device_handle *dev, const draw_elements_immediate &draw);
+    void d3d9_draw_arrays_buffered(device_handle *dev, const draw_arrays_buffered &draw);
+    void d3d9_draw_elements_buffered(device_handle *dev, const draw_elements_buffered &draw);
 
 } // namespace alia
 

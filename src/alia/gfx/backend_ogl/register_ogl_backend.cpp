@@ -102,6 +102,17 @@ namespace alia {
         return ok;
     }
 
+    static bool load_buffer_procs() {
+        bool ok = true;
+        ok = load_gl_proc(ogl_s_glGenBuffers, "glGenBuffers") && ok;
+        ok = load_gl_proc(ogl_s_glDeleteBuffers, "glDeleteBuffers") && ok;
+        ok = load_gl_proc(ogl_s_glBindBuffer, "glBindBuffer") && ok;
+        ok = load_gl_proc(ogl_s_glBufferData, "glBufferData") && ok;
+        ok = load_gl_proc(ogl_s_glMapBuffer, "glMapBuffer") && ok;
+        ok = load_gl_proc(ogl_s_glUnmapBuffer, "glUnmapBuffer") && ok;
+        return ok;
+    }
+
     static created_device create_ogl_device_and_interface() {
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
         register_win32_ogl_platform();
@@ -123,6 +134,7 @@ namespace alia {
         // For GL 3.0+ core, glGenerateMipmap is always available
         const bool gl30_or_later = (gl_major > 3 || (gl_major == 3 && gl_minor >= 0));
         const bool gl20_or_later = (gl_major > 2 || (gl_major == 2 && gl_minor >= 0));
+        const bool gl15_or_later = (gl_major > 1 || (gl_major == 1 && gl_minor >= 5));
 
         if (gl30_or_later || has_generate_mipmap) {
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
@@ -141,6 +153,7 @@ namespace alia {
         }
 
         const bool has_shaders = gl20_or_later && load_shader_procs();
+        const bool has_buffers = gl15_or_later && load_buffer_procs();
 
         graphics_backend_interface iface;
         iface.id = gfx_backend::opengl;
@@ -167,6 +180,37 @@ namespace alia {
                 nullptr,
                 "glGenerateMipmap requires GL 3.0+ or GL_EXT_framebuffer_object"
             };
+        }
+
+        if (has_buffers) {
+            iface.create_vertex_buffer  = {ogl_create_vertex_buffer};
+            iface.destroy_vertex_buffer = {ogl_destroy_vertex_buffer};
+            iface.vertex_buffer_count   = {ogl_vertex_buffer_count};
+            iface.vertex_buffer_stride  = {ogl_vertex_buffer_stride};
+            iface.vertex_buffer_usage   = {ogl_vertex_buffer_usage};
+            iface.vertex_buffer_lock    = {ogl_vertex_buffer_lock};
+            iface.vertex_buffer_unlock  = {ogl_vertex_buffer_unlock};
+            iface.create_index_buffer   = {ogl_create_index_buffer};
+            iface.destroy_index_buffer  = {ogl_destroy_index_buffer};
+            iface.index_buffer_count    = {ogl_index_buffer_count};
+            iface.index_buffer_usage    = {ogl_index_buffer_usage};
+            iface.index_buffer_lock     = {ogl_index_buffer_lock};
+            iface.index_buffer_unlock   = {ogl_index_buffer_unlock};
+        } else {
+            const char *reason = "vertex and index buffers require OpenGL 1.5 buffer object entry points";
+            iface.create_vertex_buffer  = {nullptr, reason};
+            iface.destroy_vertex_buffer = {nullptr, reason};
+            iface.vertex_buffer_count   = {nullptr, reason};
+            iface.vertex_buffer_stride  = {nullptr, reason};
+            iface.vertex_buffer_usage   = {nullptr, reason};
+            iface.vertex_buffer_lock    = {nullptr, reason};
+            iface.vertex_buffer_unlock  = {nullptr, reason};
+            iface.create_index_buffer   = {nullptr, reason};
+            iface.destroy_index_buffer  = {nullptr, reason};
+            iface.index_buffer_count    = {nullptr, reason};
+            iface.index_buffer_usage    = {nullptr, reason};
+            iface.index_buffer_lock     = {nullptr, reason};
+            iface.index_buffer_unlock   = {nullptr, reason};
         }
 
         if (has_shaders) {
@@ -205,6 +249,14 @@ namespace alia {
         iface.unbind_vertex_input             = {ogl_unbind_vertex_input};
         iface.draw_arrays_immediate           = {ogl_draw_arrays_immediate};
         iface.draw_elements_immediate         = {ogl_draw_elements_immediate};
+        if (has_buffers) {
+            iface.draw_arrays_buffered   = {ogl_draw_arrays_buffered};
+            iface.draw_elements_buffered = {ogl_draw_elements_buffered};
+        } else {
+            const char *reason = "buffered drawing requires OpenGL 1.5 buffer object entry points";
+            iface.draw_arrays_buffered   = {nullptr, reason};
+            iface.draw_elements_buffered = {nullptr, reason};
+        }
 
         return {raw, std::move(iface)};
     }
