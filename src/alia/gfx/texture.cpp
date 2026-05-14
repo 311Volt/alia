@@ -73,7 +73,7 @@ namespace alia {
 
             texture_lock_info info{};
             const rect_i full{{0, 0}, {src.width(), src.height()}};
-            if (!backend->texture_lock.get_or_throw()(dst_handle, full, 0, info))
+            if (!backend->texture_lock.get_or_throw()(dst_handle, full, 0, texture_lock_mode::write_only, info))
                 return false;
 
             bool uploaded = true;
@@ -185,7 +185,7 @@ namespace alia {
     // ── lock_impl ────────────────────────────────────────────────────────
 
     std::unique_ptr<detail::texture_lock_state>
-    texture::lock_impl(const std::optional<rect_i> &region, int level, pixel_format expected_fmt) {
+    texture::lock_impl(const std::optional<rect_i> &region, int level, pixel_format expected_fmt, texture_lock_mode mode) {
         if (!handle_ || backend_->texture_format.get_or_throw()(handle_) != expected_fmt)
             return nullptr;
 
@@ -194,13 +194,14 @@ namespace alia {
         const rect_i r = region.value_or(rect_i{{0, 0}, {lw, lh}});
 
         texture_lock_info info{};
-        if (!backend_->texture_lock.get_or_throw()(handle_, r, level, info))
+        if (!backend_->texture_lock.get_or_throw()(handle_, r, level, mode, info))
             return nullptr;
 
         auto state = std::make_unique<detail::texture_lock_state>();
         state->handle = handle_;
         state->backend = backend_;
         state->info = info;
+        state->commit_on_release = (mode != texture_lock_mode::read_only);
         return state;
     }
 
@@ -216,7 +217,7 @@ namespace alia {
         const rect_i full{{0, 0}, {lw, lh}};
 
         texture_lock_info info{};
-        if (!backend_->texture_lock.get_or_throw()(handle_, full, level, info))
+        if (!backend_->texture_lock.get_or_throw()(handle_, full, level, texture_lock_mode::read_only, info))
             throw std::runtime_error("texture::download: backend lock failed");
 
         const pixel_format fmt = backend_->texture_format.get_or_throw()(handle_);

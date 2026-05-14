@@ -25,12 +25,12 @@ namespace alia {
         delete sc;
     }
 
-    void ogl_swapchain_clear(swapchain_handle *h, color c) {
+    void ogl_swapchain_begin_frame(swapchain_handle *h) {
         auto *sc = as_ogl_swapchain(h);
         get_ogl_platform().make_current(sc->surface, sc->ctx);
-        glViewport(0, 0, sc->size.x, sc->size.y);
-        glClearColor(c.r, c.g, c.b, c.a);
-        glClear(GL_COLOR_BUFFER_BIT);
+    }
+
+    void ogl_swapchain_end_frame(swapchain_handle *) {
     }
 
     void ogl_swapchain_present(swapchain_handle *h) {

@@ -261,7 +261,7 @@ namespace alia {
         ogl_s_glUniform1i(static_cast<GLint>(slot.location), slot.slot);
     }
 
-    void ogl_apply_shader_program(shader_program_handle *h, texture_handle *primary_texture) {
+    void ogl_bind_shader_program(device_handle *, shader_program_handle *h) {
         if (!h) {
             if (ogl_s_glUseProgram)
                 ogl_s_glUseProgram(0);
@@ -270,14 +270,24 @@ namespace alia {
 
         auto *program = as_ogl_shader_program(h);
         ogl_s_glUseProgram(program->program);
+    }
 
+    void ogl_apply_shader_constants(device_handle *, shader_program_handle *h) {
+        if (!h)
+            return;
+
+        auto *program = as_ogl_shader_program(h);
         for (const auto &constant : program->stored_constants)
             apply_constant(constant);
+    }
 
+    void ogl_apply_shader_samplers(device_handle *, shader_program_handle *h) {
+        if (!h)
+            return;
+
+        auto *program = as_ogl_shader_program(h);
         for (const auto &[unit, texture] : program->sampler_textures)
             bind_texture_unit(unit, texture);
-        if (primary_texture)
-            bind_texture_unit(0, primary_texture);
         ogl_s_glActiveTexture(GL_TEXTURE0);
     }
 

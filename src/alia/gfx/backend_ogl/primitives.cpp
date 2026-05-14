@@ -1,7 +1,6 @@
 #ifdef ALIA_COMPILE_GFX_BACKEND_OPENGL
 
 #include "ogl_ops.hpp"
-#include "../gfx_device.hpp"
 #include <GL/gl.h>
 #include <any>
 #include <functional>
@@ -10,8 +9,6 @@
 #include <vector>
 
 namespace alia {
-
-    // ── Compiled vertex setup cache ──────────────────────────────────────
 
     struct ogl_compiled_vtx {
         std::function<void(const void *base, int stride, bool shader_active)> setup;
@@ -115,18 +112,6 @@ namespace alia {
         return *s_last_compiled;
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────
-
-    static void setup_matrices() {
-        float transform[16], projection[16];
-        get_current_transform_matrix(std::span<float, 16>(transform, 16));
-        get_current_projection_matrix(std::span<float, 16>(projection, 16));
-        glMatrixMode(GL_PROJECTION);
-        glLoadMatrixf(projection);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadMatrixf(transform);
-    }
-
     static GLenum to_gl_mode(prim_type type) {
         switch (type) {
         case prim_type::triangle_list:  return GL_TRIANGLES;
@@ -136,16 +121,54 @@ namespace alia {
         return GL_TRIANGLES;
     }
 
-    static bool has_vertex_color(std::span<const vertex_element> elements) {
-        for (const auto &e : elements)
-            if (e.attribute == vertex_attr::color_attr)
-                return true;
-        return false;
+    static GLenum to_gl_blend_factor(blend_factor factor) {
+        switch (factor) {
+        case blend_factor::zero:          return GL_ZERO;
+        case blend_factor::one:           return GL_ONE;
+        case blend_factor::src_alpha:     return GL_SRC_ALPHA;
+        case blend_factor::inv_src_alpha: return GL_ONE_MINUS_SRC_ALPHA;
+        }
+        return GL_ONE;
     }
 
-    static void apply_ogl_alpha_blend() {
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    static void bind_texture_unit(int unit, texture_handle *texture) {
+        auto *ogl_texture = texture ? as_ogl_texture(texture) : nullptr;
+        if (ogl_s_glActiveTexture)
+            ogl_s_glActiveTexture(static_cast<GLenum>(GL_TEXTURE0 + unit));
+        glBindTexture(GL_TEXTURE_2D, ogl_texture ? ogl_texture->tex_id : 0);
+        if (ogl_s_glActiveTexture)
+            ogl_s_glActiveTexture(GL_TEXTURE0);
+    }
+
+    static void apply_ogl_sampler(const ogl_texture &texture, const sampler_state &s) {
+        glBindTexture(GL_TEXTURE_2D, texture.tex_id);
+
+        auto min_filt = [&]() -> GLint {
+            if (texture.mip_levels <= 1)
+                return (s.min_filter == texture_filter::nearest) ? GL_NEAREST : GL_LINEAR;
+            bool mn = (s.min_filter == texture_filter::nearest);
+            bool mp = (s.mip_filter == texture_filter::nearest);
+            if (mn && mp)  return GL_NEAREST_MIPMAP_NEAREST;
+            if (mn && !mp) return GL_NEAREST_MIPMAP_LINEAR;
+            if (!mn && mp) return GL_LINEAR_MIPMAP_NEAREST;
+            return GL_LINEAR_MIPMAP_LINEAR;
+        };
+        auto mag_filt = [&]() -> GLint {
+            return (s.mag_filter == texture_filter::nearest) ? GL_NEAREST : GL_LINEAR;
+        };
+        auto wrap_mode = [](texture_wrap w) -> GLint {
+            switch (w) {
+            case texture_wrap::clamp:  return GL_CLAMP_TO_EDGE;
+            case texture_wrap::repeat: return GL_REPEAT;
+            case texture_wrap::mirror: return GL_MIRRORED_REPEAT;
+            }
+            return GL_CLAMP_TO_EDGE;
+        };
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filt());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filt());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode(s.wrap_u));
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode(s.wrap_v));
     }
 
     static void apply_ogl_alpha_mask_color() {
@@ -160,152 +183,108 @@ namespace alia {
         glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA, GL_SRC_ALPHA);
     }
 
-    // ── Drawing ──────────────────────────────────────────────────────────
-
-    void ogl_draw_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        shader_program_handle *shader
-    ) {
-        if (count < 3)
-            return;
-        apply_ogl_alpha_blend();
-        const auto &compiled = get_or_compile(vtx_type, elements);
-        if (shader) {
-            ogl_apply_shader_program(shader, nullptr);
-            compiled.setup(vertices, stride, true);
-            glDrawArrays(to_gl_mode(type), 0, count);
-            compiled.teardown(true);
-            return;
-        }
-
-        ogl_apply_shader_program(nullptr, nullptr);
-        setup_matrices();
-        compiled.setup(vertices, stride, false);
-        glDrawArrays(to_gl_mode(type), 0, count);
-        compiled.teardown(false);
+    void ogl_set_viewport(device_handle *, const render_viewport &viewport) {
+        glViewport(viewport.origin.x, viewport.origin.y, viewport.size.x, viewport.size.y);
     }
 
-    void ogl_draw_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        shader_program_handle *shader
-    ) {
-        if (indices.size() < 3 || count == 0)
-            return;
-        apply_ogl_alpha_blend();
-        const auto &compiled = get_or_compile(vtx_type, elements);
-        if (shader) {
-            ogl_apply_shader_program(shader, nullptr);
-            compiled.setup(vertices, stride, true);
-            glDrawElements(to_gl_mode(type), static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, indices.data());
-            compiled.teardown(true);
-            return;
-        }
-
-        ogl_apply_shader_program(nullptr, nullptr);
-        setup_matrices();
-        compiled.setup(vertices, stride, false);
-        glDrawElements(to_gl_mode(type), static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, indices.data());
-        compiled.teardown(false);
+    void ogl_clear_render_target(device_handle *, color c) {
+        glClearColor(c.r, c.g, c.b, c.a);
+        glClear(GL_COLOR_BUFFER_BIT);
     }
 
-    void ogl_draw_textured_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex,
-        shader_program_handle *shader
-    ) {
-        if (count < 3 || !tex)
-            return;
-        auto *ogl_tex = as_ogl_texture(tex);
-        apply_ogl_alpha_blend();
-        const auto &compiled = get_or_compile(vtx_type, elements);
-        if (shader) {
-            ogl_apply_shader_program(shader, tex);
-            compiled.setup(vertices, stride, true);
-            glDrawArrays(to_gl_mode(type), 0, count);
-            compiled.teardown(true);
-            return;
-        }
+    void ogl_set_render_state(device_handle *, const render_state &state) {
+        if (state.depth_test_enabled)
+            glEnable(GL_DEPTH_TEST);
+        else
+            glDisable(GL_DEPTH_TEST);
+        glDepthMask(state.depth_write_enabled ? GL_TRUE : GL_FALSE);
 
-        ogl_apply_shader_program(nullptr, nullptr);
-        setup_matrices();
-        glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, ogl_tex->tex_id);
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, has_vertex_color(elements) ? GL_MODULATE : GL_REPLACE);
-        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-        compiled.setup(vertices, stride, false);
-        glDrawArrays(to_gl_mode(type), 0, count);
-        compiled.teardown(false);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glDisable(GL_TEXTURE_2D);
+        if (state.fixed_function_lighting_enabled)
+            glEnable(GL_LIGHTING);
+        else
+            glDisable(GL_LIGHTING);
+
+        if (state.cull == cull_mode::none) {
+            glDisable(GL_CULL_FACE);
+            glFrontFace(GL_CCW);
+        } else {
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+            glFrontFace(state.cull == cull_mode::clockwise ? GL_CCW : GL_CW);
+        }
     }
 
-    void ogl_draw_alpha_masked_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex,
-        shader_program_handle *shader
-    ) {
-        if (count < 3 || !tex)
-            return;
-        auto *ogl_tex = as_ogl_texture(tex);
-        apply_ogl_alpha_blend();
-        const auto &compiled = get_or_compile(vtx_type, elements);
-        if (shader) {
-            ogl_apply_shader_program(shader, tex);
-            compiled.setup(vertices, stride, true);
-            glDrawArrays(to_gl_mode(type), 0, count);
-            compiled.teardown(true);
+    void ogl_set_blend_state(device_handle *, const blend_state &state) {
+        if (!state.enabled) {
+            glDisable(GL_BLEND);
             return;
         }
 
-        ogl_apply_shader_program(nullptr, nullptr);
-        setup_matrices();
-        glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, ogl_tex->tex_id);
-        apply_ogl_alpha_mask_color();
-        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-        compiled.setup(vertices, stride, false);
-        glDrawArrays(to_gl_mode(type), 0, count);
-        compiled.teardown(false);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glDisable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glBlendFunc(to_gl_blend_factor(state.src), to_gl_blend_factor(state.dst));
     }
 
-    void ogl_draw_textured_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex,
-        shader_program_handle *shader
-    ) {
-        if (indices.size() < 3 || count == 0 || !tex)
-            return;
-        auto *ogl_tex = as_ogl_texture(tex);
-        apply_ogl_alpha_blend();
-        const auto &compiled = get_or_compile(vtx_type, elements);
-        if (shader) {
-            ogl_apply_shader_program(shader, tex);
-            compiled.setup(vertices, stride, true);
-            glDrawElements(to_gl_mode(type), static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, indices.data());
-            compiled.teardown(true);
-            return;
-        }
+    void ogl_set_fixed_function_matrices(device_handle *, const fixed_function_matrices &matrices) {
+        glMatrixMode(GL_PROJECTION);
+        glLoadMatrixf(matrices.projection.data());
+        glMatrixMode(GL_MODELVIEW);
+        glLoadMatrixf(matrices.world.data());
+    }
 
-        ogl_apply_shader_program(nullptr, nullptr);
-        setup_matrices();
-        glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, ogl_tex->tex_id);
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, has_vertex_color(elements) ? GL_MODULATE : GL_REPLACE);
-        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-        compiled.setup(vertices, stride, false);
-        glDrawElements(to_gl_mode(type), static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, indices.data());
-        compiled.teardown(false);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glDisable(GL_TEXTURE_2D);
+    void ogl_set_fixed_function_texture_mode(device_handle *, fixed_function_texture_mode mode) {
+        switch (mode) {
+        case fixed_function_texture_mode::vertex_color:
+            glDisable(GL_TEXTURE_2D);
+            break;
+        case fixed_function_texture_mode::texture_replace:
+            glEnable(GL_TEXTURE_2D);
+            glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+            break;
+        case fixed_function_texture_mode::texture_modulate_vertex_color:
+            glEnable(GL_TEXTURE_2D);
+            glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+            break;
+        case fixed_function_texture_mode::alpha_mask:
+            glEnable(GL_TEXTURE_2D);
+            apply_ogl_alpha_mask_color();
+            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+            break;
+        }
+    }
+
+    void ogl_bind_texture(device_handle *, const texture_binding &binding) {
+        bind_texture_unit(binding.slot, binding.texture);
+    }
+
+    void ogl_set_texture_sampler(device_handle *, const texture_sampler_binding &binding) {
+        if (!binding.texture)
+            return;
+        apply_ogl_sampler(*as_ogl_texture(binding.texture), binding.sampler);
+    }
+
+    void ogl_bind_vertex_input(device_handle *, const vertex_input_binding &binding) {
+        const auto &compiled = get_or_compile(binding.vertex_type, binding.elements);
+        compiled.setup(binding.vertices, binding.stride, binding.mode == vertex_input_mode::shader_attributes);
+    }
+
+    void ogl_unbind_vertex_input(device_handle *, const vertex_input_binding &binding) {
+        const auto &compiled = get_or_compile(binding.vertex_type, binding.elements);
+        compiled.teardown(binding.mode == vertex_input_mode::shader_attributes);
+    }
+
+    void ogl_draw_arrays_immediate(device_handle *, const draw_arrays_immediate &draw) {
+        glDrawArrays(to_gl_mode(draw.type), 0, draw.vertex_count);
+    }
+
+    void ogl_draw_elements_immediate(device_handle *, const draw_elements_immediate &draw) {
+        glDrawElements(
+            to_gl_mode(draw.type),
+            static_cast<GLsizei>(draw.indices.size()),
+            GL_UNSIGNED_INT,
+            draw.indices.data()
+        );
     }
 
 } // namespace alia

@@ -94,7 +94,7 @@ namespace alia {
     int ogl_texture_mip_levels(const texture_handle *h);
     sampler_state ogl_texture_sampler(const texture_handle *h);
     void ogl_texture_set_sampler(texture_handle *h, const sampler_state &s);
-    bool ogl_texture_lock(texture_handle *h, rect_i region, int level, texture_lock_info &out);
+    bool ogl_texture_lock(texture_handle *h, rect_i region, int level, texture_lock_mode mode, texture_lock_info &out);
     void ogl_texture_unlock(texture_handle *h, const texture_lock_info &info, bool wrote);
     void ogl_texture_generate_mipmaps(texture_handle *h);
     texture_handle *ogl_texture_clone(const texture_handle *h);
@@ -105,48 +105,33 @@ namespace alia {
     void ogl_shader_set_constant(shader_program_handle *h, const shader_constant_slot &slot, const shader_constant_payload &payload);
     shader_sampler_slot ogl_shader_lookup_sampler(shader_program_handle *h, std::string_view name, shader_type stage);
     void ogl_shader_set_sampler(shader_program_handle *h, const shader_sampler_slot &slot, texture_handle *tex);
-    void ogl_apply_shader_program(shader_program_handle *h, texture_handle *primary_texture);
+    void ogl_bind_shader_program(device_handle *dev, shader_program_handle *h);
+    void ogl_apply_shader_constants(device_handle *dev, shader_program_handle *h);
+    void ogl_apply_shader_samplers(device_handle *dev, shader_program_handle *h);
 
     // ── Swapchain ops ─────────────────────────────────────────────────────
 
     swapchain_handle *ogl_create_swapchain(device_handle *dev, void *native_handle, vec2i size);
     void ogl_destroy_swapchain(swapchain_handle *h);
-    void ogl_swapchain_clear(swapchain_handle *h, color c);
+    void ogl_swapchain_begin_frame(swapchain_handle *h);
+    void ogl_swapchain_end_frame(swapchain_handle *h);
     void ogl_swapchain_present(swapchain_handle *h);
     void ogl_swapchain_on_resize(swapchain_handle *h, vec2i new_size);
 
     // ── Draw ops ──────────────────────────────────────────────────────────
 
-    void ogl_draw_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        shader_program_handle *shader
-    );
-    void ogl_draw_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        shader_program_handle *shader
-    );
-    void ogl_draw_textured_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex,
-        shader_program_handle *shader
-    );
-    void ogl_draw_alpha_masked_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex,
-        shader_program_handle *shader
-    );
-    void ogl_draw_textured_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex,
-        shader_program_handle *shader
-    );
+    void ogl_set_viewport(device_handle *dev, const render_viewport &viewport);
+    void ogl_clear_render_target(device_handle *dev, color c);
+    void ogl_set_render_state(device_handle *dev, const render_state &state);
+    void ogl_set_blend_state(device_handle *dev, const blend_state &state);
+    void ogl_set_fixed_function_matrices(device_handle *dev, const fixed_function_matrices &matrices);
+    void ogl_set_fixed_function_texture_mode(device_handle *dev, fixed_function_texture_mode mode);
+    void ogl_bind_texture(device_handle *dev, const texture_binding &binding);
+    void ogl_set_texture_sampler(device_handle *dev, const texture_sampler_binding &binding);
+    void ogl_bind_vertex_input(device_handle *dev, const vertex_input_binding &binding);
+    void ogl_unbind_vertex_input(device_handle *dev, const vertex_input_binding &binding);
+    void ogl_draw_arrays_immediate(device_handle *dev, const draw_arrays_immediate &draw);
+    void ogl_draw_elements_immediate(device_handle *dev, const draw_elements_immediate &draw);
 
     // ── glGenerateMipmap function pointer (loaded during device creation) ─
     extern PFNGLGENERATEMIPMAPPROC ogl_s_glGenerateMipmap;

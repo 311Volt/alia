@@ -63,15 +63,26 @@ namespace alia {
 
         iface.create_swapchain   = {d3d9_create_swapchain};
         iface.destroy_swapchain  = {d3d9_destroy_swapchain};
-        iface.swapchain_clear    = {d3d9_swapchain_clear};
-        iface.swapchain_present  = {d3d9_swapchain_present};
-        iface.swapchain_on_resize = {d3d9_swapchain_on_resize};
+        iface.swapchain_begin_frame = {d3d9_swapchain_begin_frame};
+        iface.swapchain_end_frame   = {d3d9_swapchain_end_frame};
+        iface.swapchain_present     = {d3d9_swapchain_present};
+        iface.swapchain_on_resize   = {d3d9_swapchain_on_resize};
 
-        iface.draw_prim                  = {d3d9_draw_prim};
-        iface.draw_indexed_prim          = {d3d9_draw_indexed_prim};
-        iface.draw_textured_prim         = {d3d9_draw_textured_prim};
-        iface.draw_alpha_masked_prim     = {d3d9_draw_alpha_masked_prim};
-        iface.draw_textured_indexed_prim = {d3d9_draw_textured_indexed_prim};
+        iface.set_viewport                    = {d3d9_set_viewport};
+        iface.clear_render_target             = {d3d9_clear_render_target};
+        iface.set_render_state                = {d3d9_set_render_state};
+        iface.set_blend_state                 = {d3d9_set_blend_state};
+        iface.bind_shader_program             = {d3d9_bind_shader_program};
+        iface.apply_shader_constants          = {d3d9_apply_shader_constants};
+        iface.apply_shader_samplers           = {d3d9_apply_shader_samplers};
+        iface.set_fixed_function_matrices     = {d3d9_set_fixed_function_matrices};
+        iface.set_fixed_function_texture_mode = {d3d9_set_fixed_function_texture_mode};
+        iface.bind_texture                    = {d3d9_bind_texture};
+        iface.set_texture_sampler             = {d3d9_set_texture_sampler};
+        iface.bind_vertex_input               = {d3d9_bind_vertex_input};
+        iface.unbind_vertex_input             = {d3d9_unbind_vertex_input};
+        iface.draw_arrays_immediate           = {d3d9_draw_arrays_immediate};
+        iface.draw_elements_immediate         = {d3d9_draw_elements_immediate};
 
         return {raw, std::move(iface)};
     }

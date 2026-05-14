@@ -14,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <typeindex>
+#include <typeinfo>
 
 namespace alia {
 
@@ -144,10 +145,115 @@ namespace alia {
         std::byte *data = nullptr;
     };
 
+    /// Access intent for @c texture_lock. Lets backends skip work the caller
+    /// has promised it will not need.
+    enum class texture_lock_mode {
+        /// Read and write. Backend returns current pixel data; @c texture_unlock
+        /// with @c wrote=true commits modifications.
+        read_write,
+        /// Read only. Backend returns current pixel data; the caller will not
+        /// modify it and @c texture_unlock receives @c wrote=false.
+        read_only,
+        /// Write only. Backend may return uninitialised memory; the caller must
+        /// overwrite every pixel in the locked region before unlock.
+        write_only,
+    };
+
     enum class prim_type {
         triangle_list,
         triangle_strip,
         triangle_fan,
+    };
+
+    enum class vertex_input_mode {
+        fixed_function,
+        shader_attributes,
+    };
+
+    enum class fixed_function_texture_mode {
+        vertex_color,
+        texture_replace,
+        texture_modulate_vertex_color,
+        alpha_mask,
+    };
+
+    enum class cull_mode {
+        none,
+        clockwise,
+        counter_clockwise,
+    };
+
+    enum class blend_factor {
+        zero,
+        one,
+        src_alpha,
+        inv_src_alpha,
+    };
+
+    enum class blend_op {
+        add,
+    };
+
+    struct render_viewport {
+        vec2i origin = {};
+        vec2i size = {};
+        float min_depth = 0.0f;
+        float max_depth = 1.0f;
+    };
+
+    struct render_state {
+        bool depth_test_enabled = false;
+        bool depth_write_enabled = false;
+        bool fixed_function_lighting_enabled = false;
+        cull_mode cull = cull_mode::none;
+    };
+
+    struct blend_state {
+        bool enabled = false;
+        blend_factor src = blend_factor::src_alpha;
+        blend_factor dst = blend_factor::inv_src_alpha;
+        blend_op op = blend_op::add;
+    };
+
+    struct fixed_function_matrices {
+        std::span<const float, 16> world;
+        std::span<const float, 16> projection;
+    };
+
+    struct texture_binding {
+        int slot = 0;
+        texture_handle *texture = nullptr;
+    };
+
+    struct texture_sampler_binding {
+        int slot = 0;
+        texture_handle *texture = nullptr;
+        sampler_state sampler = {};
+    };
+
+    struct vertex_input_binding {
+        vertex_input_mode mode = vertex_input_mode::fixed_function;
+        const void *vertices = nullptr;
+        int stride = 0;
+        std::type_index vertex_type = typeid(void);
+        std::span<const vertex_element> elements;
+    };
+
+    struct draw_arrays_immediate {
+        prim_type type = prim_type::triangle_list;
+        const void *vertices = nullptr;
+        int vertex_count = 0;
+        int vertex_stride = 0;
+        int primitive_count = 0;
+    };
+
+    struct draw_elements_immediate {
+        prim_type type = prim_type::triangle_list;
+        const void *vertices = nullptr;
+        int vertex_count = 0;
+        int vertex_stride = 0;
+        std::span<const uint32_t> indices;
+        int primitive_count = 0;
     };
 
     // ── graphics_backend_interface ─────────────────────────────────────────
@@ -171,7 +277,7 @@ namespace alia {
         gfx_backend_op<int(const texture_handle *texture)> texture_mip_levels;
         gfx_backend_op<sampler_state(const texture_handle *texture)> texture_sampler;
         gfx_backend_op<void(texture_handle *texture, const sampler_state &sampler)> texture_set_sampler;
-        gfx_backend_op<bool(texture_handle *texture, rect_i region, int level, texture_lock_info &out)> texture_lock;
+        gfx_backend_op<bool(texture_handle *texture, rect_i region, int level, texture_lock_mode mode, texture_lock_info &out)> texture_lock;
         gfx_backend_op<void(texture_handle *texture, const texture_lock_info &info, bool wrote)> texture_unlock;
         gfx_backend_op<void(texture_handle *texture)> texture_generate_mipmaps;
         gfx_backend_op<texture_handle *(const texture_handle *texture)> texture_clone;
@@ -190,40 +296,31 @@ namespace alia {
         // ── Swapchain ────────────────────────────────────────────────────
         gfx_backend_op<swapchain_handle *(device_handle *device, void *window, vec2i size)> create_swapchain;
         gfx_backend_op<void(swapchain_handle *swapchain)> destroy_swapchain;
-        gfx_backend_op<void(swapchain_handle *swapchain, color clear_color)> swapchain_clear;
+        gfx_backend_op<void(swapchain_handle *swapchain)> swapchain_begin_frame;
+        gfx_backend_op<void(swapchain_handle *swapchain)> swapchain_end_frame;
         gfx_backend_op<void(swapchain_handle *swapchain)> swapchain_present;
         gfx_backend_op<void(swapchain_handle *swapchain, vec2i size)> swapchain_on_resize;
 
         // ── Drawing ───────────────────────────────────────────────────────
-        gfx_backend_op<void(
-            prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements,
-            shader_program_handle *shader
-        )>
-            draw_prim;
+        gfx_backend_op<void(device_handle *device, const render_viewport &viewport)> set_viewport;
+        gfx_backend_op<void(device_handle *device, color clear_color)> clear_render_target;
+        gfx_backend_op<void(device_handle *device, const render_state &state)> set_render_state;
+        gfx_backend_op<void(device_handle *device, const blend_state &state)> set_blend_state;
 
-        gfx_backend_op<void(
-            prim_type type, const void *vertices, int count, int stride, std::span<const uint32_t> indices, std::type_index vtx_type,
-            std::span<const vertex_element> elements, shader_program_handle *shader
-        )>
-            draw_indexed_prim;
+        gfx_backend_op<void(device_handle *device, shader_program_handle *program)> bind_shader_program;
+        gfx_backend_op<void(device_handle *device, shader_program_handle *program)> apply_shader_constants;
+        gfx_backend_op<void(device_handle *device, shader_program_handle *program)> apply_shader_samplers;
 
-        gfx_backend_op<void(
-            prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements,
-            texture_handle *texture, shader_program_handle *shader
-        )>
-            draw_textured_prim;
+        gfx_backend_op<void(device_handle *device, const fixed_function_matrices &matrices)> set_fixed_function_matrices;
+        gfx_backend_op<void(device_handle *device, fixed_function_texture_mode mode)> set_fixed_function_texture_mode;
 
-        gfx_backend_op<void(
-            prim_type type, const void *vertices, int count, int stride, std::type_index vtx_type, std::span<const vertex_element> elements,
-            texture_handle *texture, shader_program_handle *shader
-        )>
-            draw_alpha_masked_prim;
+        gfx_backend_op<void(device_handle *device, const texture_binding &binding)> bind_texture;
+        gfx_backend_op<void(device_handle *device, const texture_sampler_binding &binding)> set_texture_sampler;
 
-        gfx_backend_op<void(
-            prim_type type, const void *vertices, int count, int stride, std::span<const uint32_t> indices, std::type_index vtx_type,
-            std::span<const vertex_element> elements, texture_handle *texture, shader_program_handle *shader
-        )>
-            draw_textured_indexed_prim;
+        gfx_backend_op<void(device_handle *device, const vertex_input_binding &binding)> bind_vertex_input;
+        gfx_backend_op<void(device_handle *device, const vertex_input_binding &binding)> unbind_vertex_input;
+        gfx_backend_op<void(device_handle *device, const draw_arrays_immediate &draw)> draw_arrays_immediate;
+        gfx_backend_op<void(device_handle *device, const draw_elements_immediate &draw)> draw_elements_immediate;
     };
 
     // ── Registration ─────────────────────────────────────────────────────

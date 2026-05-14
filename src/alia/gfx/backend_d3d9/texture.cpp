@@ -121,7 +121,7 @@ namespace alia {
         as_d3d9_texture(h)->sampler = s;
     }
 
-    bool d3d9_texture_lock(texture_handle *h, rect_i region, int level, texture_lock_info &out) {
+    bool d3d9_texture_lock(texture_handle *h, rect_i region, int level, texture_lock_mode mode, texture_lock_info &out) {
         auto *t = as_d3d9_texture(h);
         if (level < 0 || level >= t->mip_levels)
             return false;
@@ -135,9 +135,13 @@ namespace alia {
         if (r.width() <= 0 || r.height() <= 0)
             return false;
 
+        // D3DLOCK_DISCARD requires D3DUSAGE_DYNAMIC, which managed-pool textures
+        // don't have, so write_only doesn't earn any special flag here.
+        const DWORD lock_flags = (mode == texture_lock_mode::read_only) ? D3DLOCK_READONLY : 0u;
+
         RECT dr = {r.left(), r.top(), r.right(), r.bottom()};
         D3DLOCKED_RECT lr = {};
-        if (FAILED(t->texture->LockRect(static_cast<UINT>(level), &lr, &dr, 0)))
+        if (FAILED(t->texture->LockRect(static_cast<UINT>(level), &lr, &dr, lock_flags)))
             return false;
 
         out.data = static_cast<std::byte *>(lr.pBits);

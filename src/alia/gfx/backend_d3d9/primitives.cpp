@@ -1,15 +1,13 @@
 #ifdef ALIA_COMPILE_GFX_BACKEND_D3D9
 
 #include "d3d9_ops.hpp"
-#include "../gfx_device.hpp"
 #include <any>
+#include <cstring>
 #include <typeindex>
 #include <unordered_map>
 #include <vector>
 
 namespace alia {
-
-    // ── Compiled vertex declaration cache ────────────────────────────────
 
     struct d3d9_compiled_vtx {
         IDirect3DVertexDeclaration9 *decl = nullptr;
@@ -68,7 +66,12 @@ namespace alia {
         return decl;
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────
+    static D3DMATRIX make_identity_matrix() {
+        D3DMATRIX m;
+        std::memset(&m, 0, sizeof(m));
+        m._11 = m._22 = m._33 = m._44 = 1.0f;
+        return m;
+    }
 
     static void apply_d3d9_sampler(IDirect3DDevice9 *device, DWORD stage, const sampler_state &s) {
         auto filt = [](texture_filter f) -> DWORD {
@@ -89,26 +92,14 @@ namespace alia {
         device->SetSamplerState(stage, D3DSAMP_ADDRESSV, addr(s.wrap_v));
     }
 
-    static bool has_vertex_color(std::span<const vertex_element> elements) {
-        for (const auto &e : elements)
-            if (e.attribute == vertex_attr::color_attr)
-                return true;
-        return false;
-    }
-
-    static void apply_d3d9_alpha_blend(IDirect3DDevice9 *device) {
-        device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
-        device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
-        device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
-        device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
-    }
-
     static void apply_d3d9_vertex_color(IDirect3DDevice9 *device) {
         device->SetTexture(0, nullptr);
         device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
         device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
         device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
         device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
+        device->SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+        device->SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
     }
 
     static void apply_d3d9_texture_color(IDirect3DDevice9 *device, bool modulate) {
@@ -148,180 +139,136 @@ namespace alia {
         return D3DPT_TRIANGLELIST;
     }
 
-    static UINT compute_prim_count(prim_type type, int vertex_count) {
-        switch (type) {
-        case prim_type::triangle_list:  return static_cast<UINT>(vertex_count) / 3;
-        case prim_type::triangle_strip: return static_cast<UINT>(vertex_count) - 2;
-        case prim_type::triangle_fan:   return static_cast<UINT>(vertex_count) - 2;
+    static DWORD to_d3d_cull(cull_mode mode) {
+        switch (mode) {
+        case cull_mode::none:              return D3DCULL_NONE;
+        case cull_mode::clockwise:         return D3DCULL_CW;
+        case cull_mode::counter_clockwise: return D3DCULL_CCW;
         }
-        return 0;
+        return D3DCULL_NONE;
     }
 
-    // ── Drawing ──────────────────────────────────────────────────────────
-
-    void d3d9_draw_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        shader_program_handle *shader
-    ) {
-        if (count < 3)
-            return;
-        auto *device = as_d3d9_device(current_device().device())->device;
-        auto *decl = get_or_compile(device, vtx_type, elements);
-        if (!decl)
-            return;
-
-        apply_d3d9_alpha_blend(device);
-        device->SetVertexDeclaration(decl);
-        if (shader) {
-            d3d9_apply_shader_program(shader, nullptr);
-            device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
-            return;
+    static DWORD to_d3d_blend_factor(blend_factor factor) {
+        switch (factor) {
+        case blend_factor::zero:          return D3DBLEND_ZERO;
+        case blend_factor::one:           return D3DBLEND_ONE;
+        case blend_factor::src_alpha:     return D3DBLEND_SRCALPHA;
+        case blend_factor::inv_src_alpha: return D3DBLEND_INVSRCALPHA;
         }
-
-        device->SetVertexShader(nullptr);
-        device->SetPixelShader(nullptr);
-        apply_d3d9_vertex_color(device);
-        device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
+        return D3DBLEND_ONE;
     }
 
-    void d3d9_draw_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        shader_program_handle *shader
-    ) {
-        const UINT ni = static_cast<UINT>(indices.size());
-        if (ni < 3 || count == 0)
-            return;
-        auto *device = as_d3d9_device(current_device().device())->device;
-        auto *decl = get_or_compile(device, vtx_type, elements);
-        if (!decl)
-            return;
-
-        apply_d3d9_alpha_blend(device);
-        device->SetVertexDeclaration(decl);
-        if (shader) {
-            d3d9_apply_shader_program(shader, nullptr);
-            device->DrawIndexedPrimitiveUP(
-                to_d3d_prim(type), 0, static_cast<UINT>(count),
-                compute_prim_count(type, static_cast<int>(ni)),
-                indices.data(), D3DFMT_INDEX32, vertices, static_cast<UINT>(stride)
-            );
-            return;
+    static DWORD to_d3d_blend_op(blend_op op) {
+        switch (op) {
+        case blend_op::add: return D3DBLENDOP_ADD;
         }
+        return D3DBLENDOP_ADD;
+    }
 
-        device->SetVertexShader(nullptr);
-        device->SetPixelShader(nullptr);
-        apply_d3d9_vertex_color(device);
-        device->DrawIndexedPrimitiveUP(
-            to_d3d_prim(type), 0, static_cast<UINT>(count),
-            compute_prim_count(type, static_cast<int>(ni)),
-            indices.data(), D3DFMT_INDEX32, vertices, static_cast<UINT>(stride)
+    void d3d9_set_viewport(device_handle *dev_h, const render_viewport &viewport) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        D3DVIEWPORT9 vp = {
+            static_cast<DWORD>(viewport.origin.x),
+            static_cast<DWORD>(viewport.origin.y),
+            static_cast<DWORD>(viewport.size.x),
+            static_cast<DWORD>(viewport.size.y),
+            viewport.min_depth,
+            viewport.max_depth
+        };
+        device->SetViewport(&vp);
+    }
+
+    void d3d9_clear_render_target(device_handle *dev_h, color c) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        device->Clear(0, nullptr, D3DCLEAR_TARGET, to_d3d_color(c), 1.0f, 0);
+    }
+
+    void d3d9_set_render_state(device_handle *dev_h, const render_state &state) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        device->SetRenderState(D3DRS_ZENABLE, state.depth_test_enabled ? D3DZB_TRUE : D3DZB_FALSE);
+        device->SetRenderState(D3DRS_ZWRITEENABLE, state.depth_write_enabled ? TRUE : FALSE);
+        device->SetRenderState(D3DRS_LIGHTING, state.fixed_function_lighting_enabled ? TRUE : FALSE);
+        device->SetRenderState(D3DRS_CULLMODE, to_d3d_cull(state.cull));
+    }
+
+    void d3d9_set_blend_state(device_handle *dev_h, const blend_state &state) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        device->SetRenderState(D3DRS_ALPHABLENDENABLE, state.enabled ? TRUE : FALSE);
+        if (!state.enabled)
+            return;
+        device->SetRenderState(D3DRS_BLENDOP, to_d3d_blend_op(state.op));
+        device->SetRenderState(D3DRS_SRCBLEND, to_d3d_blend_factor(state.src));
+        device->SetRenderState(D3DRS_DESTBLEND, to_d3d_blend_factor(state.dst));
+    }
+
+    void d3d9_set_fixed_function_matrices(device_handle *dev_h, const fixed_function_matrices &matrices) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        device->SetTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX *>(matrices.world.data()));
+        D3DMATRIX view = make_identity_matrix();
+        device->SetTransform(D3DTS_VIEW, &view);
+        device->SetTransform(D3DTS_PROJECTION, reinterpret_cast<const D3DMATRIX *>(matrices.projection.data()));
+    }
+
+    void d3d9_set_fixed_function_texture_mode(device_handle *dev_h, fixed_function_texture_mode mode) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        switch (mode) {
+        case fixed_function_texture_mode::vertex_color:
+            apply_d3d9_vertex_color(device);
+            break;
+        case fixed_function_texture_mode::texture_replace:
+            apply_d3d9_texture_color(device, false);
+            break;
+        case fixed_function_texture_mode::texture_modulate_vertex_color:
+            apply_d3d9_texture_color(device, true);
+            break;
+        case fixed_function_texture_mode::alpha_mask:
+            apply_d3d9_alpha_mask_color(device);
+            break;
+        }
+    }
+
+    void d3d9_bind_texture(device_handle *dev_h, const texture_binding &binding) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        auto *texture = binding.texture ? as_d3d9_texture(binding.texture) : nullptr;
+        device->SetTexture(static_cast<DWORD>(binding.slot), texture ? texture->texture : nullptr);
+    }
+
+    void d3d9_set_texture_sampler(device_handle *dev_h, const texture_sampler_binding &binding) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        apply_d3d9_sampler(device, static_cast<DWORD>(binding.slot), binding.sampler);
+    }
+
+    void d3d9_bind_vertex_input(device_handle *dev_h, const vertex_input_binding &binding) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        IDirect3DVertexDeclaration9 *decl = get_or_compile(device, binding.vertex_type, binding.elements);
+        device->SetVertexDeclaration(decl);
+    }
+
+    void d3d9_unbind_vertex_input(device_handle *, const vertex_input_binding &) {
+    }
+
+    void d3d9_draw_arrays_immediate(device_handle *dev_h, const draw_arrays_immediate &draw) {
+        auto *device = as_d3d9_device(dev_h)->device;
+        device->DrawPrimitiveUP(
+            to_d3d_prim(draw.type),
+            static_cast<UINT>(draw.primitive_count),
+            draw.vertices,
+            static_cast<UINT>(draw.vertex_stride)
         );
     }
 
-    void d3d9_draw_textured_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex,
-        shader_program_handle *shader
-    ) {
-        if (count < 3 || !tex)
-            return;
-        auto *d3d_tex = as_d3d9_texture(tex);
-        auto *device = as_d3d9_device(current_device().device())->device;
-        auto *decl = get_or_compile(device, vtx_type, elements);
-        if (!decl)
-            return;
-
-        apply_d3d9_alpha_blend(device);
-        device->SetVertexDeclaration(decl);
-        if (shader) {
-            d3d9_apply_shader_program(shader, tex);
-            device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
-            return;
-        }
-
-        device->SetVertexShader(nullptr);
-        device->SetPixelShader(nullptr);
-        device->SetTexture(0, d3d_tex->texture);
-        apply_d3d9_sampler(device, 0, d3d_tex->sampler);
-        apply_d3d9_texture_color(device, has_vertex_color(elements));
-        device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
-        apply_d3d9_vertex_color(device);
-    }
-
-    void d3d9_draw_alpha_masked_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex,
-        shader_program_handle *shader
-    ) {
-        if (count < 3 || !tex)
-            return;
-        auto *d3d_tex = as_d3d9_texture(tex);
-        auto *device = as_d3d9_device(current_device().device())->device;
-        auto *decl = get_or_compile(device, vtx_type, elements);
-        if (!decl)
-            return;
-
-        apply_d3d9_alpha_blend(device);
-        device->SetVertexDeclaration(decl);
-        if (shader) {
-            d3d9_apply_shader_program(shader, tex);
-            device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
-            return;
-        }
-
-        device->SetVertexShader(nullptr);
-        device->SetPixelShader(nullptr);
-        device->SetTexture(0, d3d_tex->texture);
-        apply_d3d9_sampler(device, 0, d3d_tex->sampler);
-        apply_d3d9_alpha_mask_color(device);
-        device->DrawPrimitiveUP(to_d3d_prim(type), compute_prim_count(type, count), vertices, static_cast<UINT>(stride));
-        apply_d3d9_vertex_color(device);
-    }
-
-    void d3d9_draw_textured_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture_handle *tex,
-        shader_program_handle *shader
-    ) {
-        const UINT ni = static_cast<UINT>(indices.size());
-        if (ni < 3 || count == 0 || !tex)
-            return;
-        auto *d3d_tex = as_d3d9_texture(tex);
-        auto *device = as_d3d9_device(current_device().device())->device;
-        auto *decl = get_or_compile(device, vtx_type, elements);
-        if (!decl)
-            return;
-
-        apply_d3d9_alpha_blend(device);
-        device->SetVertexDeclaration(decl);
-        if (shader) {
-            d3d9_apply_shader_program(shader, tex);
-            device->DrawIndexedPrimitiveUP(
-                to_d3d_prim(type), 0, static_cast<UINT>(count),
-                compute_prim_count(type, static_cast<int>(ni)),
-                indices.data(), D3DFMT_INDEX32, vertices, static_cast<UINT>(stride)
-            );
-            return;
-        }
-
-        device->SetVertexShader(nullptr);
-        device->SetPixelShader(nullptr);
-        device->SetTexture(0, d3d_tex->texture);
-        apply_d3d9_sampler(device, 0, d3d_tex->sampler);
-        apply_d3d9_texture_color(device, has_vertex_color(elements));
+    void d3d9_draw_elements_immediate(device_handle *dev_h, const draw_elements_immediate &draw) {
+        auto *device = as_d3d9_device(dev_h)->device;
         device->DrawIndexedPrimitiveUP(
-            to_d3d_prim(type), 0, static_cast<UINT>(count),
-            compute_prim_count(type, static_cast<int>(ni)),
-            indices.data(), D3DFMT_INDEX32, vertices, static_cast<UINT>(stride)
+            to_d3d_prim(draw.type),
+            0,
+            static_cast<UINT>(draw.vertex_count),
+            static_cast<UINT>(draw.primitive_count),
+            draw.indices.data(),
+            D3DFMT_INDEX32,
+            draw.vertices,
+            static_cast<UINT>(draw.vertex_stride)
         );
-        apply_d3d9_vertex_color(device);
     }
 
 } // namespace alia

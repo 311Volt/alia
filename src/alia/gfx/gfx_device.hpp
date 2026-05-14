@@ -59,15 +59,21 @@ namespace alia {
 
         [[nodiscard]] swapchain_handle *handle() const noexcept { return handle_; }
         [[nodiscard]] const graphics_backend_interface *backend() const noexcept { return backend_; }
+        [[nodiscard]] vec2i size() const noexcept { return size_; }
 
     private:
         friend class gfx_device;
+        friend void clear(color c);
+        friend void present();
+        friend void on_resize(vec2i new_size);
 
         swapchain_handle *handle_ = nullptr;
         const graphics_backend_interface *backend_ = nullptr;
+        vec2i size_ = {};
+        bool frame_active_ = false;
 
-        explicit swapchain(swapchain_handle *handle, const graphics_backend_interface *backend) noexcept
-            : handle_(handle), backend_(backend) {}
+        explicit swapchain(swapchain_handle *handle, const graphics_backend_interface *backend, vec2i size) noexcept
+            : handle_(handle), backend_(backend), size_(size) {}
     };
 
     // ── Thread-locals ─────────────────────────────────────────────────────

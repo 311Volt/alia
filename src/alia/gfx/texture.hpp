@@ -1,5 +1,5 @@
-#ifndef TEXTURE_B1D24750_1005_447A_9A4B_D0DF4C2E7AD7
-#define TEXTURE_B1D24750_1005_447A_9A4B_D0DF4C2E7AD7
+#ifndef TEXTURE_D1DD8DA1_4AF1_4438_BF28_BC459807D50F
+#define TEXTURE_D1DD8DA1_4AF1_4438_BF28_BC459807D50F
 
 #include "bitmap/bitmap.hpp"
 #include "gfx_device.hpp"
@@ -18,6 +18,7 @@ namespace alia {
             texture_handle *handle = nullptr;
             const graphics_backend_interface *backend = nullptr;
             texture_lock_info info = {};
+            bool commit_on_release = true;
         };
     } // namespace detail
 
@@ -82,11 +83,11 @@ namespace alia {
             return impl_->info.origin;
         }
 
-        /// Commit changes and release the lock early.
+        /// Commit changes (unless this was a read-only lock) and release the lock early.
         /// The destructor calls this automatically; safe to call more than once.
         void release() {
             if (impl_) {
-                impl_->backend->texture_unlock.get_or_throw()(impl_->handle, impl_->info, true);
+                impl_->backend->texture_unlock.get_or_throw()(impl_->handle, impl_->info, impl_->commit_on_release);
                 impl_.reset();
             }
         }
@@ -165,7 +166,36 @@ namespace alia {
         /// @param level    Mip level (0 = base).
         template <pixel TPixel>
         [[nodiscard]] locked_texture_region<TPixel> lock(std::optional<rect_i> region = {}, int level = 0) {
-            return locked_texture_region<TPixel>(lock_impl(region, level, TPixel::format_id));
+            return locked_texture_region<TPixel>(lock_impl(region, level, TPixel::format_id, texture_lock_mode::read_write));
+        }
+
+        /// Acquire a typed lock to inspect pixels without modifying them.
+        ///
+        /// Equivalent to @c lock() but pixel writes through the returned view
+        /// are silently discarded on release, allowing the backend to skip the
+        /// upload step.
+        ///
+        /// @tparam TPixel  Must match this texture's format; otherwise falsy.
+        /// @param region   Sub-rectangle to lock (clamped to level bounds).
+        /// @param level    Mip level (0 = base).
+        template <pixel TPixel>
+        [[nodiscard]] locked_texture_region<TPixel> lock_read_only(std::optional<rect_i> region = {}, int level = 0) {
+            return locked_texture_region<TPixel>(lock_impl(region, level, TPixel::format_id, texture_lock_mode::read_only));
+        }
+
+        /// Acquire a typed lock for writing pixels without preserving current contents.
+        ///
+        /// The backend may skip downloading the existing pixel data, so the
+        /// returned view is guaranteed only to be writable. Reading pixels before
+        /// writing them — or leaving any pixel in the locked region unwritten —
+        /// produces undefined contents on commit.
+        ///
+        /// @tparam TPixel  Must match this texture's format; otherwise falsy.
+        /// @param region   Sub-rectangle to lock (clamped to level bounds).
+        /// @param level    Mip level (0 = base).
+        template <pixel TPixel>
+        [[nodiscard]] locked_texture_region<TPixel> lock_write_only(std::optional<rect_i> region = {}, int level = 0) {
+            return locked_texture_region<TPixel>(lock_impl(region, level, TPixel::format_id, texture_lock_mode::write_only));
         }
 
         /// Regenerate all mip levels from level 0. No-op if @c mip_levels() == 1.
@@ -188,7 +218,7 @@ namespace alia {
 
     private:
         std::unique_ptr<detail::texture_lock_state> lock_impl(
-            const std::optional<rect_i> &region, int level, pixel_format expected_fmt
+            const std::optional<rect_i> &region, int level, pixel_format expected_fmt, texture_lock_mode mode
         );
 
         explicit texture(texture_handle *handle, const graphics_backend_interface *backend, texture_role role) noexcept
@@ -201,4 +231,4 @@ namespace alia {
 
 } // namespace alia
 
-#endif /* TEXTURE_B1D24750_1005_447A_9A4B_D0DF4C2E7AD7 */
+#endif /* TEXTURE_D1DD8DA1_4AF1_4438_BF28_BC459807D50F */

@@ -37,7 +37,7 @@ int main() {
             .resizable = true,
         }
     );
-    alia::gfx_device device = alia::gfx_device::create(alia::gfx_backend::d3d9);
+    alia::gfx_device device = alia::gfx_device::create(alia::gfx_backend::opengl);
     auto swapchain = device.create_swapchain({.target = win});
 
     alia::set_current_projection(alia::transform::ortho_ui(win.size()));

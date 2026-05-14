@@ -183,17 +183,28 @@ namespace alia {
         iface.shader_lookup_sampler  = {ogl_shader_lookup_sampler};
         iface.shader_set_sampler     = {ogl_shader_set_sampler};
 
-        iface.create_swapchain    = {ogl_create_swapchain};
-        iface.destroy_swapchain   = {ogl_destroy_swapchain};
-        iface.swapchain_clear     = {ogl_swapchain_clear};
-        iface.swapchain_present   = {ogl_swapchain_present};
-        iface.swapchain_on_resize = {ogl_swapchain_on_resize};
+        iface.create_swapchain       = {ogl_create_swapchain};
+        iface.destroy_swapchain      = {ogl_destroy_swapchain};
+        iface.swapchain_begin_frame  = {ogl_swapchain_begin_frame};
+        iface.swapchain_end_frame    = {ogl_swapchain_end_frame};
+        iface.swapchain_present      = {ogl_swapchain_present};
+        iface.swapchain_on_resize    = {ogl_swapchain_on_resize};
 
-        iface.draw_prim                  = {ogl_draw_prim};
-        iface.draw_indexed_prim          = {ogl_draw_indexed_prim};
-        iface.draw_textured_prim         = {ogl_draw_textured_prim};
-        iface.draw_alpha_masked_prim     = {ogl_draw_alpha_masked_prim};
-        iface.draw_textured_indexed_prim = {ogl_draw_textured_indexed_prim};
+        iface.set_viewport                    = {ogl_set_viewport};
+        iface.clear_render_target             = {ogl_clear_render_target};
+        iface.set_render_state                = {ogl_set_render_state};
+        iface.set_blend_state                 = {ogl_set_blend_state};
+        iface.bind_shader_program             = {ogl_bind_shader_program};
+        iface.apply_shader_constants          = {ogl_apply_shader_constants};
+        iface.apply_shader_samplers           = {ogl_apply_shader_samplers};
+        iface.set_fixed_function_matrices     = {ogl_set_fixed_function_matrices};
+        iface.set_fixed_function_texture_mode = {ogl_set_fixed_function_texture_mode};
+        iface.bind_texture                    = {ogl_bind_texture};
+        iface.set_texture_sampler             = {ogl_set_texture_sampler};
+        iface.bind_vertex_input               = {ogl_bind_vertex_input};
+        iface.unbind_vertex_input             = {ogl_unbind_vertex_input};
+        iface.draw_arrays_immediate           = {ogl_draw_arrays_immediate};
+        iface.draw_elements_immediate         = {ogl_draw_elements_immediate};
 
         return {raw, std::move(iface)};
     }

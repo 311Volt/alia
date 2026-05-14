@@ -131,7 +131,7 @@ namespace alia {
         apply_sampler(t->tex_id, s, t->mip_levels);
     }
 
-    bool ogl_texture_lock(texture_handle *h, rect_i region, int level, texture_lock_info &out) {
+    bool ogl_texture_lock(texture_handle *h, rect_i region, int level, texture_lock_mode mode, texture_lock_info &out) {
         auto *t = as_ogl_texture(h);
         if (level < 0 || level >= t->mip_levels)
             return false;
@@ -154,9 +154,13 @@ namespace alia {
             t->stage_buf_bytes = needed;
         }
 
-        const auto [internal, external, type] = to_ogl_format(t->fmt, t->role);
-        glBindTexture(GL_TEXTURE_2D, t->tex_id);
-        glGetTexImage(GL_TEXTURE_2D, level, external, type, t->stage_buf.get());
+        if (mode != texture_lock_mode::write_only) {
+            const auto [internal, external, type] = to_ogl_format(t->fmt, t->role);
+            glBindTexture(GL_TEXTURE_2D, t->tex_id);
+            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+            glGetTexImage(GL_TEXTURE_2D, level, external, type, t->stage_buf.get());
+            glPixelStorei(GL_PACK_ALIGNMENT, 4);
+        }
 
         const int stride = lw * bpp;
         out.data = t->stage_buf.get() + r.top() * stride + r.left() * bpp;
@@ -177,6 +181,7 @@ namespace alia {
         const auto [internal, external, type] = to_ogl_format(t->fmt, t->role);
 
         glBindTexture(GL_TEXTURE_2D, t->tex_id);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         glPixelStorei(GL_UNPACK_ROW_LENGTH, lw);
         glTexSubImage2D(
             GL_TEXTURE_2D, info.level,
@@ -184,6 +189,7 @@ namespace alia {
             external, type, info.data
         );
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     }
 
     void ogl_texture_generate_mipmaps(texture_handle *h) {
