@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -95,6 +96,12 @@ namespace alia {
             int cursor_x = 0;
             int cursor_y = 0;
             int row_height = 0;
+
+            explicit glyph_page(texture atlas) : atlas(std::move(atlas)) {}
+            glyph_page(glyph_page &&) noexcept = default;
+            glyph_page &operator=(glyph_page &&) noexcept = default;
+            glyph_page(const glyph_page &) = delete;
+            glyph_page &operator=(const glyph_page &) = delete;
         };
 
         struct hardware_glyph_buffer_impl {
@@ -115,9 +122,7 @@ namespace alia {
 
             glyph_page &add_page() {
                 bitmap blank(page_size, px_bgra8888{255, 255, 255, 0});
-                texture atlas(current_device(), blank);
-                if (!atlas)
-                    throw std::runtime_error("hardware_glyph_buffer: failed to create atlas texture");
+                texture atlas(current_device(), blank, 1, texture_role::color, texture_usage::sampling_only);
 
                 atlas.set_sampler({
                     .min_filter = texture_filter::linear,
@@ -226,7 +231,7 @@ namespace alia {
             bool antialiasing = true;
             bool kerning = true;
             bool dirty = true;
-            texture mask;
+            std::optional<texture> mask;
             gfx_device *device = nullptr;
             vec2i texture_size;
             vec2i draw_offset;
@@ -310,7 +315,7 @@ namespace alia {
 
         void rebuild_text_texture(detail::text_impl &impl, gfx_device &device) {
             if (impl.content.empty()) {
-                impl.mask = texture();
+                impl.mask.reset();
                 impl.device = &device;
                 impl.texture_size = {};
                 impl.draw_offset = {};
@@ -352,7 +357,7 @@ namespace alia {
             }
 
             if (!has_bitmap && block_width <= 0.0f) {
-                impl.mask = texture();
+                impl.mask.reset();
                 impl.device = &device;
                 impl.texture_size = {};
                 impl.draw_offset = {};
@@ -402,9 +407,7 @@ namespace alia {
                 }
             }
 
-            texture mask(device, coverage, 1, texture_role::alpha_mask);
-            if (!mask)
-                throw std::runtime_error("text: failed to create coverage texture");
+            texture mask(device, coverage, 1, texture_role::alpha_mask, texture_usage::sampling_only);
 
             const texture_filter filter = impl.antialiasing ? texture_filter::linear : texture_filter::nearest;
             mask.set_sampler({
@@ -530,7 +533,7 @@ namespace alia {
         impl_->content.assign(value);
         impl_->dirty = true;
         if (impl_->content.empty()) {
-            impl_->mask = texture();
+            impl_->mask.reset();
             impl_->device = nullptr;
             impl_->texture_size = {};
             impl_->draw_offset = {};
@@ -588,7 +591,7 @@ namespace alia {
         full_vertex v2{{x0, y1}, text_color, {0.0f, 1.0f}};
         full_vertex v3{{x1, y1}, text_color, {1.0f, 1.0f}};
         full_vertex vertices[6] = {v0, v1, v2, v1, v3, v2};
-        draw_alpha_masked_triangles<full_vertex>(impl_->mask, vertices);
+        draw_alpha_masked_triangles<full_vertex>(*impl_->mask, vertices);
     }
 
     ttf_font load_ttf_font(std::string_view filename, int pixel_height) {

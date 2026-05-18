@@ -66,6 +66,7 @@ namespace alia {
         friend void clear(color c);
         friend void present();
         friend void on_resize(vec2i new_size);
+        friend void ensure_current_frame_active();
 
         swapchain_handle *handle_ = nullptr;
         const graphics_backend_interface *backend_ = nullptr;
@@ -81,6 +82,8 @@ namespace alia {
     inline thread_local gfx_device *tl_current_device = nullptr;
     inline thread_local swapchain *tl_current_swapchain = nullptr;
     inline thread_local window *tl_current_window = nullptr;
+    inline thread_local vec2i tl_current_render_target_size = {};
+    inline thread_local int tl_texture_render_target_depth = 0;
 
     void make_current(gfx_device &d);
     void make_current(swapchain &s);
@@ -90,6 +93,7 @@ namespace alia {
     [[nodiscard]] vec2f current_pixel_center_offset();
     swapchain &current_swapchain();
     window &current_window();
+    void ensure_current_frame_active();
 
     // ── Swapchain free functions ───────────────────────────────────────────
 

@@ -113,6 +113,21 @@ namespace alia {
         return ok;
     }
 
+    static bool load_framebuffer_procs() {
+        bool ok = true;
+        ok = (load_gl_proc(ogl_s_glGenFramebuffers, "glGenFramebuffers") ||
+              load_gl_proc(ogl_s_glGenFramebuffers, "glGenFramebuffersEXT")) && ok;
+        ok = (load_gl_proc(ogl_s_glDeleteFramebuffers, "glDeleteFramebuffers") ||
+              load_gl_proc(ogl_s_glDeleteFramebuffers, "glDeleteFramebuffersEXT")) && ok;
+        ok = (load_gl_proc(ogl_s_glBindFramebuffer, "glBindFramebuffer") ||
+              load_gl_proc(ogl_s_glBindFramebuffer, "glBindFramebufferEXT")) && ok;
+        ok = (load_gl_proc(ogl_s_glFramebufferTexture2D, "glFramebufferTexture2D") ||
+              load_gl_proc(ogl_s_glFramebufferTexture2D, "glFramebufferTexture2DEXT")) && ok;
+        ok = (load_gl_proc(ogl_s_glCheckFramebufferStatus, "glCheckFramebufferStatus") ||
+              load_gl_proc(ogl_s_glCheckFramebufferStatus, "glCheckFramebufferStatusEXT")) && ok;
+        return ok;
+    }
+
     static created_device create_ogl_device_and_interface() {
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
         register_win32_ogl_platform();
@@ -154,6 +169,9 @@ namespace alia {
 
         const bool has_shaders = gl20_or_later && load_shader_procs();
         const bool has_buffers = gl15_or_later && load_buffer_procs();
+        const bool has_framebuffers =
+            (gl30_or_later || has_gl_extension("GL_EXT_framebuffer_object")) &&
+            load_framebuffer_procs();
 
         graphics_backend_interface iface;
         iface.id = gfx_backend::opengl;
@@ -172,6 +190,15 @@ namespace alia {
         iface.texture_lock             = {ogl_texture_lock};
         iface.texture_unlock           = {ogl_texture_unlock};
         iface.texture_clone            = {ogl_texture_clone};
+        iface.copy_render_target_to_texture = {ogl_copy_render_target_to_texture};
+        if (has_framebuffers) {
+            iface.texture_begin_render_target = {ogl_texture_begin_render_target};
+            iface.texture_end_render_target   = {ogl_texture_end_render_target};
+        } else {
+            const char *reason = "render-to-texture requires OpenGL framebuffer object entry points";
+            iface.texture_begin_render_target = {nullptr, reason};
+            iface.texture_end_render_target   = {nullptr, reason};
+        }
 
         if (ogl_s_glGenerateMipmap) {
             iface.texture_generate_mipmaps = {ogl_texture_generate_mipmaps};

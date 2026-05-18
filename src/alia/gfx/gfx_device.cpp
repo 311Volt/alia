@@ -339,6 +339,7 @@ namespace alia {
     }
     void make_current(swapchain &s) {
         tl_current_swapchain = &s;
+        tl_current_render_target_size = s.size();
     }
     void make_current(window &w) {
         tl_current_window = &w;
@@ -360,6 +361,15 @@ namespace alia {
         if (!tl_current_window)
             throw std::runtime_error("No current window");
         return *tl_current_window;
+    }
+
+    void ensure_current_frame_active() {
+        auto &sc = current_swapchain();
+        if (!sc.frame_active_) {
+            sc.backend()->swapchain_begin_frame.get_or_throw()(sc.handle());
+            sc.frame_active_ = true;
+            tl_current_render_target_size = sc.size();
+        }
     }
 
     // ── gfx_device ────────────────────────────────────────────────────────
@@ -489,10 +499,7 @@ namespace alia {
         auto &dev = current_device();
         const auto *backend = sc.backend();
 
-        if (!sc.frame_active_) {
-            backend->swapchain_begin_frame.get_or_throw()(sc.handle());
-            sc.frame_active_ = true;
-        }
+        ensure_current_frame_active();
 
         backend->set_render_state.get_or_throw()(dev.device(), render_state{});
         backend->set_blend_state.get_or_throw()(dev.device(), blend_state{});
@@ -500,7 +507,7 @@ namespace alia {
             dev.device(),
             render_viewport{
                 {},
-                sc.size(),
+                tl_current_render_target_size,
                 0.0f,
                 1.0f
             }
@@ -521,6 +528,8 @@ namespace alia {
         auto &sc = current_swapchain();
         sc.backend()->swapchain_on_resize.get_or_throw()(sc.handle(), new_size);
         sc.size_ = new_size;
+        if (tl_texture_render_target_depth == 0)
+            tl_current_render_target_size = new_size;
     }
 
     // ── Draw free functions ───────────────────────────────────────────────

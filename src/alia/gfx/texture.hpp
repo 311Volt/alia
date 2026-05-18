@@ -20,6 +20,13 @@ namespace alia {
             const graphics_backend_interface *backend = nullptr;
             texture_lock_info info = {};
         };
+
+        struct texture_render_target_state {
+            render_target_scope_handle *handle = nullptr;
+            device_handle *device = nullptr;
+            const graphics_backend_interface *backend = nullptr;
+            vec2i previous_render_target_size = {};
+        };
     } // namespace detail
 
     // ── locked_texture_region ─────────────────────────────────────────────
@@ -118,13 +125,32 @@ namespace alia {
 
     // ── texture ───────────────────────────────────────────────────────────
 
+    class scoped_texture_render_target {
+    public:
+        ~scoped_texture_render_target();
+        scoped_texture_render_target(scoped_texture_render_target &&) noexcept;
+        scoped_texture_render_target &operator=(scoped_texture_render_target &&) noexcept;
+        scoped_texture_render_target(const scoped_texture_render_target &) = delete;
+        scoped_texture_render_target &operator=(const scoped_texture_render_target &) = delete;
+
+        void release();
+
+    private:
+        friend class texture;
+
+        std::unique_ptr<detail::texture_render_target_state> impl_;
+
+        explicit scoped_texture_render_target(std::unique_ptr<detail::texture_render_target_state> state) noexcept
+            : impl_(std::move(state)) {}
+    };
+
     /// @brief GPU-resident 2D pixel buffer. Hardware counterpart of @c bitmap.
     ///
     /// Owns a backend-specific GPU resource. Move-only; use @c clone() for a
-    /// GPU-to-GPU deep copy. Created through a @c gfx_device.
+    /// GPU-to-GPU deep copy. Created through a @c gfx_device; construction
+    /// throws if the backend cannot create a valid texture.
     class texture {
     public:
-        texture() = default;
         ~texture();
         texture(texture &&) noexcept;
         texture &operator=(texture &&) noexcept;
@@ -134,30 +160,52 @@ namespace alia {
         // ── Construction ─────────────────────────────────────────────────
 
         /// Create an uninitialised texture.
-        texture(gfx_device &device, pixel_format fmt, vec2i size, int mip_levels = 1, texture_role role = texture_role::color);
+        texture(
+            gfx_device &device,
+            pixel_format fmt,
+            vec2i size,
+            int mip_levels = 1,
+            texture_role role = texture_role::color,
+            texture_usage usage = texture_usage::sampling_only
+        );
 
         /// Create and initialise level 0 from a type-erased CPU view.
-        texture(gfx_device &device, const any_bitmap_view &src, int mip_levels = 1, texture_role role = texture_role::color);
+        texture(
+            gfx_device &device,
+            const any_bitmap_view &src,
+            int mip_levels = 1,
+            texture_role role = texture_role::color,
+            texture_usage usage = texture_usage::sampling_only
+        );
 
         /// Create and initialise level 0 from an owning bitmap.
-        texture(gfx_device &device, const bitmap &src, int mip_levels = 1, texture_role role = texture_role::color);
+        texture(
+            gfx_device &device,
+            const bitmap &src,
+            int mip_levels = 1,
+            texture_role role = texture_role::color,
+            texture_usage usage = texture_usage::sampling_only
+        );
 
         /// Create and initialise level 0 from a typed CPU view.
         template <pixel TPixel>
-        texture(gfx_device &device, const bitmap_view<TPixel> &src, int mip_levels = 1, texture_role role = texture_role::color)
-            : texture(device, bitmap(src), mip_levels, role) {}
+        texture(
+            gfx_device &device,
+            const bitmap_view<TPixel> &src,
+            int mip_levels = 1,
+            texture_role role = texture_role::color,
+            texture_usage usage = texture_usage::sampling_only
+        )
+            : texture(device, bitmap(src), mip_levels, role, usage) {}
 
         // ── State queries ────────────────────────────────────────────────
 
-        [[nodiscard]] bool valid() const noexcept {
-            return handle_ != nullptr;
-        }
-        [[nodiscard]] explicit operator bool() const noexcept {
-            return valid();
-        }
         [[nodiscard]] pixel_format format() const noexcept;
         [[nodiscard]] texture_role role() const noexcept {
             return role_;
+        }
+        [[nodiscard]] texture_usage usage() const noexcept {
+            return usage_;
         }
         [[nodiscard]] int width() const noexcept;
         [[nodiscard]] int height() const noexcept;
@@ -230,6 +278,9 @@ namespace alia {
         /// GPU-to-GPU deep copy, including all mip levels and sampler state.
         [[nodiscard]] texture clone() const;
 
+        /// Temporarily bind a mip level as the active render target.
+        [[nodiscard]] scoped_texture_render_target as_render_target(int level = 0);
+
         // ── Backend access (internal) ────────────────────────────────────
 
         texture_handle *impl() noexcept {
@@ -238,19 +289,37 @@ namespace alia {
         const texture_handle *impl() const noexcept {
             return handle_;
         }
+        const graphics_backend_interface *backend() const noexcept {
+            return backend_;
+        }
+        device_handle *device() const noexcept {
+            return device_;
+        }
 
     private:
+        friend void copy_render_target_to_texture(texture &dst, rect_i src_rect, vec2i dst_pos, int dst_level);
+
         std::unique_ptr<detail::texture_lock_state> lock_impl(
             const std::optional<rect_i> &region, int level, pixel_format expected_fmt, texture_lock_mode mode
         );
 
-        explicit texture(texture_handle *handle, const graphics_backend_interface *backend, texture_role role) noexcept
-            : handle_(handle), backend_(backend), role_(role) {}
+        explicit texture(
+            texture_handle *handle,
+            const graphics_backend_interface *backend,
+            device_handle *device,
+            texture_role role,
+            texture_usage usage
+        ) noexcept
+            : handle_(handle), backend_(backend), device_(device), role_(role), usage_(usage) {}
 
         texture_handle *handle_ = nullptr;
         const graphics_backend_interface *backend_ = nullptr;
+        device_handle *device_ = nullptr;
         texture_role role_ = texture_role::color;
+        texture_usage usage_ = texture_usage::sampling_only;
     };
+
+    void copy_render_target_to_texture(texture &dst, rect_i src_rect, vec2i dst_pos = {}, int dst_level = 0);
 
 } // namespace alia
 

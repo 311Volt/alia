@@ -15,5 +15,8 @@ target_link_libraries(alia_example_shader PRIVATE alia)
 add_executable(alia_example_buffered_mesh buffered_mesh.cpp)
 target_link_libraries(alia_example_buffered_mesh PRIVATE alia)
 
+add_executable(alia_example_render_target render_target.cpp)
+target_link_libraries(alia_example_render_target PRIVATE alia)
+
 add_executable(alia_example_mdspan mdspan_example.cpp)
 target_link_libraries(alia_example_mdspan PRIVATE alia)

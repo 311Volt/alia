@@ -55,6 +55,7 @@ namespace alia {
 
     struct device_handle {};
     struct texture_handle {};
+    struct render_target_scope_handle {};
     struct vertex_buffer_handle {};
     struct index_buffer_handle {};
     struct swapchain_handle {};
@@ -65,6 +66,7 @@ namespace alia {
     enum class gfx_backend { auto_, d3d9, opengl };
 
     enum class texture_role { color, alpha_mask };
+    enum class texture_usage { sampling_only, render_target };
 
     enum class texture_filter { nearest, linear };
     enum class texture_wrap { clamp, repeat, mirror };
@@ -309,8 +311,14 @@ namespace alia {
         gfx_backend_op<void(device_handle *device)> destroy_device;
 
         // ── Texture ─────────────────────────────────────────────────────
-        gfx_backend_op<texture_handle *(device_handle *device, pixel_format format, vec2i size, int mip_levels, texture_role role)>
-            create_texture;
+        gfx_backend_op<texture_handle *(
+            device_handle *device,
+            pixel_format format,
+            vec2i size,
+            int mip_levels,
+            texture_role role,
+            texture_usage usage
+        )> create_texture;
         gfx_backend_op<void(texture_handle *texture)> destroy_texture;
         gfx_backend_op<pixel_format(const texture_handle *texture)> texture_format;
         gfx_backend_op<int(const texture_handle *texture)> texture_width;
@@ -322,6 +330,10 @@ namespace alia {
         gfx_backend_op<void(texture_handle *texture, const texture_lock_info &info, bool wrote)> texture_unlock;
         gfx_backend_op<void(texture_handle *texture)> texture_generate_mipmaps;
         gfx_backend_op<texture_handle *(const texture_handle *texture)> texture_clone;
+        gfx_backend_op<render_target_scope_handle *(device_handle *device, texture_handle *texture, int level)> texture_begin_render_target;
+        gfx_backend_op<void(device_handle *device, render_target_scope_handle *scope)> texture_end_render_target;
+        gfx_backend_op<bool(device_handle *device, texture_handle *dst, rect_i src_rect, vec2i src_target_size, vec2i dst_pos, int dst_level)>
+            copy_render_target_to_texture;
 
         // -- Primitive buffers ------------------------------------------------
         gfx_backend_op<vertex_buffer_handle *(

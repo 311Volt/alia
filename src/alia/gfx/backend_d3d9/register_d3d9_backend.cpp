@@ -37,6 +37,9 @@ namespace alia {
         iface.texture_lock                = {d3d9_texture_lock};
         iface.texture_unlock              = {d3d9_texture_unlock};
         iface.texture_clone               = {d3d9_texture_clone};
+        iface.texture_begin_render_target = {d3d9_texture_begin_render_target};
+        iface.texture_end_render_target   = {d3d9_texture_end_render_target};
+        iface.copy_render_target_to_texture = {d3d9_copy_render_target_to_texture};
 
         if (can_autogen_mipmaps) {
             iface.texture_generate_mipmaps = {d3d9_texture_generate_mipmaps};

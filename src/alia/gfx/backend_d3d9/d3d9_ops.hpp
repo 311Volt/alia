@@ -39,7 +39,14 @@ namespace alia {
         bool autogen = false;
         pixel_format fmt = pixel_format::bgra8888;
         texture_role role = texture_role::color;
+        texture_usage usage = texture_usage::sampling_only;
         sampler_state sampler = {};
+        IDirect3DSurface9 *lock_surface = nullptr;
+    };
+
+    struct d3d9_render_target_scope : render_target_scope_handle {
+        IDirect3DSurface9 *previous_target = nullptr;
+        D3DVIEWPORT9 previous_viewport = {};
     };
 
     struct d3d9_vertex_buffer : vertex_buffer_handle {
@@ -133,7 +140,14 @@ namespace alia {
 
     // ── Texture ops ───────────────────────────────────────────────────────
 
-    texture_handle *d3d9_create_texture(device_handle *dev, pixel_format fmt, vec2i size, int mip_levels, texture_role role);
+    texture_handle *d3d9_create_texture(
+        device_handle *dev,
+        pixel_format fmt,
+        vec2i size,
+        int mip_levels,
+        texture_role role,
+        texture_usage usage
+    );
     void d3d9_destroy_texture(texture_handle *h);
     pixel_format d3d9_texture_format(const texture_handle *h);
     int d3d9_texture_width(const texture_handle *h);
@@ -145,6 +159,16 @@ namespace alia {
     void d3d9_texture_unlock(texture_handle *h, const texture_lock_info &info, bool wrote);
     void d3d9_texture_generate_mipmaps(texture_handle *h);
     texture_handle *d3d9_texture_clone(const texture_handle *h);
+    render_target_scope_handle *d3d9_texture_begin_render_target(device_handle *dev, texture_handle *h, int level);
+    void d3d9_texture_end_render_target(device_handle *dev, render_target_scope_handle *h);
+    bool d3d9_copy_render_target_to_texture(
+        device_handle *dev,
+        texture_handle *dst,
+        rect_i src_rect,
+        vec2i src_target_size,
+        vec2i dst_pos,
+        int dst_level
+    );
 
     // -- Primitive buffer ops ----------------------------------------------
 

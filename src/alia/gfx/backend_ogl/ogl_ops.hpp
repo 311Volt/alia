@@ -31,11 +31,18 @@ namespace alia {
         int mip_levels = 1;
         pixel_format fmt = pixel_format::rgba8888;
         texture_role role = texture_role::color;
+        texture_usage usage = texture_usage::sampling_only;
         sampler_state sampler = {};
 
         // CPU staging buffer for lock/unlock
         std::unique_ptr<std::byte[]> stage_buf;
         std::size_t stage_buf_bytes = 0;
+    };
+
+    struct ogl_render_target_scope : render_target_scope_handle {
+        GLint previous_framebuffer = 0;
+        GLint previous_viewport[4] = {};
+        GLuint framebuffer = 0;
     };
 
     struct ogl_vertex_buffer : vertex_buffer_handle {
@@ -112,7 +119,14 @@ namespace alia {
 
     // ── Texture ops ───────────────────────────────────────────────────────
 
-    texture_handle *ogl_create_texture(device_handle *dev, pixel_format fmt, vec2i size, int mip_levels, texture_role role);
+    texture_handle *ogl_create_texture(
+        device_handle *dev,
+        pixel_format fmt,
+        vec2i size,
+        int mip_levels,
+        texture_role role,
+        texture_usage usage
+    );
     void ogl_destroy_texture(texture_handle *h);
     pixel_format ogl_texture_format(const texture_handle *h);
     int ogl_texture_width(const texture_handle *h);
@@ -124,6 +138,16 @@ namespace alia {
     void ogl_texture_unlock(texture_handle *h, const texture_lock_info &info, bool wrote);
     void ogl_texture_generate_mipmaps(texture_handle *h);
     texture_handle *ogl_texture_clone(const texture_handle *h);
+    render_target_scope_handle *ogl_texture_begin_render_target(device_handle *dev, texture_handle *h, int level);
+    void ogl_texture_end_render_target(device_handle *dev, render_target_scope_handle *h);
+    bool ogl_copy_render_target_to_texture(
+        device_handle *dev,
+        texture_handle *dst,
+        rect_i src_rect,
+        vec2i src_target_size,
+        vec2i dst_pos,
+        int dst_level
+    );
 
     vertex_buffer_handle *ogl_create_vertex_buffer(
         device_handle *dev, int vertex_stride, int vertex_count, buffer_usage usage, const void *initial_data
@@ -216,6 +240,11 @@ namespace alia {
     extern PFNGLBUFFERDATAPROC ogl_s_glBufferData;
     extern PFNGLMAPBUFFERPROC ogl_s_glMapBuffer;
     extern PFNGLUNMAPBUFFERPROC ogl_s_glUnmapBuffer;
+    extern PFNGLGENFRAMEBUFFERSPROC ogl_s_glGenFramebuffers;
+    extern PFNGLDELETEFRAMEBUFFERSPROC ogl_s_glDeleteFramebuffers;
+    extern PFNGLBINDFRAMEBUFFERPROC ogl_s_glBindFramebuffer;
+    extern PFNGLFRAMEBUFFERTEXTURE2DPROC ogl_s_glFramebufferTexture2D;
+    extern PFNGLCHECKFRAMEBUFFERSTATUSPROC ogl_s_glCheckFramebufferStatus;
 
 } // namespace alia
 
