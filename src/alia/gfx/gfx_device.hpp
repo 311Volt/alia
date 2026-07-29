@@ -1,8 +1,9 @@
-#ifndef GFX_DEVICE_DE00092E_67EA_4FA0_99D4_7315A97F7B9B
-#define GFX_DEVICE_DE00092E_67EA_4FA0_99D4_7315A97F7B9B
+#ifndef GFX_DEVICE_FEA14748_42F1_4F10_AEAE_DC296E222AF5
+#define GFX_DEVICE_FEA14748_42F1_4F10_AEAE_DC296E222AF5
 
 #include "graphics_backend_interface.hpp"
 #include <memory>
+#include <typeindex>
 
 namespace alia {
 
@@ -101,58 +102,67 @@ namespace alia {
     void present();
     void on_resize(vec2i new_size);
 
-    // ── Draw free functions ────────────────────────────────────────────────
+    namespace detail {
 
-    void draw_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements
-    );
-    void draw_prim(
-        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements
-    );
-    void draw_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements
-    );
-    void draw_indexed_prim(
-        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
-        index_buffer_handle *indices, int index_count,
-        std::type_index vtx_type, std::span<const vertex_element> elements
-    );
-    void draw_textured_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    );
-    void draw_textured_prim(
-        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    );
-    void draw_alpha_masked_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    );
-    void draw_alpha_masked_prim(
-        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    );
-    void draw_textured_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    );
-    void draw_textured_indexed_prim(
-        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
-        index_buffer_handle *indices, int index_count,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    );
+        std::size_t register_vertex_definition(std::type_index vertex_type);
+
+        template <vertex_type TVertex>
+        [[nodiscard]] const vertex_definition_view &vertex_definition_of() {
+            static constexpr auto elements = TVertex::elements();
+            static const vertex_definition_view definition{
+                register_vertex_definition(typeid(TVertex)),
+                static_cast<int>(sizeof(TVertex)),
+                elements,
+            };
+            return definition;
+        }
+
+        void draw_prim(
+            prim_type type, const void *vertices, int count,
+            const vertex_definition_view &definition
+        );
+        void draw_prim(
+            prim_type type, vertex_buffer_handle *vertices, int count,
+            const vertex_definition_view &definition
+        );
+        void draw_indexed_prim(
+            prim_type type, const void *vertices, int count,
+            std::span<const uint32_t> indices,
+            const vertex_definition_view &definition
+        );
+        void draw_indexed_prim(
+            prim_type type, vertex_buffer_handle *vertices, int count,
+            index_buffer_handle *indices, int index_count,
+            const vertex_definition_view &definition
+        );
+        void draw_textured_prim(
+            prim_type type, const void *vertices, int count,
+            const vertex_definition_view &definition, texture &tex
+        );
+        void draw_textured_prim(
+            prim_type type, vertex_buffer_handle *vertices, int count,
+            const vertex_definition_view &definition, texture &tex
+        );
+        void draw_alpha_masked_prim(
+            prim_type type, const void *vertices, int count,
+            const vertex_definition_view &definition, texture &tex
+        );
+        void draw_alpha_masked_prim(
+            prim_type type, vertex_buffer_handle *vertices, int count,
+            const vertex_definition_view &definition, texture &tex
+        );
+        void draw_textured_indexed_prim(
+            prim_type type, const void *vertices, int count,
+            std::span<const uint32_t> indices,
+            const vertex_definition_view &definition, texture &tex
+        );
+        void draw_textured_indexed_prim(
+            prim_type type, vertex_buffer_handle *vertices, int count,
+            index_buffer_handle *indices, int index_count,
+            const vertex_definition_view &definition, texture &tex
+        );
+
+    } // namespace detail
 
     // ── Transform / projection matrices ───────────────────────────────────
 
@@ -163,4 +173,4 @@ namespace alia {
 
 } // namespace alia
 
-#endif /* GFX_DEVICE_DE00092E_67EA_4FA0_99D4_7315A97F7B9B */
+#endif /* GFX_DEVICE_FEA14748_42F1_4F10_AEAE_DC296E222AF5 */

@@ -11,10 +11,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <optional>
+#include <span>
 #include <string>
 #include <unordered_map>
-#include <memory>
-#include <span>
+#include <utility>
 #include <vector>
 
 #include "../graphics_backend_interface.hpp"
@@ -23,11 +25,51 @@ namespace alia {
 
     // ── Concrete device/texture/swapchain structs ─────────────────────────
 
+    struct d3d9_compiled_vertex_definition {
+        IDirect3DVertexDeclaration9 *declaration = nullptr;
+
+        d3d9_compiled_vertex_definition() = default;
+        explicit d3d9_compiled_vertex_definition(
+            IDirect3DVertexDeclaration9 *declaration
+        ) noexcept
+            : declaration(declaration) {}
+
+        ~d3d9_compiled_vertex_definition() {
+            if (declaration)
+                declaration->Release();
+        }
+
+        d3d9_compiled_vertex_definition(
+            d3d9_compiled_vertex_definition &&other
+        ) noexcept
+            : declaration(std::exchange(other.declaration, nullptr)) {}
+
+        d3d9_compiled_vertex_definition &operator=(
+            d3d9_compiled_vertex_definition &&other
+        ) noexcept {
+            if (this != &other) {
+                if (declaration)
+                    declaration->Release();
+                declaration = std::exchange(other.declaration, nullptr);
+            }
+            return *this;
+        }
+
+        d3d9_compiled_vertex_definition(
+            const d3d9_compiled_vertex_definition &
+        ) = delete;
+        d3d9_compiled_vertex_definition &operator=(
+            const d3d9_compiled_vertex_definition &
+        ) = delete;
+    };
+
     struct d3d9_device : device_handle {
         IDirect3D9 *d3d = nullptr;
         IDirect3DDevice9 *device = nullptr;
         HWND dummy = nullptr;
         D3DCAPS9 caps = {};
+        std::vector<std::optional<d3d9_compiled_vertex_definition>>
+            vertex_definitions;
     };
 
     struct d3d9_texture : texture_handle {

@@ -68,6 +68,7 @@ namespace alia {
 
     void d3d9_destroy_device(device_handle *h) {
         auto *dev = as_d3d9_device(h);
+        dev->vertex_definitions.clear();
         if (dev->device) {
             dev->device->Release();
             dev->device = nullptr;

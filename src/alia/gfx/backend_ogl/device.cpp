@@ -30,6 +30,7 @@ namespace alia {
 
     void ogl_destroy_device(device_handle *h) {
         auto *dev = as_ogl_device(h);
+        dev->vertex_definitions.clear();
         const auto &ops = get_ogl_platform();
         ops.make_none_current();
         ops.destroy_context(dev->ctx);

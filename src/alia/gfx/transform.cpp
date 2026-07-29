@@ -37,20 +37,20 @@ namespace alia {
         set_current_projection_matrix(std::span<const float, 16>(&t.m[0][0], 16));
     }
 
-    void set_current_transform_matrix(std::span<const float, 16> m) {
-        std::copy(m.begin(), m.end(), current_transform_matrix.begin());
+    void set_current_transform_matrix(std::span<const float, 16> in_matrix) {
+        std::copy(in_matrix.begin(), in_matrix.end(), current_transform_matrix.begin());
     }
 
-    void get_current_transform_matrix(std::span<float, 16> m) {
-        std::copy(current_transform_matrix.begin(), current_transform_matrix.end(), m.begin());
+    void get_current_transform_matrix(std::span<float, 16> out_matrix) {
+        std::copy(current_transform_matrix.begin(), current_transform_matrix.end(), out_matrix.begin());
     }
 
-    void set_current_projection_matrix(std::span<const float, 16> m) {
-        std::copy(m.begin(), m.end(), current_projection_matrix.begin());
+    void set_current_projection_matrix(std::span<const float, 16> in_matrix) {
+        std::copy(in_matrix.begin(), in_matrix.end(), current_projection_matrix.begin());
     }
 
-    void get_current_projection_matrix(std::span<float, 16> m) {
-        std::copy(current_projection_matrix.begin(), current_projection_matrix.end(), m.begin());
+    void get_current_projection_matrix(std::span<float, 16> out_matrix) {
+        std::copy(current_projection_matrix.begin(), current_projection_matrix.end(), out_matrix.begin());
     }
 
 } // namespace alia

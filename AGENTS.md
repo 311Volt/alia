@@ -1,6 +1,6 @@
 # Graphics subsystem architecture
 
-The graphics subsystem in `src/alia/gfx/` follows a strict four-layer split.
+The graphics subsystem in `src/alia/gfx/` follows a four-layer split.
 
 ## Layers
 

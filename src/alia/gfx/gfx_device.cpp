@@ -3,8 +3,10 @@
 #include "texture.hpp"
 #include "../os/window.hpp"
 #include <array>
+#include <limits>
 #include <mutex>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -111,15 +113,13 @@ namespace alia {
             prim_type type,
             const void *vertices,
             int vertex_count,
-            int vertex_stride,
             std::span<const uint32_t> indices,
             bool indexed,
-            std::type_index vertex_type,
-            std::span<const vertex_element> elements,
+            const vertex_definition_view &definition,
             texture *primary_texture,
             bool alpha_masked
         ) {
-            if (!vertices || vertex_count <= 0 || vertex_stride <= 0)
+            if (!vertices || vertex_count <= 0 || definition.stride <= 0)
                 return;
 
             const int count_for_primitives = indexed ? static_cast<int>(indices.size()) : vertex_count;
@@ -160,9 +160,7 @@ namespace alia {
                 nullptr,
                 vertices,
                 0,
-                vertex_stride,
-                vertex_type,
-                elements
+                definition
             };
 
             if (shader) {
@@ -173,7 +171,9 @@ namespace alia {
                     dev,
                     texture_handle,
                     sampler,
-                    choose_fixed_function_texture_mode(texture_handle, alpha_masked, elements)
+                    choose_fixed_function_texture_mode(
+                        texture_handle, alpha_masked, definition.elements
+                    )
                 );
             }
 
@@ -185,7 +185,7 @@ namespace alia {
                         type,
                         vertices,
                         vertex_count,
-                        vertex_stride,
+                        definition.stride,
                         indices,
                         primitive_count
                     }
@@ -197,7 +197,7 @@ namespace alia {
                         type,
                         vertices,
                         vertex_count,
-                        vertex_stride,
+                        definition.stride,
                         primitive_count
                     }
                 );
@@ -209,16 +209,14 @@ namespace alia {
             prim_type type,
             vertex_buffer_handle *vertices,
             int vertex_count,
-            int vertex_stride,
             index_buffer_handle *indices,
             int index_count,
             bool indexed,
-            std::type_index vertex_type,
-            std::span<const vertex_element> elements,
+            const vertex_definition_view &definition,
             texture *primary_texture,
             bool alpha_masked
         ) {
-            if (!vertices || vertex_count <= 0 || vertex_stride <= 0)
+            if (!vertices || vertex_count <= 0 || definition.stride <= 0)
                 return;
 
             const int count_for_primitives = indexed ? index_count : vertex_count;
@@ -259,9 +257,7 @@ namespace alia {
                 vertices,
                 nullptr,
                 0,
-                vertex_stride,
-                vertex_type,
-                elements
+                definition
             };
 
             if (shader) {
@@ -272,7 +268,9 @@ namespace alia {
                     dev,
                     texture_handle,
                     sampler,
-                    choose_fixed_function_texture_mode(texture_handle, alpha_masked, elements)
+                    choose_fixed_function_texture_mode(
+                        texture_handle, alpha_masked, definition.elements
+                    )
                 );
             }
 
@@ -284,7 +282,7 @@ namespace alia {
                         type,
                         vertices,
                         vertex_count,
-                        vertex_stride,
+                        definition.stride,
                         indices,
                         0,
                         index_count,
@@ -299,7 +297,7 @@ namespace alia {
                         vertices,
                         0,
                         vertex_count,
-                        vertex_stride,
+                        definition.stride,
                         primitive_count
                     }
                 );
@@ -308,6 +306,29 @@ namespace alia {
         }
 
     } // namespace
+
+    namespace detail {
+
+        std::size_t register_vertex_definition(std::type_index vertex_type) {
+            static std::mutex mutex;
+            static std::unordered_map<std::type_index, std::size_t> indices;
+            static std::size_t next_index = 0;
+
+            std::lock_guard lock(mutex);
+
+            if (auto it = indices.find(vertex_type); it != indices.end())
+                return it->second;
+
+            if (next_index == std::numeric_limits<std::size_t>::max())
+                throw std::overflow_error("vertex definition index space exhausted");
+
+            const std::size_t index = next_index;
+            indices.emplace(vertex_type, index);
+            ++next_index;
+            return index;
+        }
+
+    } // namespace detail
 
     // ── Backend registry ──────────────────────────────────────────────────
 
@@ -532,86 +553,82 @@ namespace alia {
             tl_current_render_target_size = new_size;
     }
 
-    // ── Draw free functions ───────────────────────────────────────────────
+    namespace detail {
 
-    void draw_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements
-    ) {
-        submit_draw(type, vertices, count, stride, {}, false, vtx_type, elements, nullptr, false);
-    }
+        void draw_prim(
+            prim_type type, const void *vertices, int count,
+            const vertex_definition_view &definition
+        ) {
+            submit_draw(type, vertices, count, {}, false, definition, nullptr, false);
+        }
 
-    void draw_prim(
-        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements
-    ) {
-        submit_buffered_draw(type, vertices, count, stride, nullptr, 0, false, vtx_type, elements, nullptr, false);
-    }
+        void draw_prim(
+            prim_type type, vertex_buffer_handle *vertices, int count,
+            const vertex_definition_view &definition
+        ) {
+            submit_buffered_draw(type, vertices, count, nullptr, 0, false, definition, nullptr, false);
+        }
 
-    void draw_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements
-    ) {
-        submit_draw(type, vertices, count, stride, indices, true, vtx_type, elements, nullptr, false);
-    }
+        void draw_indexed_prim(
+            prim_type type, const void *vertices, int count,
+            std::span<const uint32_t> indices,
+            const vertex_definition_view &definition
+        ) {
+            submit_draw(type, vertices, count, indices, true, definition, nullptr, false);
+        }
 
-    void draw_indexed_prim(
-        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
-        index_buffer_handle *indices, int index_count,
-        std::type_index vtx_type, std::span<const vertex_element> elements
-    ) {
-        submit_buffered_draw(type, vertices, count, stride, indices, index_count, true, vtx_type, elements, nullptr, false);
-    }
+        void draw_indexed_prim(
+            prim_type type, vertex_buffer_handle *vertices, int count,
+            index_buffer_handle *indices, int index_count,
+            const vertex_definition_view &definition
+        ) {
+            submit_buffered_draw(type, vertices, count, indices, index_count, true, definition, nullptr, false);
+        }
 
-    void draw_textured_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    ) {
-        submit_draw(type, vertices, count, stride, {}, false, vtx_type, elements, &tex, false);
-    }
+        void draw_textured_prim(
+            prim_type type, const void *vertices, int count,
+            const vertex_definition_view &definition, texture &tex
+        ) {
+            submit_draw(type, vertices, count, {}, false, definition, &tex, false);
+        }
 
-    void draw_textured_prim(
-        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    ) {
-        submit_buffered_draw(type, vertices, count, stride, nullptr, 0, false, vtx_type, elements, &tex, false);
-    }
+        void draw_textured_prim(
+            prim_type type, vertex_buffer_handle *vertices, int count,
+            const vertex_definition_view &definition, texture &tex
+        ) {
+            submit_buffered_draw(type, vertices, count, nullptr, 0, false, definition, &tex, false);
+        }
 
-    void draw_alpha_masked_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    ) {
-        submit_draw(type, vertices, count, stride, {}, false, vtx_type, elements, &tex, true);
-    }
+        void draw_alpha_masked_prim(
+            prim_type type, const void *vertices, int count,
+            const vertex_definition_view &definition, texture &tex
+        ) {
+            submit_draw(type, vertices, count, {}, false, definition, &tex, true);
+        }
 
-    void draw_alpha_masked_prim(
-        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    ) {
-        submit_buffered_draw(type, vertices, count, stride, nullptr, 0, false, vtx_type, elements, &tex, true);
-    }
+        void draw_alpha_masked_prim(
+            prim_type type, vertex_buffer_handle *vertices, int count,
+            const vertex_definition_view &definition, texture &tex
+        ) {
+            submit_buffered_draw(type, vertices, count, nullptr, 0, false, definition, &tex, true);
+        }
 
-    void draw_textured_indexed_prim(
-        prim_type type, const void *vertices, int count, int stride,
-        std::span<const uint32_t> indices,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    ) {
-        submit_draw(type, vertices, count, stride, indices, true, vtx_type, elements, &tex, false);
-    }
+        void draw_textured_indexed_prim(
+            prim_type type, const void *vertices, int count,
+            std::span<const uint32_t> indices,
+            const vertex_definition_view &definition, texture &tex
+        ) {
+            submit_draw(type, vertices, count, indices, true, definition, &tex, false);
+        }
 
-    void draw_textured_indexed_prim(
-        prim_type type, vertex_buffer_handle *vertices, int count, int stride,
-        index_buffer_handle *indices, int index_count,
-        std::type_index vtx_type, std::span<const vertex_element> elements,
-        texture &tex
-    ) {
-        submit_buffered_draw(type, vertices, count, stride, indices, index_count, true, vtx_type, elements, &tex, false);
-    }
+        void draw_textured_indexed_prim(
+            prim_type type, vertex_buffer_handle *vertices, int count,
+            index_buffer_handle *indices, int index_count,
+            const vertex_definition_view &definition, texture &tex
+        ) {
+            submit_buffered_draw(type, vertices, count, indices, index_count, true, definition, &tex, false);
+        }
+
+    } // namespace detail
 
 } // namespace alia

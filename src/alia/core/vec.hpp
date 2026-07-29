@@ -2,7 +2,6 @@
 #define ALIA_CORE_VEC_HPP
 
 #include <cmath>
-#include <concepts>
 #include <type_traits>
 #include "arithmetic.hpp"
 

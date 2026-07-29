@@ -2,39 +2,22 @@
 
 #include "ogl_ops.hpp"
 #include <GL/gl.h>
-#include <any>
 #include <cstdint>
-#include <functional>
-#include <typeindex>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace alia {
 
-    struct ogl_compiled_vtx {
-        std::function<void(const void *base, int stride, bool shader_active)> setup;
-        std::function<void(bool shader_active)> teardown;
-    };
+    static const ogl_compiled_vertex_definition &get_or_compile(
+        ogl_device &device,
+        const vertex_definition_view &definition
+    ) {
+        if (device.vertex_definitions.size() <= definition.index)
+            device.vertex_definitions.resize(definition.index + 1);
 
-    static std::unordered_map<std::type_index, std::any> &vtx_cache() {
-        static std::unordered_map<std::type_index, std::any> cache;
-        return cache;
-    }
-
-    static std::type_index s_last_type{typeid(void)};
-    static const ogl_compiled_vtx *s_last_compiled = nullptr;
-
-    static const ogl_compiled_vtx &get_or_compile(std::type_index vtx_type, std::span<const vertex_element> elements) {
-        if (vtx_type == s_last_type)
-            return *s_last_compiled;
-
-        auto &cache = vtx_cache();
-        auto it = cache.find(vtx_type);
-        if (it != cache.end()) {
-            s_last_type = vtx_type;
-            s_last_compiled = &std::any_cast<const ogl_compiled_vtx &>(it->second);
-            return *s_last_compiled;
-        }
+        auto &slot = device.vertex_definitions[definition.index];
+        if (slot)
+            return *slot;
 
         struct attr_action {
             vertex_attr attribute;
@@ -42,7 +25,7 @@ namespace alia {
             int offset;
         };
         std::vector<attr_action> actions;
-        for (const auto &e : elements)
+        for (const auto &e : definition.elements)
             actions.push_back({e.attribute, e.storage, e.offset});
 
         auto attr_index = [](vertex_attr attribute) -> GLuint {
@@ -114,10 +97,11 @@ namespace alia {
             }
         };
 
-        auto [ins, _] = cache.emplace(vtx_type, ogl_compiled_vtx{std::move(setup), std::move(teardown)});
-        s_last_type = vtx_type;
-        s_last_compiled = &std::any_cast<const ogl_compiled_vtx &>(ins->second);
-        return *s_last_compiled;
+        slot.emplace(ogl_compiled_vertex_definition{
+            std::move(setup),
+            std::move(teardown)
+        });
+        return *slot;
     }
 
     static GLenum to_gl_mode(prim_type type) {
@@ -272,20 +256,26 @@ namespace alia {
         apply_ogl_sampler(*as_ogl_texture(binding.texture), binding.sampler);
     }
 
-    void ogl_bind_vertex_input(device_handle *, const vertex_input_binding &binding) {
+    void ogl_bind_vertex_input(device_handle *dev_h, const vertex_input_binding &binding) {
         if (ogl_s_glBindBuffer) {
             const GLuint buffer_id = binding.buffer ? as_ogl_vertex_buffer(binding.buffer)->buffer_id : 0;
             ogl_s_glBindBuffer(GL_ARRAY_BUFFER, buffer_id);
         }
-        const auto &compiled = get_or_compile(binding.vertex_type, binding.elements);
+        auto &device = *as_ogl_device(dev_h);
+        const auto &compiled = get_or_compile(device, binding.definition);
         const void *base = binding.buffer
             ? reinterpret_cast<const void *>(static_cast<std::uintptr_t>(binding.vertex_offset_bytes))
             : binding.vertices;
-        compiled.setup(base, binding.stride, binding.mode == vertex_input_mode::shader_attributes);
+        compiled.setup(
+            base,
+            binding.definition.stride,
+            binding.mode == vertex_input_mode::shader_attributes
+        );
     }
 
-    void ogl_unbind_vertex_input(device_handle *, const vertex_input_binding &binding) {
-        const auto &compiled = get_or_compile(binding.vertex_type, binding.elements);
+    void ogl_unbind_vertex_input(device_handle *dev_h, const vertex_input_binding &binding) {
+        auto &device = *as_ogl_device(dev_h);
+        const auto &compiled = get_or_compile(device, binding.definition);
         compiled.teardown(binding.mode == vertex_input_mode::shader_attributes);
         if (ogl_s_glBindBuffer)
             ogl_s_glBindBuffer(GL_ARRAY_BUFFER, 0);

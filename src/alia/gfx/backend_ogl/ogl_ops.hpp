@@ -7,7 +7,9 @@
 #include <GL/glext.h>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -20,8 +22,16 @@ namespace alia {
 
     // ── Concrete device/texture/swapchain structs ─────────────────────────
 
+    struct ogl_compiled_vertex_definition {
+        std::function<void(const void *base, int stride, bool shader_active)>
+            setup;
+        std::function<void(bool shader_active)> teardown;
+    };
+
     struct ogl_device : device_handle {
         void *ctx = nullptr; // opaque context handle (HGLRC on Win32)
+        std::vector<std::optional<ogl_compiled_vertex_definition>>
+            vertex_definitions;
     };
 
     struct ogl_texture : texture_handle {

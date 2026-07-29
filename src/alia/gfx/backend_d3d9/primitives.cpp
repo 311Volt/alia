@@ -1,41 +1,25 @@
 #ifdef ALIA_COMPILE_GFX_BACKEND_D3D9
 
 #include "d3d9_ops.hpp"
-#include <any>
 #include <cstring>
-#include <typeindex>
-#include <unordered_map>
 #include <vector>
 
 namespace alia {
 
-    struct d3d9_compiled_vtx {
-        IDirect3DVertexDeclaration9 *decl = nullptr;
-    };
-
-    static std::unordered_map<std::type_index, std::any> &vtx_cache() {
-        static std::unordered_map<std::type_index, std::any> cache;
-        return cache;
-    }
-
-    static std::type_index s_last_type{typeid(void)};
-    static IDirect3DVertexDeclaration9 *s_last_decl = nullptr;
-
     static IDirect3DVertexDeclaration9 *
-    get_or_compile(IDirect3DDevice9 *device, std::type_index vtx_type, std::span<const vertex_element> elements) {
-        if (vtx_type == s_last_type)
-            return s_last_decl;
+    get_or_compile(
+        d3d9_device &device,
+        const vertex_definition_view &definition
+    ) {
+        if (device.vertex_definitions.size() <= definition.index)
+            device.vertex_definitions.resize(definition.index + 1);
 
-        auto &cache = vtx_cache();
-        auto it = cache.find(vtx_type);
-        if (it != cache.end()) {
-            s_last_type = vtx_type;
-            s_last_decl = std::any_cast<d3d9_compiled_vtx &>(it->second).decl;
-            return s_last_decl;
-        }
+        auto &slot = device.vertex_definitions[definition.index];
+        if (slot)
+            return slot->declaration;
 
         std::vector<D3DVERTEXELEMENT9> d3d_elems;
-        for (const auto &e : elements) {
+        for (const auto &e : definition.elements) {
             D3DVERTEXELEMENT9 d3d_e = {};
             d3d_e.Stream = 0;
             d3d_e.Offset = static_cast<WORD>(e.offset);
@@ -58,13 +42,11 @@ namespace alia {
         d3d_elems.push_back(D3DDECL_END());
 
         IDirect3DVertexDeclaration9 *decl = nullptr;
-        if (FAILED(device->CreateVertexDeclaration(d3d_elems.data(), &decl)))
+        if (FAILED(device.device->CreateVertexDeclaration(d3d_elems.data(), &decl)))
             return nullptr;
 
-        cache[vtx_type] = d3d9_compiled_vtx{decl};
-        s_last_type = vtx_type;
-        s_last_decl = decl;
-        return decl;
+        slot.emplace(decl);
+        return slot->declaration;
     }
 
     static D3DMATRIX make_identity_matrix() {
@@ -240,19 +222,19 @@ namespace alia {
     }
 
     void d3d9_bind_vertex_input(device_handle *dev_h, const vertex_input_binding &binding) {
-        auto *device = as_d3d9_device(dev_h)->device;
-        IDirect3DVertexDeclaration9 *decl = get_or_compile(device, binding.vertex_type, binding.elements);
-        device->SetVertexDeclaration(decl);
+        auto &device = *as_d3d9_device(dev_h);
+        IDirect3DVertexDeclaration9 *decl = get_or_compile(device, binding.definition);
+        device.device->SetVertexDeclaration(decl);
         if (binding.buffer) {
             auto *buffer = as_d3d9_vertex_buffer(binding.buffer);
-            device->SetStreamSource(
+            device.device->SetStreamSource(
                 0,
                 buffer->buffer,
                 static_cast<UINT>(binding.vertex_offset_bytes),
-                static_cast<UINT>(binding.stride)
+                static_cast<UINT>(binding.definition.stride)
             );
         } else {
-            device->SetStreamSource(0, nullptr, 0, 0);
+            device.device->SetStreamSource(0, nullptr, 0, 0);
         }
     }
 

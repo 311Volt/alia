@@ -16,14 +16,7 @@
 namespace alia {
 
     struct color {
-        float r, g, b, a;
-
-        // Constructs a fully-opaque black.
-        constexpr color() : r(0), g(0), b(0), a(1) {
-        }
-        // Constructs a color from floating-point channel values in [0, 1].
-        constexpr color(float r, float g, float b, float a = 1.0f) : r(r), g(g), b(b), a(a) {
-        }
+        float r=0.f, g=0.f, b=0.f, a=0.f;
 
         // Creates a color from 8-bit RGBA channel values.
         static constexpr color from_rgba8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) {

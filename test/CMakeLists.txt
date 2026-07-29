@@ -56,6 +56,18 @@ target_link_libraries(pixel_bitmap_tests
     GTest::gtest_main
 )
 
+add_executable(vertex_definition_registry_tests
+    vertex_definition_registry_test.cpp
+    vertex_definition_registry_test_helper.cpp
+)
+
+target_link_libraries(vertex_definition_registry_tests
+    PRIVATE
+    alia
+    GTest::gtest
+    GTest::gtest_main
+)
+
 # Register tests with CTest
 include(GoogleTest)
 gtest_discover_tests(cstring_view_tests)
@@ -63,3 +75,4 @@ gtest_discover_tests(array_map_tests)
 gtest_discover_tests(soo_any_tests)
 gtest_discover_tests(any_deque_tests)
 gtest_discover_tests(pixel_bitmap_tests)
+gtest_discover_tests(vertex_definition_registry_tests)

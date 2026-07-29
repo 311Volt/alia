@@ -13,8 +13,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <typeindex>
-#include <typeinfo>
 
 namespace alia {
 
@@ -252,14 +250,20 @@ namespace alia {
         sampler_state sampler = {};
     };
 
+    struct vertex_definition_view {
+        /// Process-wide vertex-type slot used to index each device's table of
+        /// backend-compiled vertex definitions.
+        std::size_t index = 0;
+        int stride = 0;
+        std::span<const vertex_element> elements;
+    };
+
     struct vertex_input_binding {
         vertex_input_mode mode = vertex_input_mode::fixed_function;
         vertex_buffer_handle *buffer = nullptr;
         const void *vertices = nullptr;
         int vertex_offset_bytes = 0;
-        int stride = 0;
-        std::type_index vertex_type = typeid(void);
-        std::span<const vertex_element> elements;
+        vertex_definition_view definition;
     };
 
     struct draw_arrays_immediate {
