@@ -80,6 +80,8 @@ namespace alia {
         void validate_pipeline(pipeline &) const;
         void prepare_draw(const vertex_definition_view &);
         void unbind_render_target_source(texture_handle *);
+        [[nodiscard]] const graphics_backend_interface *backend() const noexcept { return swapchain_->backend_; }
+        [[nodiscard]] device_handle *device() const noexcept { return swapchain_->device_; }
 
         swapchain *swapchain_ = nullptr;
         pipeline *pipeline_ = nullptr;

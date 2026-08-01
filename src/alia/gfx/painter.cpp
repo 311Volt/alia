@@ -4,8 +4,10 @@
 
 namespace alia {
     painter::painter(gfx_device &device)
-        : colored_fx_{}, textured_fx_{}, pipeline_(device, pipeline_config{.effect = &colored_fx_}) {
+        : colored_fx_{}, textured_fx_{}, glyph_fx_{}, mask_fx_{}, pipeline_(device, pipeline_config{.effect = &colored_fx_}), device_(&device) {
         textured_fx_.texture_op = texture_operation::replace;
+        glyph_fx_.texture_op = texture_operation::modulate;
+        mask_fx_.texture_op = texture_operation::alpha_mask;
     }
     void painter::begin(frame &frame) {
         if (frame_)
@@ -19,6 +21,10 @@ namespace alia {
         colored_fx_.projection = projection;
         textured_fx_.world = transform::identity();
         textured_fx_.projection = projection;
+        glyph_fx_.world = transform::identity();
+        glyph_fx_.projection = projection;
+        mask_fx_.world = transform::identity();
+        mask_fx_.projection = projection;
     }
     void painter::end() {
         frame_ = nullptr;

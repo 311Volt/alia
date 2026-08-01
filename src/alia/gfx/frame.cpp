@@ -193,19 +193,19 @@ namespace alia {
             if (!vertices)
                 throw std::invalid_argument("frame::draw: vertex data is null");
             frame.prepare_draw(definition);
-            frame.swapchain_->backend_->upload_transient_vertex_data.get_or_throw()(frame.swapchain_->device_, vertices, vertex_count * definition.stride);
-            frame.swapchain_->backend_->draw.get_or_throw()(frame.swapchain_->device_, topology, vertex_count, 0);
+            frame.backend()->upload_transient_vertex_data.get_or_throw()(frame.device(), vertices, vertex_count * definition.stride);
+            frame.backend()->draw.get_or_throw()(frame.device(), topology, vertex_count, 0);
         }
         void frame_draw_buffered(frame &frame, vertex_buffer_handle *vertices, int vertex_count, int first_vertex, const vertex_definition_view &definition, primitive_topology topology) {
             if (vertex_count <= 0)
                 return;
             if (!vertices)
                 throw std::invalid_argument("frame::draw: vertex buffer is not valid");
-            const int total = frame.swapchain_->backend_->vertex_buffer_count.get_or_throw()(vertices);
+            const int total = frame.backend()->vertex_buffer_count.get_or_throw()(vertices);
             validate_range("frame::draw", first_vertex, vertex_count, total);
             frame.prepare_draw(definition);
-            frame.swapchain_->backend_->bind_vertex_buffer.get_or_throw()(frame.swapchain_->device_, vertices);
-            frame.swapchain_->backend_->draw.get_or_throw()(frame.swapchain_->device_, topology, vertex_count, first_vertex);
+            frame.backend()->bind_vertex_buffer.get_or_throw()(frame.device(), vertices);
+            frame.backend()->draw.get_or_throw()(frame.device(), topology, vertex_count, first_vertex);
         }
         void frame_draw_indexed_transient(frame &frame, const void *vertices, int vertex_count, std::span<const uint32_t> indices, const vertex_definition_view &definition, primitive_topology topology) {
             if (vertex_count <= 0 || indices.empty())
@@ -213,9 +213,9 @@ namespace alia {
             if (!vertices)
                 throw std::invalid_argument("frame::draw_indexed: vertex data is null");
             frame.prepare_draw(definition);
-            frame.swapchain_->backend_->upload_transient_vertex_data.get_or_throw()(frame.swapchain_->device_, vertices, vertex_count * definition.stride);
-            frame.swapchain_->backend_->upload_transient_index_data.get_or_throw()(frame.swapchain_->device_, indices);
-            frame.swapchain_->backend_->draw_indexed.get_or_throw()(frame.swapchain_->device_, topology, static_cast<int>(indices.size()), 0, 0);
+            frame.backend()->upload_transient_vertex_data.get_or_throw()(frame.device(), vertices, vertex_count * definition.stride);
+            frame.backend()->upload_transient_index_data.get_or_throw()(frame.device(), indices);
+            frame.backend()->draw_indexed.get_or_throw()(frame.device(), topology, static_cast<int>(indices.size()), 0, 0);
         }
         void frame_draw_indexed_buffered(frame &frame, vertex_buffer_handle *vertices, int vertex_count, index_buffer_handle *indices, int index_total, int first_index, int index_count, int base_vertex, const vertex_definition_view &definition, primitive_topology topology) {
             if (index_count < 0)
@@ -228,9 +228,9 @@ namespace alia {
             if (base_vertex < 0 || base_vertex >= vertex_count)
                 throw std::out_of_range("frame::draw_indexed: base vertex is outside the vertex buffer");
             frame.prepare_draw(definition);
-            frame.swapchain_->backend_->bind_vertex_buffer.get_or_throw()(frame.swapchain_->device_, vertices);
-            frame.swapchain_->backend_->bind_index_buffer.get_or_throw()(frame.swapchain_->device_, indices);
-            frame.swapchain_->backend_->draw_indexed.get_or_throw()(frame.swapchain_->device_, topology, index_count, first_index, base_vertex);
+            frame.backend()->bind_vertex_buffer.get_or_throw()(frame.device(), vertices);
+            frame.backend()->bind_index_buffer.get_or_throw()(frame.device(), indices);
+            frame.backend()->draw_indexed.get_or_throw()(frame.device(), topology, index_count, first_index, base_vertex);
         }
     } // namespace detail
 } // namespace alia

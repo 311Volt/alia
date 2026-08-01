@@ -42,8 +42,9 @@ src/alia/gfx/
   gfx_device.hpp / gfx_device.cpp  — L1/L3 for device, swapchain, and backend registry
   pipeline.hpp / pipeline.cpp      — L1/L3 immutable and dynamic pipeline objects
   frame.hpp / frame.cpp            — L1/L2/L3 frame lifetime, target/clear commands, and draw validation
-  painter.hpp / painter.cpp        — L1/L3 persistent 2D rect/line/textured-rect renderer
+  painter.hpp / painter.cpp        — L1/L3 persistent 2D rect/line/textured-rect/text renderer
   texture.hpp / texture.cpp        — L1/L2/L3 for texture (lock template, upload, download, clone)
+  text/                            — FreeType loading, glyph atlas cache, and baked masks; `painter::draw_text` bodies live here because the pimpl types are complete in `font.cpp`
   primitives.hpp / primitives.cpp  — disabled historical immediate-helper API
   backend_d3d9/                    — L4 D3D9 implementation
     d3d9_ops.hpp                   — concrete structs + cast helpers + all op declarations
@@ -71,7 +72,7 @@ Do **not** use `reason_unsupported` for "this backend doesn't implement X yet" �
 
 `swapchain::begin_frame()` creates a move-only `frame`; a frame ends with `frame::present()` or, without presenting, its destructor. It initially targets the swapchain backbuffer without clearing. `set_target()` selects the backbuffer (with depth); `set_target(texture, level)` selects a render-target texture mip (without depth); `clear()` is an independent command. A pipeline must be selected before the first draw.
 
-Depth clears and depth-enabled pipelines are valid only while the backbuffer is selected. Dynamic pipeline depth changes are checked again just before draw. Resource bindings persist for the frame across pipeline switches; when selecting a texture target, frame-managed bindings of that same texture are defensively removed. Shader-owned samplers must still avoid sampling the current render target. `painter` owns its effects and dynamic pipeline across frames; `begin(frame)` captures the current target size and `end()` is its future batching flush boundary.
+Depth clears and depth-enabled pipelines are valid only while the backbuffer is selected. Dynamic pipeline depth changes are checked again just before draw. Resource bindings persist for the frame across pipeline switches; when selecting a texture target, frame-managed bindings of that same texture are defensively removed. Shader-owned samplers must still avoid sampling the current render target. `painter` owns its effects and dynamic pipeline across frames; `begin(frame)` captures the current target size and `end()` is its future batching flush boundary. Its glyph effect uses `modulate` for the hardware atlas, while its mask effect uses `alpha_mask` for baked text textures. `text` and `hardware_glyph_buffer` grant `painter` friendship so the `painter::draw_text` bodies can live in `font.cpp`, where their pimpl types are complete.
 
 ## Adding a new backend operation
 

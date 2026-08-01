@@ -11,6 +11,8 @@
 
 namespace alia {
 
+    class painter;
+
     struct font_metrics {
         float ascender = 0.0f;
         float descender = 0.0f;
@@ -85,7 +87,7 @@ namespace alia {
         void clear();
 
     private:
-        // friend void draw_text(font &, std::string_view, color, vec2f, hardware_glyph_buffer *);
+        friend class painter;
 
         std::unique_ptr<detail::hardware_glyph_buffer_impl> impl_;
     };
@@ -111,19 +113,15 @@ namespace alia {
         text &set_antialiasing(bool enabled);
         text &set_kerning(bool enabled);
 
-        // Disabled pending the render-pass text rebuild.
-        // void draw(vec2i position, color text_color = white);
-
     private:
+        friend class painter;
+
         std::unique_ptr<detail::text_impl> impl_;
     };
 
     [[nodiscard]] ttf_font load_ttf_font(std::string_view filename, int pixel_height = 32);
 
     [[nodiscard]] vec2f measure_text(font &source, std::string_view text);
-
-    // Disabled pending the render-pass text rebuild.
-    // void draw_text(font &source, std::string_view text, color color, vec2f position, hardware_glyph_buffer *glyph_buffer = nullptr);
 
 } // namespace alia
 
