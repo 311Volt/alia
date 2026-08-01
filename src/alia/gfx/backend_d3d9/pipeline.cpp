@@ -169,7 +169,7 @@ namespace alia {
         device.device->SetRenderState(D3DRS_LIGHTING, FALSE);
         device.current_pipeline = pipeline;
     }
-    bool d3d9_begin_render_pass(device_handle *h, const render_pass_begin_info &info) {
+    bool d3d9_set_render_target(device_handle *h, const render_target_info &info) {
         auto &device = *as_d3d9_device(h);
         HRESULT result = E_FAIL;
         if (info.swapchain) {
@@ -191,20 +191,21 @@ namespace alia {
         }
         if (FAILED(result)) return false;
         d3d9_set_viewport(h, {{}, info.target_size, 0.0f, 1.0f});
-        DWORD clear_flags = 0;
-        DWORD clear_color = 0;
-        if (info.clear_color) { clear_flags |= D3DCLEAR_TARGET; clear_color = to_d3d_color(*info.clear_color); }
-        if (info.clear_depth) clear_flags |= D3DCLEAR_ZBUFFER;
-        if (clear_flags && FAILED(device.device->Clear(0, nullptr, clear_flags, clear_color, info.clear_depth.value_or(1.0f), 0))) return false;
-        device.pass_active = true; device.pass_size = info.target_size; device.pass_has_depth = info.swapchain != nullptr;
         return true;
     }
-    void d3d9_end_render_pass(device_handle *h) {
+    bool d3d9_clear(device_handle *h, const std::optional<color> &clear_color, const std::optional<float> &clear_depth) {
         auto &device = *as_d3d9_device(h);
+        DWORD clear_flags = 0;
+        DWORD clear_color_value = 0;
+        if (clear_color) { clear_flags |= D3DCLEAR_TARGET; clear_color_value = to_d3d_color(*clear_color); }
+        if (clear_depth) clear_flags |= D3DCLEAR_ZBUFFER;
+        if (clear_flags && FAILED(device.device->Clear(0, nullptr, clear_flags, clear_color_value, clear_depth.value_or(1.0f), 0))) return false;
+        return true;
+    }
+    void d3d9_reset_frame_state(d3d9_device &device) {
         device.device->SetStreamSource(0, nullptr, 0, 0); device.device->SetIndices(nullptr);
         device.current_pipeline = nullptr; device.current_vb = nullptr; device.current_ib = nullptr;
         device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; device.transient_indices = nullptr; device.transient_index_count = 0;
-        device.pass_active = false; device.pass_size = {}; device.pass_has_depth = false;
     }
     void d3d9_set_viewport(device_handle *h, const render_viewport &viewport) {
         D3DVIEWPORT9 value{static_cast<DWORD>(viewport.origin.x), static_cast<DWORD>(viewport.origin.y), static_cast<DWORD>(viewport.size.x), static_cast<DWORD>(viewport.size.y), viewport.min_depth, viewport.max_depth};

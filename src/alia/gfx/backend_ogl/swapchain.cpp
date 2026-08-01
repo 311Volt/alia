@@ -12,6 +12,7 @@ namespace alia {
             return nullptr;
 
         auto *sc = new ogl_swapchain;
+        sc->owner = dev;
         sc->native = native_handle;
         sc->surface = surface;
         sc->ctx = dev->ctx;
@@ -30,7 +31,8 @@ namespace alia {
         get_ogl_platform().make_current(sc->surface, sc->ctx);
     }
 
-    void ogl_swapchain_end_frame(swapchain_handle *) {
+    void ogl_swapchain_end_frame(swapchain_handle *h) {
+        ogl_reset_frame_state(*as_ogl_swapchain(h)->owner);
     }
 
     void ogl_swapchain_present(swapchain_handle *h) {

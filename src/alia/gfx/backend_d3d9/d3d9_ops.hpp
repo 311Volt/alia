@@ -51,9 +51,6 @@ namespace alia {
         int transient_vertex_bytes = 0;
         const uint32_t *transient_indices = nullptr;
         int transient_index_count = 0;
-        bool pass_active = false;
-        vec2i pass_size = {};
-        bool pass_has_depth = false;
     };
     struct d3d9_texture : texture_handle {
         IDirect3DDevice9 *device = nullptr;
@@ -79,6 +76,7 @@ namespace alia {
         buffer_usage usage = buffer_usage::static_mesh;
     };
     struct d3d9_swapchain : swapchain_handle {
+        d3d9_device *owner = nullptr;
         IDirect3DDevice9 *device = nullptr;
         IDirect3DSwapChain9 *swap_chain = nullptr;
         IDirect3DSurface9 *depth_stencil = nullptr;
@@ -145,7 +143,7 @@ namespace alia {
     swapchain_handle *d3d9_create_swapchain(device_handle *, void *, vec2i); void d3d9_destroy_swapchain(swapchain_handle *);
     void d3d9_swapchain_begin_frame(swapchain_handle *); void d3d9_swapchain_end_frame(swapchain_handle *); void d3d9_swapchain_present(swapchain_handle *); void d3d9_swapchain_on_resize(swapchain_handle *, vec2i);
     pipeline_handle *d3d9_create_pipeline(device_handle *, const pipeline_desc &); void d3d9_destroy_pipeline(pipeline_handle *); void d3d9_update_pipeline(pipeline_handle *, const pipeline_desc &); void d3d9_bind_pipeline(device_handle *, pipeline_handle *);
-    bool d3d9_begin_render_pass(device_handle *, const render_pass_begin_info &); void d3d9_end_render_pass(device_handle *); void d3d9_set_viewport(device_handle *, const render_viewport &);
+    bool d3d9_set_render_target(device_handle *, const render_target_info &); bool d3d9_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void d3d9_reset_frame_state(d3d9_device &); void d3d9_set_viewport(device_handle *, const render_viewport &);
     void d3d9_bind_vertex_buffer(device_handle *, vertex_buffer_handle *); void d3d9_bind_index_buffer(device_handle *, index_buffer_handle *);
     void d3d9_upload_transient_vertex_data(device_handle *, const void *, int); void d3d9_upload_transient_index_data(device_handle *, std::span<const uint32_t>);
     void d3d9_bind_resources(device_handle *, const texture_sampler_binding &); void d3d9_draw(device_handle *, primitive_topology, int, int); void d3d9_draw_indexed(device_handle *, primitive_topology, int, int, int);

@@ -88,7 +88,7 @@ namespace alia {
         swapchain_handle *handle = backend_->create_swapchain.get_or_throw()(device_, config.target.native_handle(), size);
         if (!handle)
             throw std::runtime_error("gfx_device::create_swapchain: backend failed to create swapchain");
-        return swapchain(handle, backend_.get(), size);
+        return swapchain(handle, backend_.get(), device_, size);
     }
     vec2f gfx_device::pixel_center_offset() const { return backend_ ? backend_->pixel_center_offset : vec2f{}; }
 
@@ -98,13 +98,15 @@ namespace alia {
     }
     swapchain::swapchain(swapchain &&other) noexcept
         : handle_(std::exchange(other.handle_, nullptr)), backend_(std::exchange(other.backend_, nullptr)),
-          size_(std::exchange(other.size_, {})), frame_active_(std::exchange(other.frame_active_, false)) {}
+          device_(std::exchange(other.device_, nullptr)), size_(std::exchange(other.size_, {})),
+          frame_active_(std::exchange(other.frame_active_, false)) {}
     swapchain &swapchain::operator=(swapchain &&other) noexcept {
         if (this != &other) {
             if (handle_)
                 backend_->destroy_swapchain.get_or_throw()(handle_);
             handle_ = std::exchange(other.handle_, nullptr);
             backend_ = std::exchange(other.backend_, nullptr);
+            device_ = std::exchange(other.device_, nullptr);
             size_ = std::exchange(other.size_, {});
             frame_active_ = std::exchange(other.frame_active_, false);
         }

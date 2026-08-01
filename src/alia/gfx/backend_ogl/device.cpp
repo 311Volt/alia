@@ -30,8 +30,8 @@ namespace alia {
 
     void ogl_destroy_device(device_handle *h) {
         auto *dev = as_ogl_device(h);
-        if (dev->pass_fbo && ogl_s_glDeleteFramebuffers)
-            ogl_s_glDeleteFramebuffers(1, &dev->pass_fbo);
+        if (dev->target_fbo && ogl_s_glDeleteFramebuffers)
+            ogl_s_glDeleteFramebuffers(1, &dev->target_fbo);
         dev->vertex_definitions.clear();
         const auto &ops = get_ogl_platform();
         ops.make_none_current();

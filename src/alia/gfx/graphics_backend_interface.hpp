@@ -1,5 +1,5 @@
-#ifndef GRAPHICS_BACKEND_INTERFACE_B17C3B83_2C66_4D0F_908A_037719970A33
-#define GRAPHICS_BACKEND_INTERFACE_B17C3B83_2C66_4D0F_908A_037719970A33
+#ifndef GRAPHICS_BACKEND_INTERFACE_BB6C9C63_C0AA_47D0_9CA6_1F400BE39F06
+#define GRAPHICS_BACKEND_INTERFACE_BB6C9C63_C0AA_47D0_9CA6_1F400BE39F06
 
 #include "../core/color.hpp"
 #include "../core/rect.hpp"
@@ -192,18 +192,16 @@ namespace alia {
         depth_state depth = {};
         raster_state raster = {};
     };
-    struct render_pass_begin_info {
+    struct render_target_info {
         swapchain_handle *swapchain = nullptr;
         texture_handle *target_texture = nullptr;
         int target_level = 0;
         vec2i target_size = {};
-        std::optional<color> clear_color;
-        std::optional<float> clear_depth;
     };
 
     // Bind and upload operations are record-only. Backends consume their
     // recorded sources at draw time. Transient data remains valid through the
-    // next same-kind bind/upload or end_render_pass.
+    // next same-kind bind/upload or swapchain_end_frame.
     struct graphics_backend_interface {
         gfx_backend id = gfx_backend::auto_;
         vec2f pixel_center_offset = {};
@@ -256,8 +254,8 @@ namespace alia {
         gfx_backend_op<void(pipeline_handle *)> destroy_pipeline;
         gfx_backend_op<void(pipeline_handle *, const pipeline_desc &)> update_pipeline;
         gfx_backend_op<void(device_handle *, pipeline_handle *)> bind_pipeline;
-        gfx_backend_op<bool(device_handle *, const render_pass_begin_info &)> begin_render_pass;
-        gfx_backend_op<void(device_handle *)> end_render_pass;
+        gfx_backend_op<bool(device_handle *, const render_target_info &)> set_render_target;
+        gfx_backend_op<bool(device_handle *, const std::optional<color> &, const std::optional<float> &)> clear;
         gfx_backend_op<void(device_handle *, const render_viewport &)> set_viewport;
         gfx_backend_op<void(device_handle *, vertex_buffer_handle *)> bind_vertex_buffer;
         gfx_backend_op<void(device_handle *, index_buffer_handle *)> bind_index_buffer;
@@ -274,4 +272,4 @@ namespace alia {
 
 } // namespace alia
 
-#endif
+#endif /* GRAPHICS_BACKEND_INTERFACE_BB6C9C63_C0AA_47D0_9CA6_1F400BE39F06 */

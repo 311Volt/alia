@@ -1,7 +1,7 @@
 #include "alia/os/window.hpp"
 #include "alia/gfx/gfx_device.hpp"
 #include "alia/gfx/pipeline.hpp"
-#include "alia/gfx/render_pass.hpp"
+#include "alia/gfx/frame.hpp"
 #include "alia/gfx/prim_buffers.hpp"
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/transform.hpp"
@@ -318,16 +318,12 @@ int main(int argc, char **argv) {
             transform_constant.set_value(model);
 
             auto frame = swapchain.begin_frame();
-            {
-                auto pass = frame.begin_render_pass(pipeline, {
-                    .clear_color = alia::color(0.025f, 0.03f, 0.04f, 1.0f),
-                    .clear_depth = 1.0f,
-                });
-                if (use_buffered)
-                    pass.draw_indexed(gpu_vertices, gpu_indices);
-                else
-                    pass.draw_indexed(vertex_span, index_span);
-            }
+            frame.clear(alia::color(0.025f, 0.03f, 0.04f, 1.0f), 1.0f);
+            frame.set_pipeline(pipeline);
+            if (use_buffered)
+                frame.draw_indexed(gpu_vertices, gpu_indices);
+            else
+                frame.draw_indexed(vertex_span, index_span);
             frame.present();
         }
     } catch (const std::exception &e) {

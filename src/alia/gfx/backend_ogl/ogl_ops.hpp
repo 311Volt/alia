@@ -29,7 +29,7 @@ namespace alia {
     struct ogl_index_buffer;
     struct ogl_device : device_handle {
         void *ctx = nullptr;
-        std::vector<std::optional<ogl_compiled_vertex_definition>> vertex_definitions;
+        std::vector<std::unique_ptr<ogl_compiled_vertex_definition>> vertex_definitions;
         ogl_pipeline *current_pipeline = nullptr;
         ogl_vertex_buffer *current_vb = nullptr;
         ogl_index_buffer *current_ib = nullptr;
@@ -37,13 +37,10 @@ namespace alia {
         int transient_vertex_bytes = 0;
         const uint32_t *transient_indices = nullptr;
         int transient_index_count = 0;
-        bool pass_active = false;
-        vec2i pass_size = {};
-        bool pass_has_depth = false;
         const ogl_compiled_vertex_definition *applied_layout = nullptr;
         bool applied_shader_active = false;
         const void *applied_base = nullptr;
-        GLuint pass_fbo = 0;
+        GLuint target_fbo = 0;
     };
     struct ogl_texture : texture_handle {
         GLuint tex_id = 0;
@@ -57,7 +54,7 @@ namespace alia {
     };
     struct ogl_vertex_buffer : vertex_buffer_handle { GLuint buffer_id = 0; int stride = 0, count = 0; buffer_usage usage = buffer_usage::static_mesh; };
     struct ogl_index_buffer : index_buffer_handle { GLuint buffer_id = 0; int count = 0; buffer_usage usage = buffer_usage::static_mesh; };
-    struct ogl_swapchain : swapchain_handle { void *native = nullptr; void *surface = nullptr; void *ctx = nullptr; vec2i size = {}; };
+    struct ogl_swapchain : swapchain_handle { ogl_device *owner = nullptr; void *native = nullptr; void *surface = nullptr; void *ctx = nullptr; vec2i size = {}; };
     struct ogl_stored_shader_constant {
         shader_constant_slot slot = {};
         shader_constant_value_type type = shader_constant_value_type::float_1;
@@ -111,7 +108,7 @@ namespace alia {
     swapchain_handle *ogl_create_swapchain(device_handle *, void *, vec2i); void ogl_destroy_swapchain(swapchain_handle *);
     void ogl_swapchain_begin_frame(swapchain_handle *); void ogl_swapchain_end_frame(swapchain_handle *); void ogl_swapchain_present(swapchain_handle *); void ogl_swapchain_on_resize(swapchain_handle *, vec2i);
     pipeline_handle *ogl_create_pipeline(device_handle *, const pipeline_desc &); void ogl_destroy_pipeline(pipeline_handle *); void ogl_update_pipeline(pipeline_handle *, const pipeline_desc &); void ogl_bind_pipeline(device_handle *, pipeline_handle *);
-    bool ogl_begin_render_pass(device_handle *, const render_pass_begin_info &); void ogl_end_render_pass(device_handle *); void ogl_set_viewport(device_handle *, const render_viewport &);
+    bool ogl_set_render_target(device_handle *, const render_target_info &); bool ogl_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void ogl_reset_frame_state(ogl_device &); void ogl_set_viewport(device_handle *, const render_viewport &);
     void ogl_bind_vertex_buffer(device_handle *, vertex_buffer_handle *); void ogl_bind_index_buffer(device_handle *, index_buffer_handle *);
     void ogl_upload_transient_vertex_data(device_handle *, const void *, int); void ogl_upload_transient_index_data(device_handle *, std::span<const uint32_t>);
     void ogl_bind_resources(device_handle *, const texture_sampler_binding &); void ogl_draw(device_handle *, primitive_topology, int, int); void ogl_draw_indexed(device_handle *, primitive_topology, int, int, int);

@@ -87,8 +87,8 @@ namespace alia {
         iface.destroy_pipeline            = {d3d9_destroy_pipeline};
         iface.update_pipeline             = {d3d9_update_pipeline};
         iface.bind_pipeline               = {d3d9_bind_pipeline};
-        iface.begin_render_pass           = {d3d9_begin_render_pass};
-        iface.end_render_pass             = {d3d9_end_render_pass};
+        iface.set_render_target           = {d3d9_set_render_target};
+        iface.clear                       = {d3d9_clear};
         iface.set_viewport                = {d3d9_set_viewport};
         iface.bind_vertex_buffer          = {d3d9_bind_vertex_buffer};
         iface.bind_index_buffer           = {d3d9_bind_index_buffer};

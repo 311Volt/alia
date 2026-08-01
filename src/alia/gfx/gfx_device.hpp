@@ -60,10 +60,11 @@ namespace alia {
         friend class frame;
         swapchain_handle *handle_ = nullptr;
         const graphics_backend_interface *backend_ = nullptr;
+        device_handle *device_ = nullptr;
         vec2i size_ = {};
         bool frame_active_ = false;
-        explicit swapchain(swapchain_handle *handle, const graphics_backend_interface *backend, vec2i size) noexcept
-            : handle_(handle), backend_(backend), size_(size) {}
+        explicit swapchain(swapchain_handle *handle, const graphics_backend_interface *backend, device_handle *device, vec2i size) noexcept
+            : handle_(handle), backend_(backend), device_(device), size_(size) {}
     };
 
     inline thread_local gfx_device *tl_current_device = nullptr;

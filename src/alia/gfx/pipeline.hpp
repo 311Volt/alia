@@ -17,7 +17,7 @@ namespace alia {
         raster_state raster = {};
     };
 
-    class render_pass;
+    class frame;
 
     class pipeline {
     public:
@@ -55,7 +55,7 @@ namespace alia {
         pipeline_desc desc_ = {};
         bool dynamic_ = false;
 
-        friend class render_pass;
+        friend class frame;
     };
 
     class dynamic_pipeline : public pipeline {
@@ -72,7 +72,7 @@ namespace alia {
 
     private:
         void set_vertex_definition(const vertex_definition_view &definition);
-        friend class render_pass;
+        friend class frame;
     };
 
 } // namespace alia

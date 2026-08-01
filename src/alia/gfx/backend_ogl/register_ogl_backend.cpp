@@ -257,8 +257,8 @@ namespace alia {
         iface.destroy_pipeline             = {ogl_destroy_pipeline};
         iface.update_pipeline              = {ogl_update_pipeline};
         iface.bind_pipeline                = {ogl_bind_pipeline};
-        iface.begin_render_pass            = {ogl_begin_render_pass};
-        iface.end_render_pass              = {ogl_end_render_pass};
+        iface.set_render_target            = {ogl_set_render_target};
+        iface.clear                        = {ogl_clear};
         iface.set_viewport                 = {ogl_set_viewport};
         iface.bind_vertex_buffer           = {ogl_bind_vertex_buffer};
         iface.bind_index_buffer            = {ogl_bind_index_buffer};

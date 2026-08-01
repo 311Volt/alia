@@ -1,5 +1,5 @@
-#ifndef FONT_E3608192_E499_42CD_B4DB_D6397F113B99
-#define FONT_E3608192_E499_42CD_B4DB_D6397F113B99
+#ifndef FONT_A9A7DDC3_2E5E_40F5_BD9A_A4D226FAD5B4
+#define FONT_A9A7DDC3_2E5E_40F5_BD9A_A4D226FAD5B4
 
 #include "alia/core/color.hpp"
 #include "alia/core/rect.hpp"
@@ -127,4 +127,4 @@ namespace alia {
 
 } // namespace alia
 
-#endif /* FONT_E3608192_E499_42CD_B4DB_D6397F113B99 */
+#endif /* FONT_A9A7DDC3_2E5E_40F5_BD9A_A4D226FAD5B4 */

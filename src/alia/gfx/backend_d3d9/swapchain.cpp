@@ -28,6 +28,7 @@ namespace alia {
     swapchain_handle *d3d9_create_swapchain(device_handle *dev_h, void *native_handle, vec2i size) {
         auto *dev = as_d3d9_device(dev_h);
         auto *swapchain = new d3d9_swapchain;
+        swapchain->owner = dev;
         swapchain->device = dev->device;
         swapchain->hwnd = static_cast<HWND>(native_handle);
         swapchain->size = size;
@@ -46,7 +47,11 @@ namespace alia {
         delete swapchain;
     }
     void d3d9_swapchain_begin_frame(swapchain_handle *h) { as_d3d9_swapchain(h)->device->BeginScene(); }
-    void d3d9_swapchain_end_frame(swapchain_handle *h) { as_d3d9_swapchain(h)->device->EndScene(); }
+    void d3d9_swapchain_end_frame(swapchain_handle *h) {
+        auto *swapchain = as_d3d9_swapchain(h);
+        d3d9_reset_frame_state(*swapchain->owner);
+        swapchain->device->EndScene();
+    }
     void d3d9_swapchain_present(swapchain_handle *h) { as_d3d9_swapchain(h)->swap_chain->Present(nullptr, nullptr, nullptr, nullptr, 0); }
     void d3d9_swapchain_on_resize(swapchain_handle *h, vec2i new_size) {
         auto *swapchain = as_d3d9_swapchain(h);

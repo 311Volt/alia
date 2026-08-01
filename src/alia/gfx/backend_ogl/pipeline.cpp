@@ -49,7 +49,8 @@ namespace alia {
                     }
                 }
             };
-            slot.emplace(ogl_compiled_vertex_definition{std::move(setup), std::move(teardown)});
+            slot = std::make_unique<ogl_compiled_vertex_definition>(
+                ogl_compiled_vertex_definition{std::move(setup), std::move(teardown)});
             return *slot;
         }
         GLenum to_gl(primitive_topology topology) {
@@ -127,31 +128,33 @@ namespace alia {
         }
         device.current_pipeline = pipeline;
     }
-    bool ogl_begin_render_pass(device_handle *h, const render_pass_begin_info &info) {
+    bool ogl_set_render_target(device_handle *h, const render_target_info &info) {
         auto &device = *as_ogl_device(h);
         if (info.target_texture) {
             if (!fbo_available()) return false;
-            if (!device.pass_fbo) ogl_s_glGenFramebuffers(1, &device.pass_fbo);
-            if (!device.pass_fbo) return false;
-            ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, device.pass_fbo);
+            if (!device.target_fbo) ogl_s_glGenFramebuffers(1, &device.target_fbo);
+            if (!device.target_fbo) return false;
+            ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, device.target_fbo);
             ogl_s_glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, as_ogl_texture(info.target_texture)->tex_id, info.target_level);
             if (ogl_s_glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0); return false; }
         } else if (fbo_available()) {
             ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
         glViewport(0, 0, info.target_size.x, info.target_size.y);
-        GLbitfield mask = 0;
-        if (info.clear_color) { glClearColor(info.clear_color->r, info.clear_color->g, info.clear_color->b, info.clear_color->a); mask |= GL_COLOR_BUFFER_BIT; }
-        if (info.clear_depth) { GLboolean write_mask = GL_FALSE; glGetBooleanv(GL_DEPTH_WRITEMASK, &write_mask); glDepthMask(GL_TRUE); glClearDepth(*info.clear_depth); mask |= GL_DEPTH_BUFFER_BIT; glClear(mask); glDepthMask(write_mask); mask = 0; }
-        if (mask) glClear(mask);
-        device.pass_active = true; device.pass_size = info.target_size; device.pass_has_depth = info.swapchain != nullptr;
         return true;
     }
-    void ogl_end_render_pass(device_handle *h) {
-        auto &device = *as_ogl_device(h); clear_applied_layout(device);
+    bool ogl_clear(device_handle *, const std::optional<color> &clear_color, const std::optional<float> &clear_depth) {
+        GLbitfield mask = 0;
+        if (clear_color) { glClearColor(clear_color->r, clear_color->g, clear_color->b, clear_color->a); mask |= GL_COLOR_BUFFER_BIT; }
+        if (clear_depth) { GLboolean write_mask = GL_FALSE; glGetBooleanv(GL_DEPTH_WRITEMASK, &write_mask); glDepthMask(GL_TRUE); glClearDepth(*clear_depth); mask |= GL_DEPTH_BUFFER_BIT; glClear(mask); glDepthMask(write_mask); mask = 0; }
+        if (mask) glClear(mask);
+        return true;
+    }
+    void ogl_reset_frame_state(ogl_device &device) {
+        clear_applied_layout(device);
         if (ogl_s_glBindBuffer) { ogl_s_glBindBuffer(GL_ARRAY_BUFFER, 0); ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); }
         if (fbo_available()) ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        device.current_pipeline = nullptr; device.current_vb = nullptr; device.current_ib = nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; device.transient_indices = nullptr; device.transient_index_count = 0; device.pass_active = false; device.pass_size = {}; device.pass_has_depth = false;
+        device.current_pipeline = nullptr; device.current_vb = nullptr; device.current_ib = nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; device.transient_indices = nullptr; device.transient_index_count = 0;
     }
     void ogl_set_viewport(device_handle *, const render_viewport &viewport) { glViewport(viewport.origin.x, viewport.origin.y, viewport.size.x, viewport.size.y); glDepthRange(viewport.min_depth, viewport.max_depth); }
     void ogl_bind_vertex_buffer(device_handle *h, vertex_buffer_handle *buffer) { auto &device = *as_ogl_device(h); device.current_vb = buffer ? as_ogl_vertex_buffer(buffer) : nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; }

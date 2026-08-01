@@ -6,9 +6,9 @@ The graphics subsystem in `src/alia/gfx/` follows a four-layer split.
 
 | Layer | Location | Role |
 |-------|----------|------|
-| L1 | `*.hpp` (public) | User-facing API: `texture`, `gfx_device`, `swapchain`, `pipeline`, `dynamic_pipeline`, `frame`, `render_pass`, `simplified_render_pass` |
-| L2 | `*.hpp` (detail/templates) | Type-erasure shims: `texture::lock<TPixel>` → `lock_impl`, and `render_pass::draw<TVertex>` → L3 submission helpers |
-| L3 | `*.cpp` (backend-agnostic) | Device/pipeline/pass lifetime and validation, texture format dispatch, and vertex-definition registry; calls into L4 |
+| L1 | `*.hpp` (public) | User-facing API: `texture`, `gfx_device`, `swapchain`, `pipeline`, `dynamic_pipeline`, `frame`, `painter` |
+| L2 | `*.hpp` (detail/templates) | Type-erasure shims: `texture::lock<TPixel>` → `lock_impl`, and `frame::draw<TVertex>` → L3 submission helpers |
+| L3 | `*.cpp` (backend-agnostic) | Device/pipeline/frame lifetime and validation, texture format dispatch, and vertex-definition registry; calls into L4 |
 | L4 | `graphics_backend_interface` | Single function-pointer table per device; one slot per backend operation |
 
 ## Key types
@@ -21,7 +21,7 @@ The graphics subsystem in `src/alia/gfx/` follows a four-layer split.
 
 **Pipelines and effects** — `pipeline` is immutable and contains its vertex layout, effect/program selection, blend/depth/raster state. `dynamic_pipeline` has the same backend object but may change those fields; it is rebound before every draw, so mutations take effect at draw granularity. `pipeline_config::effect` is non-owning on both alternatives: `const basic_effect*` for fixed function and `shader_program*` for programmable drawing. The referenced object must outlive the pipeline. `basic_effect` owns mutable fixed-function world/projection matrices; shader programs retain their own constants and sampler records.
 
-**Recorded geometry sources** — L4 `bind_vertex_buffer`, `bind_index_buffer`, and transient upload operations only record the current source. Actual API binding and layout application occur in `draw`/`draw_indexed`. Transient pointers remain valid through the next bind/upload of the same kind or `end_render_pass`; L3 enforces this lifetime. Every backend clears this shadow state at `end_render_pass`.
+**Recorded geometry sources** — L4 `bind_vertex_buffer`, `bind_index_buffer`, and transient upload operations only record the current source. Actual API binding and layout application occur in `draw`/`draw_indexed`. Transient pointers remain valid through the next bind/upload of the same kind or `swapchain_end_frame`; L3 enforces this lifetime. Every backend clears this shadow state at frame end.
 
 **`created_device`** — returned by each backend's factory function after the device is created and hardware capabilities are probed:
 ```cpp
@@ -41,8 +41,8 @@ src/alia/gfx/
   graphics_backend_interface.hpp   — L4 types (opaque handles, operation slots, full interface struct)
   gfx_device.hpp / gfx_device.cpp  — L1/L3 for device, swapchain, and backend registry
   pipeline.hpp / pipeline.cpp      — L1/L3 immutable and dynamic pipeline objects
-  render_pass.hpp / render_pass.cpp — L1/L2/L3 frame/pass RAII and draw validation
-  simplified_render_pass.hpp/.cpp  — L1/L3 2D rect/line/textured-rect convenience layer
+  frame.hpp / frame.cpp            — L1/L2/L3 frame lifetime, target/clear commands, and draw validation
+  painter.hpp / painter.cpp        — L1/L3 persistent 2D rect/line/textured-rect renderer
   texture.hpp / texture.cpp        — L1/L2/L3 for texture (lock template, upload, download, clone)
   primitives.hpp / primitives.cpp  — disabled historical immediate-helper API
   backend_d3d9/                    — L4 D3D9 implementation
@@ -67,11 +67,11 @@ src/alia/gfx/
 
 Do **not** use `reason_unsupported` for "this backend doesn't implement X yet" — only for genuine hardware-level gaps.
 
-## Frames and render passes
+## Frames and painter
 
-`swapchain::begin_frame()` creates a move-only `frame`; a frame ends with `frame::present()` or, without presenting, its destructor. A frame may own one active `render_pass` at a time. Pass creation always takes its initial `pipeline`, binds it immediately, and either targets the swapchain backbuffer (with depth) or a render-target texture mip (without depth).
+`swapchain::begin_frame()` creates a move-only `frame`; a frame ends with `frame::present()` or, without presenting, its destructor. It initially targets the swapchain backbuffer without clearing. `set_target()` selects the backbuffer (with depth); `set_target(texture, level)` selects a render-target texture mip (without depth); `clear()` is an independent command. A pipeline must be selected before the first draw.
 
-`render_pass_desc::clear_depth` and depth-enabled pipelines are valid only on swapchain passes. Dynamic pipeline depth changes are checked again just before draw. Resource bindings persist within a pass across pipeline switches. `render_pass::end()` is idempotent, and `frame::present()` rejects an active pass.
+Depth clears and depth-enabled pipelines are valid only while the backbuffer is selected. Dynamic pipeline depth changes are checked again just before draw. Resource bindings persist for the frame across pipeline switches; when selecting a texture target, frame-managed bindings of that same texture are defensively removed. Shader-owned samplers must still avoid sampling the current render target. `painter` owns its effects and dynamic pipeline across frames; `begin(frame)` captures the current target size and `end()` is its future batching flush boundary.
 
 ## Adding a new backend operation
 

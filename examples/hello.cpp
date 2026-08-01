@@ -1,8 +1,8 @@
 #include "alia/os/window.hpp"
 #include "alia/gfx/gfx_device.hpp"
 #include "alia/gfx/pipeline.hpp"
-#include "alia/gfx/render_pass.hpp"
-#include "alia/gfx/simplified_render_pass.hpp"
+#include "alia/gfx/frame.hpp"
+#include "alia/gfx/painter.hpp"
 #include "alia/gfx/bitmap/image_io.hpp"
 #include "alia/events/event_queue.hpp"
 
@@ -38,6 +38,7 @@ int main(int argc, char **argv) {
             {{700.0f, 500.0f}, {0.15f, 0.15f, 1.0f}},
         };
         alia::texture checker(device, alia::load_image("./resources/test.png"));
+        alia::painter painter(device);
 
         bool running = true;
         while (running) {
@@ -50,19 +51,17 @@ int main(int argc, char **argv) {
             }
 
             auto frame = swapchain.begin_frame();
-            {
-                auto pass = frame.begin_render_pass(triangle_pipeline, {.clear_color = alia::light_blue});
-                triangle_effect.projection = alia::transform::ortho_ui(pass.target_size());
-                pass.draw<alia::colored_vertex>(triangle);
-            }
-            {
-                alia::simplified_render_pass pass(device, frame);
-                pass.fill_rect(alia::rect_f::pos_size({50, 50}, {100, 100}), alia::color(1, 1, 0, 0.5f));
-                pass.draw_textured_rect(alia::rect_f::pos_size({50, 250}, {256, 256}), checker);
-                pass.draw_rect(alia::rect_f::pos_size({200, 50}, {100, 100}), alia::color(0, 1, 1, 1), 5.0f);
-                pass.draw_line({50, 200}, {300, 250}, alia::color(1, 0, 1, 1), 3.0f);
-                // Text drawing is intentionally disabled pending its pass-based rebuild.
-            }
+            frame.clear(alia::light_blue);
+            frame.set_pipeline(triangle_pipeline);
+            triangle_effect.projection = alia::transform::ortho_ui(frame.target_size());
+            frame.draw<alia::colored_vertex>(triangle);
+
+            painter.begin(frame);
+            painter.fill_rect(alia::rect_f::pos_size({50, 50}, {100, 100}), alia::color(1, 1, 0, 0.5f));
+            painter.draw_textured_rect(alia::rect_f::pos_size({50, 250}, {256, 256}), checker);
+            painter.draw_rect(alia::rect_f::pos_size({200, 50}, {100, 100}), alia::color(0, 1, 1, 1), 5.0f);
+            painter.draw_line({50, 200}, {300, 250}, alia::color(1, 0, 1, 1), 3.0f);
+            painter.end();
             frame.present();
         }
     } catch (const std::exception &error) {

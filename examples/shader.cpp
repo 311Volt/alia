@@ -1,8 +1,8 @@
 #include "alia/os/window.hpp"
 #include "alia/gfx/gfx_device.hpp"
 #include "alia/gfx/pipeline.hpp"
-#include "alia/gfx/render_pass.hpp"
-#include "alia/gfx/simplified_render_pass.hpp"
+#include "alia/gfx/frame.hpp"
+#include "alia/gfx/painter.hpp"
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/transform.hpp"
 #include "alia/gfx/bitmap/bitmap.hpp"
@@ -127,6 +127,7 @@ int main(int argc, char **argv) {
 
         alia::bitmap checker_bmp = make_checker_bitmap();
         alia::texture checker_tex(device, checker_bmp);
+        alia::painter painter(device);
 
         const std::array<alia::shader_source, 4> sources{{
             {
@@ -220,16 +221,15 @@ int main(int argc, char **argv) {
             tint_constant.set_value(alia::color(1.0f, 0.65f + 0.35f * pulse, 0.8f, 1.0f));
 
             auto frame = swapchain.begin_frame();
-            {
-                auto pass = frame.begin_render_pass(pipeline, {.clear_color = alia::color(0.06f, 0.07f, 0.09f, 1.0f)});
-                pass.set_texture(0, checker_tex); // Program samplers may alternatively bind their own texture.
-                pass.draw<alia::uv_vertex>(quad);
-            }
-            {
-                alia::simplified_render_pass pass(device, frame);
-                pass.draw_rect(alia::rect_f::pos_size({260.0f, 160.0f}, {280.0f, 280.0f}), alia::white, 2.0f);
-                pass.fill_rect(alia::rect_f::pos_size({30.0f, 30.0f}, {80.0f, 80.0f}), alia::color(0.1f, 0.8f, 0.45f, 0.75f));
-            }
+            frame.clear(alia::color(0.06f, 0.07f, 0.09f, 1.0f));
+            frame.set_pipeline(pipeline);
+            frame.set_texture(0, checker_tex); // Program samplers may alternatively bind their own texture.
+            frame.draw<alia::uv_vertex>(quad);
+
+            painter.begin(frame);
+            painter.draw_rect(alia::rect_f::pos_size({260.0f, 160.0f}, {280.0f, 280.0f}), alia::white, 2.0f);
+            painter.fill_rect(alia::rect_f::pos_size({30.0f, 30.0f}, {80.0f, 80.0f}), alia::color(0.1f, 0.8f, 0.45f, 0.75f));
+            painter.end();
             frame.present();
         }
     } catch (const std::exception &e) {
