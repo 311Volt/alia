@@ -258,38 +258,27 @@ namespace alia {
 
     void ogl_shader_set_sampler(shader_program_handle *h, const shader_sampler_slot &slot, texture_handle *tex) {
         auto *program = as_ogl_shader_program(h);
-        program->sampler_textures[slot.slot] = tex;
-        ogl_s_glUseProgram(program->program);
-        ogl_s_glUniform1i(static_cast<GLint>(slot.location), slot.slot);
-    }
-
-    void ogl_bind_shader_program(device_handle *, shader_program_handle *h) {
-        if (!h) {
-            if (ogl_s_glUseProgram)
-                ogl_s_glUseProgram(0);
-            return;
+        auto it = std::find_if(program->stored_samplers.begin(), program->stored_samplers.end(), [&](const ogl_stored_shader_sampler &sampler) {
+            return sampler.location == slot.location;
+        });
+        if (it == program->stored_samplers.end()) {
+            program->stored_samplers.push_back({static_cast<GLint>(slot.location), slot.slot, tex});
+        } else {
+            it->unit = slot.slot;
+            it->texture = tex;
         }
-
-        auto *program = as_ogl_shader_program(h);
-        ogl_s_glUseProgram(program->program);
     }
 
-    void ogl_apply_shader_constants(device_handle *, shader_program_handle *h) {
-        if (!h)
+    void ogl_apply_program_state(ogl_shader_program *program) {
+        if (!program)
             return;
-
-        auto *program = as_ogl_shader_program(h);
+        ogl_s_glUseProgram(program->program);
         for (const auto &constant : program->stored_constants)
             apply_constant(constant);
-    }
-
-    void ogl_apply_shader_samplers(device_handle *, shader_program_handle *h) {
-        if (!h)
-            return;
-
-        auto *program = as_ogl_shader_program(h);
-        for (const auto &[unit, texture] : program->sampler_textures)
-            bind_texture_unit(unit, texture);
+        for (const auto &sampler : program->stored_samplers) {
+            bind_texture_unit(sampler.unit, sampler.texture);
+            ogl_s_glUniform1i(sampler.location, sampler.unit);
+        }
         ogl_s_glActiveTexture(GL_TEXTURE0);
     }
 

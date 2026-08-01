@@ -7,8 +7,6 @@
 
 namespace alia {
 
-    static thread_local shader_program *tl_current_shader_program = nullptr;
-
     shader_program::shader_program(gfx_device &device, const shader_program_desc &desc) {
         if (!device)
             throw shader_error("shader_program: device is not valid");
@@ -24,15 +22,11 @@ namespace alia {
     shader_program::~shader_program() {
         if (handle_)
             backend_->destroy_shader_program.get_or_throw()(handle_);
-        if (tl_current_shader_program == this)
-            tl_current_shader_program = nullptr;
     }
 
     shader_program::shader_program(shader_program &&other) noexcept
         : handle_(std::exchange(other.handle_, nullptr))
         , backend_(std::exchange(other.backend_, nullptr)) {
-        if (tl_current_shader_program == &other)
-            tl_current_shader_program = this;
     }
 
     shader_program &shader_program::operator=(shader_program &&other) noexcept {
@@ -41,8 +35,6 @@ namespace alia {
                 backend_->destroy_shader_program.get_or_throw()(handle_);
             handle_ = std::exchange(other.handle_, nullptr);
             backend_ = std::exchange(other.backend_, nullptr);
-            if (tl_current_shader_program == &other)
-                tl_current_shader_program = this;
         }
         return *this;
     }
@@ -61,22 +53,6 @@ namespace alia {
         if (!*this)
             throw shader_error("shader_sampler::set_texture: invalid shader sampler");
         backend_->shader_set_sampler.get_or_throw()(program_, slot_, tex.impl());
-    }
-
-    void use(shader_program &program) {
-        if (!program)
-            throw shader_error("use(shader_program): program is not valid");
-        if (current_device().backend() != program.backend())
-            throw shader_error("use(shader_program): program belongs to a different gfx_device");
-        tl_current_shader_program = &program;
-    }
-
-    void reset_shader() noexcept {
-        tl_current_shader_program = nullptr;
-    }
-
-    shader_program_handle *current_shader_program_handle() noexcept {
-        return tl_current_shader_program ? tl_current_shader_program->impl() : nullptr;
     }
 
 } // namespace alia

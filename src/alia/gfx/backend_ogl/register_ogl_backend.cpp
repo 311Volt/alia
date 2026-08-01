@@ -191,14 +191,6 @@ namespace alia {
         iface.texture_unlock           = {ogl_texture_unlock};
         iface.texture_clone            = {ogl_texture_clone};
         iface.copy_render_target_to_texture = {ogl_copy_render_target_to_texture};
-        if (has_framebuffers) {
-            iface.texture_begin_render_target = {ogl_texture_begin_render_target};
-            iface.texture_end_render_target   = {ogl_texture_end_render_target};
-        } else {
-            const char *reason = "render-to-texture requires OpenGL framebuffer object entry points";
-            iface.texture_begin_render_target = {nullptr, reason};
-            iface.texture_end_render_target   = {nullptr, reason};
-        }
 
         if (ogl_s_glGenerateMipmap) {
             iface.texture_generate_mipmaps = {ogl_texture_generate_mipmaps};
@@ -261,29 +253,20 @@ namespace alia {
         iface.swapchain_present      = {ogl_swapchain_present};
         iface.swapchain_on_resize    = {ogl_swapchain_on_resize};
 
-        iface.set_viewport                    = {ogl_set_viewport};
-        iface.clear_render_target             = {ogl_clear_render_target};
-        iface.set_render_state                = {ogl_set_render_state};
-        iface.set_blend_state                 = {ogl_set_blend_state};
-        iface.bind_shader_program             = {ogl_bind_shader_program};
-        iface.apply_shader_constants          = {ogl_apply_shader_constants};
-        iface.apply_shader_samplers           = {ogl_apply_shader_samplers};
-        iface.set_fixed_function_matrices     = {ogl_set_fixed_function_matrices};
-        iface.set_fixed_function_texture_mode = {ogl_set_fixed_function_texture_mode};
-        iface.bind_texture                    = {ogl_bind_texture};
-        iface.set_texture_sampler             = {ogl_set_texture_sampler};
-        iface.bind_vertex_input               = {ogl_bind_vertex_input};
-        iface.unbind_vertex_input             = {ogl_unbind_vertex_input};
-        iface.draw_arrays_immediate           = {ogl_draw_arrays_immediate};
-        iface.draw_elements_immediate         = {ogl_draw_elements_immediate};
-        if (has_buffers) {
-            iface.draw_arrays_buffered   = {ogl_draw_arrays_buffered};
-            iface.draw_elements_buffered = {ogl_draw_elements_buffered};
-        } else {
-            const char *reason = "buffered drawing requires OpenGL 1.5 buffer object entry points";
-            iface.draw_arrays_buffered   = {nullptr, reason};
-            iface.draw_elements_buffered = {nullptr, reason};
-        }
+        iface.create_pipeline              = {ogl_create_pipeline};
+        iface.destroy_pipeline             = {ogl_destroy_pipeline};
+        iface.update_pipeline              = {ogl_update_pipeline};
+        iface.bind_pipeline                = {ogl_bind_pipeline};
+        iface.begin_render_pass            = {ogl_begin_render_pass};
+        iface.end_render_pass              = {ogl_end_render_pass};
+        iface.set_viewport                 = {ogl_set_viewport};
+        iface.bind_vertex_buffer           = {ogl_bind_vertex_buffer};
+        iface.bind_index_buffer            = {ogl_bind_index_buffer};
+        iface.upload_transient_vertex_data = {ogl_upload_transient_vertex_data};
+        iface.upload_transient_index_data  = {ogl_upload_transient_index_data};
+        iface.bind_resources               = {ogl_bind_resources};
+        iface.draw                         = {ogl_draw};
+        iface.draw_indexed                 = {ogl_draw_indexed};
 
         return {raw, std::move(iface)};
     }

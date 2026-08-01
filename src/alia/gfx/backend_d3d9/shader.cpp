@@ -284,35 +284,13 @@ namespace alia {
         as_d3d9_shader_program(h)->sampler_textures[slot.slot] = tex;
     }
 
-    void d3d9_bind_shader_program(device_handle *dev_h, shader_program_handle *h) {
-        auto *device = as_d3d9_device(dev_h)->device;
-        if (!h) {
-            device->SetVertexShader(nullptr);
-            device->SetPixelShader(nullptr);
+    void d3d9_apply_program_state(IDirect3DDevice9 *device, d3d9_shader_program *program) {
+        if (!program)
             return;
-        }
-
-        auto *program = as_d3d9_shader_program(h);
         device->SetVertexShader(program->vertex_shader);
         device->SetPixelShader(program->pixel_shader);
-    }
-
-    void d3d9_apply_shader_constants(device_handle *dev_h, shader_program_handle *h) {
-        if (!h)
-            return;
-
-        auto *device = as_d3d9_device(dev_h)->device;
-        auto *program = as_d3d9_shader_program(h);
         for (const auto &constant : program->stored_constants)
             apply_constant(device, constant);
-    }
-
-    void d3d9_apply_shader_samplers(device_handle *dev_h, shader_program_handle *h) {
-        if (!h)
-            return;
-
-        auto *device = as_d3d9_device(dev_h)->device;
-        auto *program = as_d3d9_shader_program(h);
         for (const auto &[slot, texture] : program->sampler_textures)
             bind_texture_slot(device, slot, texture);
     }

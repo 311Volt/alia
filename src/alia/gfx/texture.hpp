@@ -21,12 +21,6 @@ namespace alia {
             texture_lock_info info = {};
         };
 
-        struct texture_render_target_state {
-            render_target_scope_handle *handle = nullptr;
-            device_handle *device = nullptr;
-            const graphics_backend_interface *backend = nullptr;
-            vec2i previous_render_target_size = {};
-        };
     } // namespace detail
 
     // ── locked_texture_region ─────────────────────────────────────────────
@@ -124,25 +118,6 @@ namespace alia {
     };
 
     // ── texture ───────────────────────────────────────────────────────────
-
-    class scoped_texture_render_target {
-    public:
-        ~scoped_texture_render_target();
-        scoped_texture_render_target(scoped_texture_render_target &&) noexcept;
-        scoped_texture_render_target &operator=(scoped_texture_render_target &&) noexcept;
-        scoped_texture_render_target(const scoped_texture_render_target &) = delete;
-        scoped_texture_render_target &operator=(const scoped_texture_render_target &) = delete;
-
-        void release();
-
-    private:
-        friend class texture;
-
-        std::unique_ptr<detail::texture_render_target_state> impl_;
-
-        explicit scoped_texture_render_target(std::unique_ptr<detail::texture_render_target_state> state) noexcept
-            : impl_(std::move(state)) {}
-    };
 
     /// @brief GPU-resident 2D pixel buffer. Hardware counterpart of @c bitmap.
     ///
@@ -278,9 +253,6 @@ namespace alia {
         /// GPU-to-GPU deep copy, including all mip levels and sampler state.
         [[nodiscard]] texture clone() const;
 
-        /// Temporarily bind a mip level as the active render target.
-        [[nodiscard]] scoped_texture_render_target as_render_target(int level = 0);
-
         // ── Backend access (internal) ────────────────────────────────────
 
         texture_handle *impl() noexcept {
@@ -297,8 +269,6 @@ namespace alia {
         }
 
     private:
-        friend void copy_render_target_to_texture(texture &dst, rect_i src_rect, vec2i dst_pos, int dst_level);
-
         std::unique_ptr<detail::texture_lock_state> lock_impl(
             const std::optional<rect_i> &region, int level, pixel_format expected_fmt, texture_lock_mode mode
         );
@@ -318,8 +288,6 @@ namespace alia {
         texture_role role_ = texture_role::color;
         texture_usage usage_ = texture_usage::sampling_only;
     };
-
-    void copy_render_target_to_texture(texture &dst, rect_i src_rect, vec2i dst_pos = {}, int dst_level = 0);
 
 } // namespace alia
 

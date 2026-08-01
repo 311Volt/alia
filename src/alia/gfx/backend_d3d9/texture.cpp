@@ -414,46 +414,6 @@ namespace alia {
         return t;
     }
 
-    render_target_scope_handle *d3d9_texture_begin_render_target(device_handle *dev_h, texture_handle *h, int level) {
-        auto *device = as_d3d9_device(dev_h)->device;
-        auto *texture = as_d3d9_texture(h);
-        if (texture->usage != texture_usage::render_target)
-            return nullptr;
-        if (level < 0 || level >= texture->mip_levels)
-            return nullptr;
-        if (texture->autogen && level > 0)
-            return nullptr;
-
-        auto *scope = new d3d9_render_target_scope;
-        if (FAILED(device->GetRenderTarget(0, &scope->previous_target)) ||
-            FAILED(device->GetViewport(&scope->previous_viewport))) {
-            if (scope->previous_target)
-                scope->previous_target->Release();
-            delete scope;
-            return nullptr;
-        }
-
-        com_ptr<IDirect3DSurface9> surface;
-        if (FAILED(texture->texture->GetSurfaceLevel(static_cast<UINT>(level), surface.put())) ||
-            FAILED(device->SetRenderTarget(0, surface.get()))) {
-            scope->previous_target->Release();
-            delete scope;
-            return nullptr;
-        }
-
-        return scope;
-    }
-
-    void d3d9_texture_end_render_target(device_handle *dev_h, render_target_scope_handle *h) {
-        auto *device = as_d3d9_device(dev_h)->device;
-        auto *scope = static_cast<d3d9_render_target_scope *>(h);
-        device->SetRenderTarget(0, scope->previous_target);
-        device->SetViewport(&scope->previous_viewport);
-        if (scope->previous_target)
-            scope->previous_target->Release();
-        delete scope;
-    }
-
     bool d3d9_copy_render_target_to_texture(
         device_handle *dev_h,
         texture_handle *dst_h,

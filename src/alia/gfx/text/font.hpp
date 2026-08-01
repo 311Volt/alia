@@ -85,7 +85,7 @@ namespace alia {
         void clear();
 
     private:
-        friend void draw_text(font &source, std::string_view text, color color, vec2f position, hardware_glyph_buffer *glyph_buffer);
+        // friend void draw_text(font &, std::string_view, color, vec2f, hardware_glyph_buffer *);
 
         std::unique_ptr<detail::hardware_glyph_buffer_impl> impl_;
     };
@@ -111,7 +111,8 @@ namespace alia {
         text &set_antialiasing(bool enabled);
         text &set_kerning(bool enabled);
 
-        void draw(vec2i position, color text_color = white);
+        // Disabled pending the render-pass text rebuild.
+        // void draw(vec2i position, color text_color = white);
 
     private:
         std::unique_ptr<detail::text_impl> impl_;
@@ -121,7 +122,8 @@ namespace alia {
 
     [[nodiscard]] vec2f measure_text(font &source, std::string_view text);
 
-    void draw_text(font &source, std::string_view text, color color, vec2f position, hardware_glyph_buffer *glyph_buffer = nullptr);
+    // Disabled pending the render-pass text rebuild.
+    // void draw_text(font &source, std::string_view text, color color, vec2f position, hardware_glyph_buffer *glyph_buffer = nullptr);
 
 } // namespace alia
 

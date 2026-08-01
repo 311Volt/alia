@@ -1,8 +1,10 @@
 #include "alia/os/window.hpp"
 #include "alia/gfx/gfx_device.hpp"
+#include "alia/gfx/pipeline.hpp"
+#include "alia/gfx/render_pass.hpp"
+#include "alia/gfx/simplified_render_pass.hpp"
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/transform.hpp"
-#include "alia/gfx/primitives.hpp"
 #include "alia/gfx/bitmap/bitmap.hpp"
 #include "alia/gfx/bitmap/pixel_types.hpp"
 #include "alia/events/event_queue.hpp"
@@ -13,6 +15,7 @@
 #include <exception>
 #include <iostream>
 #include <span>
+#include <stdexcept>
 
 namespace {
 
@@ -98,7 +101,17 @@ void main() {
 
 } // namespace
 
-int main() {
+namespace {
+alia::gfx_backend requested_backend(int argc, char **argv) {
+    if (argc < 2) return alia::gfx_backend::auto_;
+    const std::string_view value(argv[1]);
+    if (value == "d3d9") return alia::gfx_backend::d3d9;
+    if (value == "opengl") return alia::gfx_backend::opengl;
+    throw std::invalid_argument("backend must be d3d9 or opengl");
+}
+}
+
+int main(int argc, char **argv) {
     try {
         alia::window win(
             {800, 600},
@@ -108,9 +121,9 @@ int main() {
             }
         );
 
-        alia::gfx_device device = alia::gfx_device::create();
+        alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
         auto swapchain = device.create_swapchain({.target = win});
-        alia::set_current_projection(alia::transform::ortho_ui(win.size()));
+        alia::make_current(device);
 
         alia::bitmap checker_bmp = make_checker_bitmap();
         alia::texture checker_tex(device, checker_bmp);
@@ -168,10 +181,11 @@ int main() {
         auto tint_constant =
             shader.allocate_constant<alia::color>("u_tint", alia::shader_type::pixel);
 
-        auto texture_sampler =
-            shader.allocate_sampler("u_texture", alia::shader_type::pixel);
-            
-        texture_sampler.set_texture(checker_tex);
+        auto pipeline = alia::pipeline::create<alia::uv_vertex>(device, {.effect = &shader});
+        const alia::uv_vertex quad[] = {
+            {{-0.5f, -0.5f}, {0.0f, 0.0f}}, {{0.5f, -0.5f}, {1.0f, 0.0f}}, {{-0.5f, 0.5f}, {0.0f, 1.0f}},
+            {{0.5f, -0.5f}, {1.0f, 0.0f}}, {{0.5f, 0.5f}, {1.0f, 1.0f}}, {{-0.5f, 0.5f}, {0.0f, 1.0f}},
+        };
 
         alia::event_queue events;
         events.register_source(&win.get_event_source());
@@ -185,8 +199,7 @@ int main() {
                 if (ev.get_if<alia::window_close_event>()) {
                     running = false;
                 } else if (auto *e = ev.get_if<alia::window_resize_event>()) {
-                    alia::on_resize(e->new_size);
-                    alia::set_current_projection(alia::transform::ortho_ui(e->new_size));
+                    swapchain.on_resize(e->new_size);
                 } else if (auto *e = ev.get_if<alia::window_key_down_event>()) {
                     if (e->key == alia::key::escape)
                         running = false;
@@ -202,20 +215,22 @@ int main() {
                 alia::transform::rotate(t) *
                 alia::transform::translate({400.0f, 300.0f});
 
-            projection_constant.set_value(alia::get_current_projection());
+            projection_constant.set_value(alia::transform::ortho_ui(win.size()));
             transform_constant.set_value(model);
             tint_constant.set_value(alia::color(1.0f, 0.65f + 0.35f * pulse, 0.8f, 1.0f));
 
-            alia::clear(alia::color(0.06f, 0.07f, 0.09f, 1.0f));
-
-            alia::use(shader);
-            alia::draw_textured_rect(alia::rect_f::pos_size({-0.5f, -0.5f}, {1.0f, 1.0f}), checker_tex);
-            alia::reset_shader();
-
-            alia::draw_rect(alia::rect_f::pos_size({260.0f, 160.0f}, {280.0f, 280.0f}), alia::white, 2.0f);
-            alia::fill_rect(alia::rect_f::pos_size({30.0f, 30.0f}, {80.0f, 80.0f}), alia::color(0.1f, 0.8f, 0.45f, 0.75f));
-
-            alia::present();
+            auto frame = swapchain.begin_frame();
+            {
+                auto pass = frame.begin_render_pass(pipeline, {.clear_color = alia::color(0.06f, 0.07f, 0.09f, 1.0f)});
+                pass.set_texture(0, checker_tex); // Program samplers may alternatively bind their own texture.
+                pass.draw<alia::uv_vertex>(quad);
+            }
+            {
+                alia::simplified_render_pass pass(device, frame);
+                pass.draw_rect(alia::rect_f::pos_size({260.0f, 160.0f}, {280.0f, 280.0f}), alia::white, 2.0f);
+                pass.fill_rect(alia::rect_f::pos_size({30.0f, 30.0f}, {80.0f, 80.0f}), alia::color(0.1f, 0.8f, 0.45f, 0.75f));
+            }
+            frame.present();
         }
     } catch (const std::exception &e) {
         std::cerr << "shader example failed: " << e.what() << '\n';

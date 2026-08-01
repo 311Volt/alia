@@ -317,49 +317,6 @@ namespace alia {
         return dst;
     }
 
-    render_target_scope_handle *ogl_texture_begin_render_target(device_handle *, texture_handle *h, int level) {
-        auto *texture = as_ogl_texture(h);
-        if (texture->usage != texture_usage::render_target)
-            return nullptr;
-        if (level < 0 || level >= texture->mip_levels)
-            return nullptr;
-        if (!framebuffer_ops_loaded())
-            return nullptr;
-
-        auto *scope = new ogl_render_target_scope;
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &scope->previous_framebuffer);
-        glGetIntegerv(GL_VIEWPORT, scope->previous_viewport);
-
-        ogl_s_glGenFramebuffers(1, &scope->framebuffer);
-        if (!scope->framebuffer) {
-            delete scope;
-            return nullptr;
-        }
-
-        ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, scope->framebuffer);
-        if (!attach_texture_to_framebuffer(texture->tex_id, level)) {
-            ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(scope->previous_framebuffer));
-            ogl_s_glDeleteFramebuffers(1, &scope->framebuffer);
-            delete scope;
-            return nullptr;
-        }
-
-        return scope;
-    }
-
-    void ogl_texture_end_render_target(device_handle *, render_target_scope_handle *h) {
-        auto *scope = static_cast<ogl_render_target_scope *>(h);
-        ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(scope->previous_framebuffer));
-        glViewport(
-            scope->previous_viewport[0],
-            scope->previous_viewport[1],
-            scope->previous_viewport[2],
-            scope->previous_viewport[3]
-        );
-        ogl_s_glDeleteFramebuffers(1, &scope->framebuffer);
-        delete scope;
-    }
-
     bool ogl_copy_render_target_to_texture(
         device_handle *,
         texture_handle *dst_h,

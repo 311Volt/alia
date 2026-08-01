@@ -3,77 +3,60 @@
 #include "d3d9_ops.hpp"
 
 namespace alia {
+    namespace {
+        bool create_depth_stencil(d3d9_swapchain &swapchain) {
+            if (SUCCEEDED(swapchain.device->CreateDepthStencilSurface(
+                    static_cast<UINT>(swapchain.size.x), static_cast<UINT>(swapchain.size.y),
+                    D3DFMT_D24S8, D3DMULTISAMPLE_NONE, 0, TRUE, &swapchain.depth_stencil, nullptr)))
+                return true;
+            return SUCCEEDED(swapchain.device->CreateDepthStencilSurface(
+                static_cast<UINT>(swapchain.size.x), static_cast<UINT>(swapchain.size.y),
+                D3DFMT_D16, D3DMULTISAMPLE_NONE, 0, TRUE, &swapchain.depth_stencil, nullptr));
+        }
+        bool create_native_swapchain(d3d9_swapchain &swapchain) {
+            D3DPRESENT_PARAMETERS pp = {};
+            pp.Windowed = TRUE;
+            pp.SwapEffect = D3DSWAPEFFECT_DISCARD;
+            pp.BackBufferFormat = D3DFMT_UNKNOWN;
+            pp.BackBufferWidth = static_cast<UINT>(swapchain.size.x);
+            pp.BackBufferHeight = static_cast<UINT>(swapchain.size.y);
+            pp.hDeviceWindow = swapchain.hwnd;
+            return SUCCEEDED(swapchain.device->CreateAdditionalSwapChain(&pp, &swapchain.swap_chain));
+        }
+    }
 
     swapchain_handle *d3d9_create_swapchain(device_handle *dev_h, void *native_handle, vec2i size) {
         auto *dev = as_d3d9_device(dev_h);
-        HWND hwnd = static_cast<HWND>(native_handle);
-
-        D3DPRESENT_PARAMETERS pp = {};
-        pp.Windowed = TRUE;
-        pp.SwapEffect = D3DSWAPEFFECT_DISCARD;
-        pp.BackBufferFormat = D3DFMT_UNKNOWN;
-        pp.BackBufferWidth = static_cast<UINT>(size.x);
-        pp.BackBufferHeight = static_cast<UINT>(size.y);
-        pp.hDeviceWindow = hwnd;
-
-        IDirect3DSwapChain9 *sc = nullptr;
-        if (FAILED(dev->device->CreateAdditionalSwapChain(&pp, &sc)))
+        auto *swapchain = new d3d9_swapchain;
+        swapchain->device = dev->device;
+        swapchain->hwnd = static_cast<HWND>(native_handle);
+        swapchain->size = size;
+        if (!create_native_swapchain(*swapchain) || !create_depth_stencil(*swapchain)) {
+            if (swapchain->depth_stencil) swapchain->depth_stencil->Release();
+            if (swapchain->swap_chain) swapchain->swap_chain->Release();
+            delete swapchain;
             return nullptr;
-
-        auto *s = new d3d9_swapchain;
-        s->device = dev->device;
-        s->swap_chain = sc;
-        s->hwnd = hwnd;
-        s->size = size;
-        return s;
-    }
-
-    void d3d9_destroy_swapchain(swapchain_handle *h) {
-        auto *sc = as_d3d9_swapchain(h);
-        if (sc->swap_chain)
-            sc->swap_chain->Release();
-        delete sc;
-    }
-
-    void d3d9_swapchain_begin_frame(swapchain_handle *h) {
-        auto *sc = as_d3d9_swapchain(h);
-
-        IDirect3DSurface9 *bb = nullptr;
-        sc->swap_chain->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &bb);
-        sc->device->SetRenderTarget(0, bb);
-        bb->Release();
-
-        sc->device->BeginScene();
-    }
-
-    void d3d9_swapchain_end_frame(swapchain_handle *h) {
-        auto *sc = as_d3d9_swapchain(h);
-        sc->device->EndScene();
-    }
-
-    void d3d9_swapchain_present(swapchain_handle *h) {
-        auto *sc = as_d3d9_swapchain(h);
-        sc->swap_chain->Present(nullptr, nullptr, nullptr, nullptr, 0);
-    }
-
-    void d3d9_swapchain_on_resize(swapchain_handle *h, vec2i new_size) {
-        auto *sc = as_d3d9_swapchain(h);
-        sc->size = new_size;
-        if (sc->swap_chain) {
-            sc->swap_chain->Release();
-            sc->swap_chain = nullptr;
         }
-
-        D3DPRESENT_PARAMETERS pp = {};
-        pp.Windowed = TRUE;
-        pp.SwapEffect = D3DSWAPEFFECT_DISCARD;
-        pp.BackBufferFormat = D3DFMT_UNKNOWN;
-        pp.BackBufferWidth = static_cast<UINT>(new_size.x);
-        pp.BackBufferHeight = static_cast<UINT>(new_size.y);
-        pp.hDeviceWindow = sc->hwnd;
-        sc->device->CreateAdditionalSwapChain(&pp, &sc->swap_chain);
+        return swapchain;
     }
-
+    void d3d9_destroy_swapchain(swapchain_handle *h) {
+        auto *swapchain = as_d3d9_swapchain(h);
+        if (swapchain->depth_stencil) swapchain->depth_stencil->Release();
+        if (swapchain->swap_chain) swapchain->swap_chain->Release();
+        delete swapchain;
+    }
+    void d3d9_swapchain_begin_frame(swapchain_handle *h) { as_d3d9_swapchain(h)->device->BeginScene(); }
+    void d3d9_swapchain_end_frame(swapchain_handle *h) { as_d3d9_swapchain(h)->device->EndScene(); }
+    void d3d9_swapchain_present(swapchain_handle *h) { as_d3d9_swapchain(h)->swap_chain->Present(nullptr, nullptr, nullptr, nullptr, 0); }
+    void d3d9_swapchain_on_resize(swapchain_handle *h, vec2i new_size) {
+        auto *swapchain = as_d3d9_swapchain(h);
+        swapchain->device->SetDepthStencilSurface(nullptr);
+        if (swapchain->depth_stencil) { swapchain->depth_stencil->Release(); swapchain->depth_stencil = nullptr; }
+        if (swapchain->swap_chain) { swapchain->swap_chain->Release(); swapchain->swap_chain = nullptr; }
+        swapchain->size = new_size;
+        if (!create_native_swapchain(*swapchain) || !create_depth_stencil(*swapchain))
+            throw std::runtime_error("D3D9 failed to resize swapchain depth buffer");
+    }
 } // namespace alia
 
-#endif // ALIA_COMPILE_GFX_BACKEND_D3D9
+#endif

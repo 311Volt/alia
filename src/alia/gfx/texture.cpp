@@ -125,32 +125,6 @@ namespace alia {
 
     // ── Destructor / move ─────────────────────────────────────────────────
 
-    scoped_texture_render_target::~scoped_texture_render_target() {
-        release();
-    }
-
-    scoped_texture_render_target::scoped_texture_render_target(scoped_texture_render_target &&other) noexcept
-        : impl_(std::move(other.impl_)) {}
-
-    scoped_texture_render_target &
-    scoped_texture_render_target::operator=(scoped_texture_render_target &&other) noexcept {
-        if (this != &other) {
-            release();
-            impl_ = std::move(other.impl_);
-        }
-        return *this;
-    }
-
-    void scoped_texture_render_target::release() {
-        if (!impl_)
-            return;
-
-        impl_->backend->texture_end_render_target.get_or_throw()(impl_->device, impl_->handle);
-        tl_current_render_target_size = impl_->previous_render_target_size;
-        --tl_texture_render_target_depth;
-        impl_.reset();
-    }
-
     texture::~texture() {
         if (handle_)
             backend_->destroy_texture.get_or_throw()(handle_);
@@ -308,78 +282,6 @@ namespace alia {
         if (!cloned)
             throw std::runtime_error("texture::clone: backend failed to clone texture");
         return texture(cloned, backend_, device_, role_, usage_);
-    }
-
-    scoped_texture_render_target texture::as_render_target(int level) {
-        if (usage_ != texture_usage::render_target)
-            throw std::runtime_error("texture::as_render_target: texture was not created with texture_usage::render_target");
-        if (level < 0 || level >= mip_levels())
-            throw std::out_of_range("texture::as_render_target: mip level out of range");
-
-        auto &dev = current_device();
-        if (dev.backend() != backend_ || dev.device() != device_)
-            throw std::runtime_error("texture::as_render_target: texture belongs to a different gfx_device");
-
-        ensure_current_frame_active();
-
-        auto state = std::make_unique<detail::texture_render_target_state>();
-        state->device = device_;
-        state->backend = backend_;
-        state->previous_render_target_size = tl_current_render_target_size;
-        state->handle = backend_->texture_begin_render_target.get_or_throw()(device_, handle_, level);
-        if (!state->handle)
-            throw std::runtime_error("texture::as_render_target: backend failed to bind texture");
-
-        const vec2i target_size = mip_size_for(size(), level);
-        try {
-            backend_->set_viewport.get_or_throw()(
-                device_,
-                render_viewport{
-                    {},
-                    target_size,
-                    0.0f,
-                    1.0f
-                }
-            );
-        } catch (...) {
-            backend_->texture_end_render_target.get_or_throw()(device_, state->handle);
-            throw;
-        }
-        tl_current_render_target_size = target_size;
-        ++tl_texture_render_target_depth;
-        return scoped_texture_render_target(std::move(state));
-    }
-
-    void copy_render_target_to_texture(texture &dst, rect_i src_rect, vec2i dst_pos, int dst_level) {
-        auto &dev = current_device();
-        if (dev.backend() != dst.backend() || dev.device() != dst.device())
-            throw std::runtime_error("copy_render_target_to_texture: texture belongs to a different gfx_device");
-        ensure_current_frame_active();
-        if (dst_level < 0 || dst_level >= dst.mip_levels())
-            throw std::out_of_range("copy_render_target_to_texture: destination mip level out of range");
-        if (src_rect.width() <= 0 || src_rect.height() <= 0)
-            throw std::invalid_argument("copy_render_target_to_texture: source rectangle must be non-empty");
-        if (dst_pos.x < 0 || dst_pos.y < 0)
-            throw std::invalid_argument("copy_render_target_to_texture: destination position must be non-negative");
-
-        const vec2i source_size = tl_current_render_target_size;
-        if (source_size.x <= 0 || source_size.y <= 0)
-            throw std::runtime_error("copy_render_target_to_texture: no active render target");
-        const rect_i source_bounds{{0, 0}, source_size};
-        if (!source_bounds.contains(src_rect))
-            throw std::invalid_argument("copy_render_target_to_texture: source rectangle is outside the active render target");
-
-        const vec2i dst_size = mip_size_for(dst.size(), dst_level);
-        const rect_i dst_rect = rect_i::pos_size(dst_pos, src_rect.size());
-        const rect_i dst_bounds{{0, 0}, dst_size};
-        if (!dst_bounds.contains(dst_rect))
-            throw std::invalid_argument("copy_render_target_to_texture: destination rectangle is outside the texture level");
-
-        if (!dst.backend()->copy_render_target_to_texture.get_or_throw()(
-                dst.device(), dst.impl(), src_rect, source_size, dst_pos, dst_level
-            )) {
-            throw std::runtime_error("copy_render_target_to_texture: backend copy failed");
-        }
     }
 
 } // namespace alia

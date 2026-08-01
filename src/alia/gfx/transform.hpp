@@ -88,23 +88,6 @@ struct transform {
     }
 };
 
-transform get_current_transform();
-void      set_current_transform(const transform& t);
-transform get_current_projection();
-void      set_current_projection(const transform& t);
-
-struct scoped_transform {
-    explicit scoped_transform(const transform& t) {
-        saved_ = get_current_transform();
-        set_current_transform(saved_ * t);
-    }
-    ~scoped_transform() {
-        set_current_transform(saved_);
-    }
-private:
-    transform saved_;
-};
-
 } // namespace alia
 
 #endif /* TRANSFORM_D0BF54D2_38DF_4A32_87FE_50E22A30C9FA */

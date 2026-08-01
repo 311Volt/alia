@@ -1,7 +1,6 @@
 #include "font.hpp"
 
 #include "alia/gfx/bitmap/pixel_types.hpp"
-#include "alia/gfx/primitives.hpp"
 #include "alia/gfx/texture.hpp"
 #include "alia/util/utf8.hpp"
 
@@ -570,6 +569,7 @@ namespace alia {
         return *this;
     }
 
+    #if 0 // Disabled pending the render-pass text rebuild.
     void text::draw(vec2i position, color text_color) {
         if (impl_->content.empty())
             return;
@@ -593,6 +593,7 @@ namespace alia {
         full_vertex vertices[6] = {v0, v1, v2, v1, v3, v2};
         draw_alpha_masked_triangles<full_vertex>(*impl_->mask, vertices);
     }
+    #endif
 
     ttf_font load_ttf_font(std::string_view filename, int pixel_height) {
         if (pixel_height <= 0)
@@ -658,6 +659,7 @@ namespace alia {
         return {max_x, metrics.line_height * static_cast<float>(line_count)};
     }
 
+    #if 0 // Disabled pending the render-pass text rebuild.
     void draw_text(font &source, std::string_view text, color text_color, vec2f position, hardware_glyph_buffer *glyph_buffer) {
         if (text.empty())
             return;
@@ -717,5 +719,6 @@ namespace alia {
             previous = cp;
         }
     }
+    #endif
 
 } // namespace alia

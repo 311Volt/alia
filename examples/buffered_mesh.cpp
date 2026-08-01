@@ -1,7 +1,8 @@
 #include "alia/os/window.hpp"
 #include "alia/gfx/gfx_device.hpp"
+#include "alia/gfx/pipeline.hpp"
+#include "alia/gfx/render_pass.hpp"
 #include "alia/gfx/prim_buffers.hpp"
-#include "alia/gfx/primitives.hpp"
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/transform.hpp"
 #include "alia/events/event_queue.hpp"
@@ -13,6 +14,7 @@
 #include <exception>
 #include <iostream>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -181,7 +183,17 @@ void main() {
 
 } // namespace
 
-int main() {
+namespace {
+alia::gfx_backend requested_backend(int argc, char **argv) {
+    if (argc < 2) return alia::gfx_backend::auto_;
+    const std::string_view value(argv[1]);
+    if (value == "d3d9") return alia::gfx_backend::d3d9;
+    if (value == "opengl") return alia::gfx_backend::opengl;
+    throw std::invalid_argument("backend must be d3d9 or opengl");
+}
+}
+
+int main(int argc, char **argv) {
     try {
         alia::window win(
             {1000, 700},
@@ -191,7 +203,7 @@ int main() {
             }
         );
 
-        alia::gfx_device device = alia::gfx_device::create();
+        alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
         auto swapchain = device.create_swapchain({.target = win});
 
         mesh_data mesh = make_sphere_mesh(160, 320);
@@ -244,6 +256,10 @@ int main() {
             shader.allocate_constant<alia::transform>("u_projection", alia::shader_type::vertex);
         auto transform_constant =
             shader.allocate_constant<alia::transform>("u_transform", alia::shader_type::vertex);
+        auto pipeline = alia::pipeline::create<alia::normal_vertex3d>(device, {
+            .effect = &shader,
+            .depth = {.test_enabled = true, .write_enabled = true},
+        });
 
         alia::event_queue events;
         events.register_source(&win.get_event_source());
@@ -271,7 +287,7 @@ int main() {
                 if (ev.get_if<alia::window_close_event>()) {
                     running = false;
                 } else if (auto *e = ev.get_if<alia::window_resize_event>()) {
-                    alia::on_resize(e->new_size);
+                    swapchain.on_resize(e->new_size);
                 } else if (auto *e = ev.get_if<alia::window_key_down_event>()) {
                     if (e->key == alia::key::escape) {
                         running = false;
@@ -301,16 +317,18 @@ int main() {
             projection_constant.set_value(projection);
             transform_constant.set_value(model);
 
-            alia::clear(alia::color(0.025f, 0.03f, 0.04f, 1.0f));
-
-            alia::use(shader);
-            if (use_buffered)
-                alia::draw_triangles(gpu_vertices, gpu_indices);
-            else
-                alia::draw_triangles(vertex_span, index_span);
-            alia::reset_shader();
-
-            alia::present();
+            auto frame = swapchain.begin_frame();
+            {
+                auto pass = frame.begin_render_pass(pipeline, {
+                    .clear_color = alia::color(0.025f, 0.03f, 0.04f, 1.0f),
+                    .clear_depth = 1.0f,
+                });
+                if (use_buffered)
+                    pass.draw_indexed(gpu_vertices, gpu_indices);
+                else
+                    pass.draw_indexed(vertex_span, index_span);
+            }
+            frame.present();
         }
     } catch (const std::exception &e) {
         std::cerr << "buffered mesh example failed: " << e.what() << '\n';

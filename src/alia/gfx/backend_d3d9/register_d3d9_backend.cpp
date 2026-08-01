@@ -37,8 +37,6 @@ namespace alia {
         iface.texture_lock                = {d3d9_texture_lock};
         iface.texture_unlock              = {d3d9_texture_unlock};
         iface.texture_clone               = {d3d9_texture_clone};
-        iface.texture_begin_render_target = {d3d9_texture_begin_render_target};
-        iface.texture_end_render_target   = {d3d9_texture_end_render_target};
         iface.copy_render_target_to_texture = {d3d9_copy_render_target_to_texture};
 
         if (can_autogen_mipmaps) {
@@ -85,23 +83,20 @@ namespace alia {
         iface.swapchain_present     = {d3d9_swapchain_present};
         iface.swapchain_on_resize   = {d3d9_swapchain_on_resize};
 
-        iface.set_viewport                    = {d3d9_set_viewport};
-        iface.clear_render_target             = {d3d9_clear_render_target};
-        iface.set_render_state                = {d3d9_set_render_state};
-        iface.set_blend_state                 = {d3d9_set_blend_state};
-        iface.bind_shader_program             = {d3d9_bind_shader_program};
-        iface.apply_shader_constants          = {d3d9_apply_shader_constants};
-        iface.apply_shader_samplers           = {d3d9_apply_shader_samplers};
-        iface.set_fixed_function_matrices     = {d3d9_set_fixed_function_matrices};
-        iface.set_fixed_function_texture_mode = {d3d9_set_fixed_function_texture_mode};
-        iface.bind_texture                    = {d3d9_bind_texture};
-        iface.set_texture_sampler             = {d3d9_set_texture_sampler};
-        iface.bind_vertex_input               = {d3d9_bind_vertex_input};
-        iface.unbind_vertex_input             = {d3d9_unbind_vertex_input};
-        iface.draw_arrays_immediate           = {d3d9_draw_arrays_immediate};
-        iface.draw_elements_immediate         = {d3d9_draw_elements_immediate};
-        iface.draw_arrays_buffered            = {d3d9_draw_arrays_buffered};
-        iface.draw_elements_buffered          = {d3d9_draw_elements_buffered};
+        iface.create_pipeline             = {d3d9_create_pipeline};
+        iface.destroy_pipeline            = {d3d9_destroy_pipeline};
+        iface.update_pipeline             = {d3d9_update_pipeline};
+        iface.bind_pipeline               = {d3d9_bind_pipeline};
+        iface.begin_render_pass           = {d3d9_begin_render_pass};
+        iface.end_render_pass             = {d3d9_end_render_pass};
+        iface.set_viewport                = {d3d9_set_viewport};
+        iface.bind_vertex_buffer          = {d3d9_bind_vertex_buffer};
+        iface.bind_index_buffer           = {d3d9_bind_index_buffer};
+        iface.upload_transient_vertex_data = {d3d9_upload_transient_vertex_data};
+        iface.upload_transient_index_data = {d3d9_upload_transient_index_data};
+        iface.bind_resources              = {d3d9_bind_resources};
+        iface.draw                        = {d3d9_draw};
+        iface.draw_indexed                = {d3d9_draw_indexed};
 
         return {raw, std::move(iface)};
     }

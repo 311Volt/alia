@@ -270,10 +270,6 @@ namespace alia {
         const graphics_backend_interface *backend_ = nullptr;
     };
 
-    void use(shader_program &program);
-    void reset_shader() noexcept;
-    [[nodiscard]] shader_program_handle *current_shader_program_handle() noexcept;
-
 } // namespace alia
 
 #endif /* SHADER_A879FFEC_0EF8_44FE_9368_C7B98EF8ACF8 */
