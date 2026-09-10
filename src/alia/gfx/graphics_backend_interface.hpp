@@ -1,5 +1,5 @@
-#ifndef GRAPHICS_BACKEND_INTERFACE_BB6C9C63_C0AA_47D0_9CA6_1F400BE39F06
-#define GRAPHICS_BACKEND_INTERFACE_BB6C9C63_C0AA_47D0_9CA6_1F400BE39F06
+#ifndef GRAPHICS_BACKEND_INTERFACE_C6537708_AD74_4B03_AB5F_5848902518DF
+#define GRAPHICS_BACKEND_INTERFACE_C6537708_AD74_4B03_AB5F_5848902518DF
 
 #include "../core/color.hpp"
 #include "../core/rect.hpp"
@@ -34,13 +34,14 @@ namespace alia {
         R (*operation)(Args...) = nullptr;
         std::optional<std::string> reason_unsupported;
 
-        [[nodiscard]] bool is_supported() const noexcept { return operation != nullptr; }
+        [[nodiscard]] bool is_supported() const noexcept {
+            return operation != nullptr;
+        }
 
         auto get_or_throw() const -> R (*)(Args...) {
             if (operation)
                 return operation;
-            throw unsupported_operation_exception(
-                reason_unsupported.value_or("operation not supported by this backend"));
+            throw unsupported_operation_exception(reason_unsupported.value_or("operation not supported by this backend"));
         }
     };
 
@@ -54,14 +55,41 @@ namespace alia {
     struct shader_program_handle {};
     struct pipeline_handle {};
 
-    enum class gfx_backend { auto_, d3d9, opengl };
-    enum class texture_role { color, alpha_mask };
-    enum class texture_usage { sampling_only, render_target };
-    enum class texture_filter { nearest, linear };
-    enum class texture_wrap { clamp, repeat, mirror };
-    enum class buffer_usage { static_mesh, dynamic_mesh };
-    enum class buffer_lock_mode { read_write, read_only, write_only };
-    enum class shader_type { vertex, pixel };
+    enum class gfx_backend {
+        auto_,
+        d3d9,
+        opengl
+    };
+    enum class texture_role {
+        color,
+        alpha_mask
+    };
+    enum class texture_usage {
+        sampling_only,
+        render_target
+    };
+    enum class texture_filter {
+        nearest,
+        linear
+    };
+    enum class texture_wrap {
+        clamp,
+        repeat,
+        mirror
+    };
+    enum class buffer_usage {
+        static_mesh,
+        dynamic_mesh
+    };
+    enum class buffer_lock_mode {
+        read_write,
+        read_only,
+        write_only
+    };
+    enum class shader_type {
+        vertex,
+        pixel
+    };
 
     struct shader_source {
         gfx_backend backend = gfx_backend::auto_;
@@ -88,8 +116,15 @@ namespace alia {
         std::span<const shader_sampler_binding> sampler_bindings = {};
     };
     enum class shader_constant_value_type {
-        float_1, float_2, float_3, float_4,
-        int_1, int_2, int_3, int_4, matrix_4x4,
+        float_1,
+        float_2,
+        float_3,
+        float_4,
+        int_1,
+        int_2,
+        int_3,
+        int_4,
+        matrix_4x4,
     };
     struct shader_constant_payload {
         shader_constant_value_type type = shader_constant_value_type::float_1;
@@ -118,14 +153,14 @@ namespace alia {
     };
     inline constexpr sampler_state linear_clamp{};
     inline constexpr sampler_state linear_wrap{
-        texture_filter::linear, texture_filter::linear, texture_filter::linear,
-        texture_wrap::repeat, texture_wrap::repeat};
+        texture_filter::linear, texture_filter::linear, texture_filter::linear, texture_wrap::repeat, texture_wrap::repeat
+    };
     inline constexpr sampler_state nearest_clamp{
-        texture_filter::nearest, texture_filter::nearest, texture_filter::nearest,
-        texture_wrap::clamp, texture_wrap::clamp};
+        texture_filter::nearest, texture_filter::nearest, texture_filter::nearest, texture_wrap::clamp, texture_wrap::clamp
+    };
     inline constexpr sampler_state nearest_wrap{
-        texture_filter::nearest, texture_filter::nearest, texture_filter::nearest,
-        texture_wrap::repeat, texture_wrap::repeat};
+        texture_filter::nearest, texture_filter::nearest, texture_filter::nearest, texture_wrap::repeat, texture_wrap::repeat
+    };
 
     struct texture_lock_info {
         vec2i origin;
@@ -139,15 +174,50 @@ namespace alia {
         int size_bytes = 0;
         std::byte *data = nullptr;
     };
-    enum class texture_lock_mode { read_write, read_only, write_only };
+    enum class texture_lock_mode {
+        read_write,
+        read_only,
+        write_only
+    };
 
-    enum class primitive_topology { triangle_list, triangle_strip, triangle_fan };
-    enum class cull_mode { none, clockwise, counter_clockwise };
-    enum class compare_func { never, less, equal, less_equal, greater, not_equal, greater_equal, always };
-    enum class blend_factor { zero, one, src_alpha, inv_src_alpha };
-    enum class blend_op { add };
-    enum class texture_operation { vertex_color, replace, modulate, alpha_mask };
-    enum class lighting_mode { unlit };
+    enum class primitive_topology {
+        triangle_list,
+        triangle_strip,
+        triangle_fan
+    };
+    enum class cull_mode {
+        none,
+        clockwise,
+        counter_clockwise
+    };
+    enum class compare_func {
+        never,
+        less,
+        equal,
+        less_equal,
+        greater,
+        not_equal,
+        greater_equal,
+        always
+    };
+    enum class blend_factor {
+        zero,
+        one,
+        src_alpha,
+        inv_src_alpha
+    };
+    enum class blend_op {
+        add
+    };
+    enum class texture_operation {
+        vertex_color,
+        replace,
+        modulate,
+        alpha_mask
+    };
+    enum class lighting_mode {
+        unlit
+    };
 
     struct render_viewport {
         vec2i origin = {};
@@ -166,7 +236,9 @@ namespace alia {
         bool write_enabled = false;
         compare_func compare = compare_func::less_equal;
     };
-    struct raster_state { cull_mode cull = cull_mode::none; };
+    struct raster_state {
+        cull_mode cull = cull_mode::none;
+    };
     struct basic_effect {
         texture_operation texture_op = texture_operation::vertex_color;
         lighting_mode lighting = lighting_mode::unlit;
@@ -266,10 +338,16 @@ namespace alia {
         gfx_backend_op<void(device_handle *, primitive_topology, int, int, int)> draw_indexed;
     };
 
-    struct created_device { device_handle *handle = nullptr; graphics_backend_interface iface; };
-    struct gfx_backend_factory { gfx_backend id; created_device (*create)(); };
+    struct created_device {
+        device_handle *handle = nullptr;
+        graphics_backend_interface iface;
+    };
+    struct gfx_backend_factory {
+        gfx_backend id;
+        created_device (*create)();
+    };
     void register_gfx_backend(gfx_backend_factory factory);
 
 } // namespace alia
 
-#endif /* GRAPHICS_BACKEND_INTERFACE_BB6C9C63_C0AA_47D0_9CA6_1F400BE39F06 */
+#endif /* GRAPHICS_BACKEND_INTERFACE_C6537708_AD74_4B03_AB5F_5848902518DF */

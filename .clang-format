@@ -9,6 +9,7 @@ BreakTemplateDeclarations: Yes
 AllowShortCaseExpressionOnASingleLine: true
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
 AccessModifierOffset: -4
 AlignConsecutiveShortCaseStatements:
   Enabled: true

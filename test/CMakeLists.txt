@@ -23,6 +23,17 @@ target_link_libraries(array_map_tests
     GTest::gtest_main
 )
 
+add_executable(primitive_renderer_tests
+    primitive_renderer_test.cpp
+)
+
+target_link_libraries(primitive_renderer_tests
+    PRIVATE
+    alia
+    GTest::gtest
+    GTest::gtest_main
+)
+
 add_executable(soo_any_tests
     soo_any_test.cpp
 )
@@ -72,6 +83,7 @@ target_link_libraries(vertex_definition_registry_tests
 include(GoogleTest)
 gtest_discover_tests(cstring_view_tests)
 gtest_discover_tests(array_map_tests)
+gtest_discover_tests(primitive_renderer_tests)
 gtest_discover_tests(soo_any_tests)
 gtest_discover_tests(any_deque_tests)
 gtest_discover_tests(pixel_bitmap_tests)

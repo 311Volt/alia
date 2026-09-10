@@ -2,28 +2,29 @@
 #include "alia/gfx/gfx_device.hpp"
 #include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/frame.hpp"
-#include "alia/gfx/painter.hpp"
+#include "alia/gfx/primitive_renderer.hpp"
 #include "alia/gfx/bitmap/image_io.hpp"
-#include "alia/gfx/text/font.hpp"
 #include "alia/events/event_queue.hpp"
 
+#include <array>
 #include <chrono>
 #include <exception>
 #include <iostream>
-#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 
 namespace {
-std::string_view demo_font_path() {
-#if defined(_WIN32)
-    return "C:/Windows/Fonts/segoeui.ttf";
-#elif defined(__APPLE__)
-    return "/System/Library/Fonts/Supplemental/Arial.ttf";
-#else
-    return "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-#endif
+
+std::array<alia::uv_vertex, 6> textured_quad(alia::rect_f rectangle) {
+    return {{
+        {{rectangle.left(), rectangle.top()}, {0.0f, 0.0f}},
+        {{rectangle.right(), rectangle.top()}, {1.0f, 0.0f}},
+        {{rectangle.left(), rectangle.bottom()}, {0.0f, 1.0f}},
+        {{rectangle.right(), rectangle.top()}, {1.0f, 0.0f}},
+        {{rectangle.right(), rectangle.bottom()}, {1.0f, 1.0f}},
+        {{rectangle.left(), rectangle.bottom()}, {0.0f, 1.0f}},
+    }};
 }
 
 alia::gfx_backend requested_backend(int argc, char **argv) {
@@ -33,7 +34,8 @@ alia::gfx_backend requested_backend(int argc, char **argv) {
     if (value == "opengl") return alia::gfx_backend::opengl;
     throw std::invalid_argument("backend must be d3d9 or opengl");
 }
-}
+
+} // namespace
 
 int main(int argc, char **argv) {
     try {
@@ -51,33 +53,27 @@ int main(int argc, char **argv) {
             {{100.0f, 500.0f}, {0.15f, 1.0f, 0.15f}},
             {{700.0f, 500.0f}, {0.15f, 0.15f, 1.0f}},
         };
+
+        alia::basic_effect prim_fx;
+        auto prim_pipeline = alia::pipeline::create<alia::colored_vertex>(device, {.effect = &prim_fx});
+        alia::basic_effect tex_fx{.texture_op = alia::texture_operation::replace};
+        auto tex_pipeline = alia::pipeline::create<alia::uv_vertex>(device, {.effect = &tex_fx});
+        alia::immediate_primitive_renderer renderer;
         alia::texture checker(device, alia::load_image("./resources/test.png"));
-        alia::painter painter(device);
-        std::optional<alia::ttf_font> demo_font;
-        std::optional<alia::text> demo_text;
-        std::optional<alia::text> demo_numbers;
-        std::optional<alia::text> fps_text;
-        std::optional<alia::hardware_glyph_buffer> glyph_cache;
-        try {
-            demo_font.emplace(alia::load_ttf_font(demo_font_path(), 32));
-            demo_text.emplace(*demo_font);
-            demo_text->set_text("The quick brown fox jumps over the lazy dog");
-            demo_numbers.emplace(*demo_font);
-            demo_numbers->set_text("1234567890!@#$%^&*()");
-            fps_text.emplace(*demo_font);
-            fps_text->set_text("FPS: --");
-            glyph_cache.emplace(*demo_font);
-        } catch (const std::exception &error) {
-            std::cerr << "text disabled: " << error.what() << '\n';
-            glyph_cache.reset();
-            fps_text.reset();
-            demo_numbers.reset();
-            demo_text.reset();
-            demo_font.reset();
-        }
+
+        constexpr std::array zigzag{
+            alia::vec2f{350.0f, 205.0f},
+            alia::vec2f{410.0f, 245.0f},
+            alia::vec2f{470.0f, 190.0f},
+            alia::vec2f{535.0f, 250.0f},
+        };
+        const alia::rect_f transformed_rect =
+            alia::rect_f::pos_size({440.0f, 350.0f}, {150.0f, 90.0f});
+        const alia::vec2f transformed_center = transformed_rect.center();
 
         bool running = true;
-        auto fps_window_start = std::chrono::steady_clock::now();
+        const auto animation_start = std::chrono::steady_clock::now();
+        auto fps_window_start = animation_start;
         int fps_frames = 0;
         while (running) {
             win.poll();
@@ -89,44 +85,75 @@ int main(int argc, char **argv) {
                 else if (const auto *key = event.get_if<alia::window_key_down_event>(); key && key->key == alia::key::escape) running = false;
             }
 
-            const auto fps_now = std::chrono::steady_clock::now();
-            const float fps_elapsed = std::chrono::duration<float>(fps_now - fps_window_start).count();
+            const auto now = std::chrono::steady_clock::now();
+            const float elapsed = std::chrono::duration<float>(now - animation_start).count();
+            const float fps_elapsed = std::chrono::duration<float>(now - fps_window_start).count();
             if (fps_elapsed >= 1.0f) {
-                if (fps_text) {
-                    const int fps = static_cast<int>(static_cast<float>(fps_frames) / fps_elapsed + 0.5f);
-                    fps_text->set_text("FPS: " + std::to_string(fps));
-                }
-                fps_window_start = fps_now;
+                const int fps = static_cast<int>(static_cast<float>(fps_frames) / fps_elapsed + 0.5f);
+                const std::string title = "Hello ALIA — pipelines | FPS: " + std::to_string(fps);
+                win.set_title(title.c_str());
+                fps_window_start = now;
                 fps_frames = 0;
             }
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::light_blue);
-            frame.set_pipeline(triangle_pipeline);
+
             triangle_effect.projection = alia::transform::ortho_ui(frame.target_size());
+            frame.set_pipeline(triangle_pipeline);
             frame.draw<alia::colored_vertex>(triangle);
 
-            painter.begin(frame);
-            painter.fill_rect(alia::rect_f::pos_size({50, 50}, {100, 100}), alia::color(1, 1, 0, 0.5f));
-            painter.draw_textured_rect(alia::rect_f::pos_size({50, 250}, {256, 256}), checker);
-            painter.draw_rect(alia::rect_f::pos_size({200, 50}, {100, 100}), alia::color(0, 1, 1, 1), 5.0f);
-            painter.draw_line({50, 200}, {300, 250}, alia::color(1, 0, 1, 1), 3.0f);
-            if (demo_text)
-                painter.draw_text({310, 58}, *demo_text);
-            if (demo_numbers)
-                painter.draw_text({310, 98}, *demo_numbers, alia::color(0.05f, 0.08f, 0.12f, 1.0f));
-            if (fps_text)
-                painter.draw_text({10, 10}, *fps_text);
-            if (demo_font && glyph_cache) {
-                painter.draw_text(
-                    {310.0f, 138.0f},
-                    *demo_font,
-                    "immediate atlas path (hardware_glyph_buffer)",
-                    alia::white,
-                    &*glyph_cache
-                );
-            }
-            painter.end();
+            prim_fx.world = alia::transform::identity();
+            prim_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            frame.set_pipeline(prim_pipeline);
+            renderer.fill_rect(
+                frame,
+                alia::rect_f::pos_size({50.0f, 50.0f}, {100.0f, 100.0f}),
+                alia::color(1.0f, 1.0f, 0.0f, 0.5f)
+            );
+            renderer.draw_rect(
+                frame,
+                alia::rect_f::pos_size({200.0f, 50.0f}, {100.0f, 100.0f}),
+                alia::color(0.0f, 1.0f, 1.0f, 0.65f),
+                5.0f
+            );
+            renderer.draw_rect(
+                frame,
+                alia::rect_f::pos_size({350.0f, 50.0f}, {100.0f, 100.0f}),
+                alia::color(1.0f, 0.55f, 0.1f, 0.85f),
+                8.0f,
+                alia::line_join::bevel
+            );
+            renderer.draw_line(
+                frame,
+                {50.0f, 200.0f},
+                {300.0f, 250.0f},
+                alia::color(1.0f, 0.0f, 1.0f, 1.0f),
+                3.0f
+            );
+            renderer.draw_polyline(
+                frame,
+                zigzag,
+                alia::color(0.05f, 0.15f, 0.45f, 1.0f),
+                10.0f,
+                alia::line_join::bevel
+            );
+
+            tex_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            frame.set_pipeline(tex_pipeline);
+            frame.set_texture(0, checker);
+            const auto checker_quad =
+                textured_quad(alia::rect_f::pos_size({50.0f, 290.0f}, {256.0f, 256.0f}));
+            frame.draw<alia::uv_vertex>(checker_quad);
+
+            prim_fx.world =
+                alia::transform::translate(-1.0f * transformed_center) *
+                alia::transform::rotate(elapsed) *
+                alia::transform::translate(transformed_center);
+            frame.set_pipeline(prim_pipeline);
+            renderer.draw_rect(frame, transformed_rect, alia::white, 5.0f);
+            prim_fx.world = alia::transform::identity();
+
             frame.present();
         }
     } catch (const std::exception &error) {

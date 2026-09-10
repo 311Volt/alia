@@ -1,7 +1,6 @@
 #include "font.hpp"
 
 #include "alia/gfx/bitmap/pixel_types.hpp"
-#include "alia/gfx/painter.hpp"
 #include "alia/gfx/texture.hpp"
 #include "alia/util/utf8.hpp"
 
@@ -313,7 +312,8 @@ namespace alia {
             block_width = (std::max)(block_width, pen_x);
         }
 
-        void rebuild_text_texture(detail::text_impl &impl, gfx_device &device) {
+        // Kept for the future text_renderer.
+        [[maybe_unused]] void rebuild_text_texture(detail::text_impl &impl, gfx_device &device) {
             if (impl.content.empty()) {
                 impl.mask.reset();
                 impl.device = &device;
@@ -570,34 +570,6 @@ namespace alia {
         return *this;
     }
 
-    void painter::draw_text(vec2i position, text &value, color text_color) {
-        auto &frame = active_frame();
-        auto &impl = *value.impl_;
-        if (impl.content.empty())
-            return;
-
-        if (impl.dirty || impl.device != device_)
-            rebuild_text_texture(impl, *device_);
-
-        if (!impl.mask)
-            return;
-
-        const float x0 = static_cast<float>(position.x + impl.draw_offset.x);
-        const float y0 = static_cast<float>(position.y + impl.draw_offset.y);
-        const float x1 = x0 + static_cast<float>(impl.texture_size.x);
-        const float y1 = y0 + static_cast<float>(impl.texture_size.y);
-
-        full_vertex v0{{x0, y0}, text_color, {0.0f, 0.0f}};
-        full_vertex v1{{x1, y0}, text_color, {1.0f, 0.0f}};
-        full_vertex v2{{x0, y1}, text_color, {0.0f, 1.0f}};
-        full_vertex v3{{x1, y1}, text_color, {1.0f, 1.0f}};
-        full_vertex vertices[6] = {v0, v1, v2, v1, v3, v2};
-        pipeline_.set_effect(&mask_fx_);
-        frame.set_pipeline(pipeline_);
-        frame.set_texture(0, *impl.mask);
-        frame.draw<full_vertex>(vertices);
-    }
-
     ttf_font load_ttf_font(std::string_view filename, int pixel_height) {
         if (pixel_height <= 0)
             throw std::invalid_argument("load_ttf_font: pixel height must be positive");
@@ -660,89 +632,6 @@ namespace alia {
         }
 
         return {max_x, metrics.line_height * static_cast<float>(line_count)};
-    }
-
-    void painter::draw_text(vec2f position, font &source, std::string_view text, color text_color, hardware_glyph_buffer *glyph_buffer) {
-        auto &frame = active_frame();
-        if (text.empty())
-            return;
-
-        std::optional<hardware_glyph_buffer> local_buffer;
-        if (!glyph_buffer)
-            local_buffer.emplace(source);
-        hardware_glyph_buffer &buffer = glyph_buffer ? *glyph_buffer : *local_buffer;
-        if (&buffer.source_font() != &source)
-            throw std::invalid_argument("painter::draw_text: glyph buffer belongs to a different font");
-
-        auto &cache = *buffer.impl_;
-        if (!cache.pages.empty() && cache.pages.front().atlas.device() != device_->device())
-            cache.clear();
-
-        std::vector<full_vertex> batch;
-        int batch_page = -1;
-        auto flush = [&] {
-            if (batch.empty())
-                return;
-            pipeline_.set_effect(&glyph_fx_);
-            frame.set_pipeline(pipeline_);
-            frame.set_texture(0, cache.pages[static_cast<std::size_t>(batch_page)].atlas);
-            frame.draw<full_vertex>(batch);
-            batch.clear();
-        };
-
-        const font_metrics metrics = source.metrics();
-        float pen_x = 0.0f;
-        float baseline = position.y + metrics.ascender;
-        uint32_t previous = 0;
-
-        std::size_t offset = 0;
-        while (offset < text.size()) {
-            const uint32_t cp = utf8_read_next_codepoint(text, offset).value_or(utf8_replacement_codepoint);
-            if (cp == '\r')
-                continue;
-            if (cp == '\n') {
-                pen_x = 0.0f;
-                baseline += metrics.line_height;
-                previous = 0;
-                continue;
-            }
-            if (cp == '\t') {
-                const glyph_metrics space = source.get_glyph_metrics(' ');
-                pen_x += space.advance * 4.0f;
-                previous = 0;
-                continue;
-            }
-
-            pen_x += source.kerning(previous, cp);
-
-            detail::cached_glyph &glyph = cache.get(*device_, cp);
-            if (glyph.page >= 0) {
-                const int page_index = glyph.page;
-                if (batch_page != page_index) {
-                    flush();
-                    batch_page = page_index;
-                }
-                const rect_i r = glyph.atlas_rect;
-                const float x0 = position.x + pen_x + static_cast<float>(glyph.metrics.bearing.x - glyph_atlas_border_size);
-                const float y0 = baseline - static_cast<float>(glyph.metrics.bearing.y + glyph_atlas_border_size);
-                const float x1 = x0 + static_cast<float>(r.width());
-                const float y1 = y0 + static_cast<float>(r.height());
-                const float u0 = static_cast<float>(r.left()) / static_cast<float>(cache.page_size.x);
-                const float v0 = static_cast<float>(r.top()) / static_cast<float>(cache.page_size.y);
-                const float u1 = static_cast<float>(r.right()) / static_cast<float>(cache.page_size.x);
-                const float v1 = static_cast<float>(r.bottom()) / static_cast<float>(cache.page_size.y);
-
-                full_vertex v0tx{{x0, y0}, text_color, {u0, v0}};
-                full_vertex v1tx{{x1, y0}, text_color, {u1, v0}};
-                full_vertex v2tx{{x0, y1}, text_color, {u0, v1}};
-                full_vertex v3tx{{x1, y1}, text_color, {u1, v1}};
-                batch.insert(batch.end(), {v0tx, v1tx, v2tx, v1tx, v3tx, v2tx});
-            }
-
-            pen_x += glyph.metrics.advance;
-            previous = cp;
-        }
-        flush();
     }
 
 } // namespace alia

@@ -2,7 +2,7 @@
 #include "alia/gfx/gfx_device.hpp"
 #include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/frame.hpp"
-#include "alia/gfx/painter.hpp"
+#include "alia/gfx/primitive_renderer.hpp"
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/transform.hpp"
 #include "alia/gfx/bitmap/bitmap.hpp"
@@ -127,7 +127,9 @@ int main(int argc, char **argv) {
 
         alia::bitmap checker_bmp = make_checker_bitmap();
         alia::texture checker_tex(device, checker_bmp);
-        alia::painter painter(device);
+        alia::basic_effect prim_fx;
+        auto prim_pipeline = alia::pipeline::create<alia::colored_vertex>(device, {.effect = &prim_fx});
+        alia::immediate_primitive_renderer renderer;
 
         const std::array<alia::shader_source, 4> sources{{
             {
@@ -226,10 +228,20 @@ int main(int argc, char **argv) {
             frame.set_texture(0, checker_tex); // Program samplers may alternatively bind their own texture.
             frame.draw<alia::uv_vertex>(quad);
 
-            painter.begin(frame);
-            painter.draw_rect(alia::rect_f::pos_size({260.0f, 160.0f}, {280.0f, 280.0f}), alia::white, 2.0f);
-            painter.fill_rect(alia::rect_f::pos_size({30.0f, 30.0f}, {80.0f, 80.0f}), alia::color(0.1f, 0.8f, 0.45f, 0.75f));
-            painter.end();
+            prim_fx.world = alia::transform::identity();
+            prim_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            frame.set_pipeline(prim_pipeline);
+            renderer.draw_rect(
+                frame,
+                alia::rect_f::pos_size({260.0f, 160.0f}, {280.0f, 280.0f}),
+                alia::white,
+                2.0f
+            );
+            renderer.fill_rect(
+                frame,
+                alia::rect_f::pos_size({30.0f, 30.0f}, {80.0f, 80.0f}),
+                alia::color(0.1f, 0.8f, 0.45f, 0.75f)
+            );
             frame.present();
         }
     } catch (const std::exception &e) {

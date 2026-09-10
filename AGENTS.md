@@ -6,7 +6,7 @@ The graphics subsystem in `src/alia/gfx/` follows a four-layer split.
 
 | Layer | Location | Role |
 |-------|----------|------|
-| L1 | `*.hpp` (public) | User-facing API: `texture`, `gfx_device`, `swapchain`, `pipeline`, `dynamic_pipeline`, `frame`, `painter` |
+| L1 | `*.hpp` (public) | User-facing API: `texture`, `gfx_device`, `swapchain`, `pipeline`, `dynamic_pipeline`, `frame`, and the primitive renderer family |
 | L2 | `*.hpp` (detail/templates) | Type-erasure shims: `texture::lock<TPixel>` → `lock_impl`, and `frame::draw<TVertex>` → L3 submission helpers |
 | L3 | `*.cpp` (backend-agnostic) | Device/pipeline/frame lifetime and validation, texture format dispatch, and vertex-definition registry; calls into L4 |
 | L4 | `graphics_backend_interface` | Single function-pointer table per device; one slot per backend operation |
@@ -42,10 +42,9 @@ src/alia/gfx/
   gfx_device.hpp / gfx_device.cpp  — L1/L3 for device, swapchain, and backend registry
   pipeline.hpp / pipeline.cpp      — L1/L3 immutable and dynamic pipeline objects
   frame.hpp / frame.cpp            — L1/L2/L3 frame lifetime, target/clear commands, and draw validation
-  painter.hpp / painter.cpp        — L1/L3 persistent 2D rect/line/textured-rect/text renderer
+  primitive_renderer.hpp          — header-only colored-primitive tessellation (batching + immediate)
   texture.hpp / texture.cpp        — L1/L2/L3 for texture (lock template, upload, download, clone)
-  text/                            — FreeType loading, glyph atlas cache, and baked masks; `painter::draw_text` bodies live here because the pimpl types are complete in `font.cpp`
-  primitives.hpp / primitives.cpp  — disabled historical immediate-helper API
+  text/                            — FreeType loading, glyph atlas cache, and baked masks; text drawing is temporarily unavailable pending a `text_renderer`
   backend_d3d9/                    — L4 D3D9 implementation
     d3d9_ops.hpp                   — concrete structs + cast helpers + all op declarations
     register_d3d9_backend.cpp      — probes D3DCAPS2_CANAUTOGENMIPMAP, builds + registers interface
@@ -68,11 +67,13 @@ src/alia/gfx/
 
 Do **not** use `reason_unsupported` for "this backend doesn't implement X yet" — only for genuine hardware-level gaps.
 
-## Frames and painter
+## Frames and primitive renderers
 
 `swapchain::begin_frame()` creates a move-only `frame`; a frame ends with `frame::present()` or, without presenting, its destructor. It initially targets the swapchain backbuffer without clearing. `set_target()` selects the backbuffer (with depth); `set_target(texture, level)` selects a render-target texture mip (without depth); `clear()` is an independent command. A pipeline must be selected before the first draw.
 
-Depth clears and depth-enabled pipelines are valid only while the backbuffer is selected. Dynamic pipeline depth changes are checked again just before draw. Resource bindings persist for the frame across pipeline switches; when selecting a texture target, frame-managed bindings of that same texture are defensively removed. Shader-owned samplers must still avoid sampling the current render target. `painter` owns its effects and dynamic pipeline across frames; `begin(frame)` captures the current target size and `end()` is its future batching flush boundary. Its glyph effect uses `modulate` for the hardware atlas, while its mask effect uses `alpha_mask` for baked text textures. `text` and `hardware_glyph_buffer` grant `painter` friendship so the `painter::draw_text` bodies can live in `font.cpp`, where their pimpl types are complete.
+Depth clears and depth-enabled pipelines are valid only while the backbuffer is selected. Dynamic pipeline depth changes are checked again just before draw. Resource bindings persist for the frame across pipeline switches; when selecting a texture target, frame-managed bindings of that same texture are defensively removed. Shader-owned samplers must still avoid sampling the current render target.
+
+Primitive renderers own no device, effect, pipeline, or transform state. The caller binds a colored-vertex pipeline and owns its `basic_effect` world/projection matrices; re-derive the projection after every `set_target()`, and call `make_current(device)` before using `transform::ortho_ui`. Tessellators append absolute indices to any `primitive_sink`. Because the draw API uses deducing-this, call it on the concrete renderer type: a `generic_primitive_renderer&` is not a sink, while treating an immediate renderer as `primitive_renderer&` silently loses auto-flush. Polyline and rectangle outlines support miter and bevel joins with non-overlapping adjacent geometry for well-formed input. Batched `primitive_renderer` geometry is submitted only by `flush(frame)`; forgetting to flush silently drops it.
 
 ## Adding a new backend operation
 
@@ -80,3 +81,7 @@ Depth clears and depth-enabled pipelines are valid only while the backbuffer is 
 2. Implement the function in each backend's appropriate `.cpp` file and declare it in `*_ops.hpp`.
 3. Wire the slot in `register_*_backend.cpp` (set `operation` pointer, or leave null + set `reason_unsupported` if hardware-conditional).
 4. Add the L3 free function or method in `gfx_device.cpp` / `texture.cpp` that calls `.get_or_throw()`.
+
+## The `slop` folder
+
+They contain AI-generated design documents. They may, or may not be in any way relevant to the current state of the repo. They may, or may not be in any way aligned with the user's intent. Only intentionally read documents from that folder if explicitly asked to / pointed at by the user.

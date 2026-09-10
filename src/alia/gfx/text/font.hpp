@@ -11,8 +11,6 @@
 
 namespace alia {
 
-    class painter;
-
     struct font_metrics {
         float ascender = 0.0f;
         float descender = 0.0f;
@@ -87,8 +85,6 @@ namespace alia {
         void clear();
 
     private:
-        friend class painter;
-
         std::unique_ptr<detail::hardware_glyph_buffer_impl> impl_;
     };
 
@@ -114,8 +110,6 @@ namespace alia {
         text &set_kerning(bool enabled);
 
     private:
-        friend class painter;
-
         std::unique_ptr<detail::text_impl> impl_;
     };
 
