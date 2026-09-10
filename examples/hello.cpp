@@ -4,17 +4,29 @@
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/primitive_renderer.hpp"
 #include "alia/gfx/bitmap/image_io.hpp"
+#include "alia/gfx/text/font.hpp"
 #include "alia/events/event_queue.hpp"
 
 #include <array>
 #include <chrono>
 #include <exception>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 
 namespace {
+
+std::string_view demo_font_path() {
+#if defined(_WIN32)
+    return "C:/Windows/Fonts/segoeui.ttf";
+#elif defined(__APPLE__)
+    return "/System/Library/Fonts/Supplemental/Arial.ttf";
+#else
+    return "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+#endif
+}
 
 std::array<alia::uv_vertex, 6> textured_quad(alia::rect_f rectangle) {
     return {{
@@ -58,8 +70,33 @@ int main(int argc, char **argv) {
         auto prim_pipeline = alia::pipeline::create<alia::colored_vertex>(device, {.effect = &prim_fx});
         alia::basic_effect tex_fx{.texture_op = alia::texture_operation::replace};
         auto tex_pipeline = alia::pipeline::create<alia::uv_vertex>(device, {.effect = &tex_fx});
+        alia::basic_effect text_fx{.texture_op = alia::texture_operation::alpha_mask};
+        auto text_pipeline = alia::pipeline::create<alia::full_vertex>(device, {.effect = &text_fx});
         alia::immediate_primitive_renderer renderer;
         alia::texture checker(device, alia::load_image("./resources/test.png"));
+
+        std::optional<alia::ttf_font> demo_font;
+        std::optional<alia::text> demo_text;
+        std::optional<alia::text> demo_numbers;
+        std::optional<alia::text> fps_text;
+        std::optional<alia::hardware_glyph_buffer> glyph_cache;
+        try {
+            demo_font.emplace(alia::load_ttf_font(demo_font_path(), 32));
+            demo_text.emplace(device, *demo_font);
+            demo_text->set_text("The quick brown fox jumps over the lazy dog");
+            demo_numbers.emplace(device, *demo_font);
+            demo_numbers->set_text("1234567890!@#$%^&*()");
+            fps_text.emplace(device, *demo_font);
+            fps_text->set_text("FPS: --");
+            glyph_cache.emplace(device, *demo_font);
+        } catch (const std::exception &error) {
+            std::cerr << "text disabled: " << error.what() << '\n';
+            glyph_cache.reset();
+            fps_text.reset();
+            demo_numbers.reset();
+            demo_text.reset();
+            demo_font.reset();
+        }
 
         constexpr std::array zigzag{
             alia::vec2f{350.0f, 205.0f},
@@ -90,6 +127,8 @@ int main(int argc, char **argv) {
             const float fps_elapsed = std::chrono::duration<float>(now - fps_window_start).count();
             if (fps_elapsed >= 1.0f) {
                 const int fps = static_cast<int>(static_cast<float>(fps_frames) / fps_elapsed + 0.5f);
+                if (fps_text)
+                    fps_text->set_text("FPS: " + std::to_string(fps));
                 const std::string title = "Hello ALIA — pipelines | FPS: " + std::to_string(fps);
                 win.set_title(title.c_str());
                 fps_window_start = now;
@@ -153,6 +192,29 @@ int main(int argc, char **argv) {
             frame.set_pipeline(prim_pipeline);
             renderer.draw_rect(frame, transformed_rect, alia::white, 5.0f);
             prim_fx.world = alia::transform::identity();
+
+            text_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            frame.set_pipeline(text_pipeline);
+            if (demo_text)
+                alia::draw_text(frame, {310.0f, 58.0f}, *demo_text);
+            if (demo_numbers) {
+                alia::draw_text(
+                    frame,
+                    {310.0f, 98.0f},
+                    *demo_numbers,
+                    alia::color(0.05f, 0.08f, 0.12f, 1.0f)
+                );
+            }
+            if (fps_text)
+                alia::draw_text(frame, {10.0f, 10.0f}, *fps_text);
+            if (glyph_cache) {
+                alia::draw_text(
+                    frame,
+                    {310.0f, 138.0f},
+                    *glyph_cache,
+                    "immediate atlas path (hardware_glyph_buffer)"
+                );
+            }
 
             frame.present();
         }

@@ -44,7 +44,7 @@ src/alia/gfx/
   frame.hpp / frame.cpp            — L1/L2/L3 frame lifetime, target/clear commands, and draw validation
   primitive_renderer.hpp          — header-only colored-primitive tessellation (batching + immediate)
   texture.hpp / texture.cpp        — L1/L2/L3 for texture (lock template, upload, download, clone)
-  text/                            — FreeType loading, glyph atlas cache, and baked masks; text drawing is temporarily unavailable pending a `text_renderer`
+  text/                            — FreeType loading, gray8 glyph atlas cache, baked masks, and free-function `draw_text`
   backend_d3d9/                    — L4 D3D9 implementation
     d3d9_ops.hpp                   — concrete structs + cast helpers + all op declarations
     register_d3d9_backend.cpp      — probes D3DCAPS2_CANAUTOGENMIPMAP, builds + registers interface
@@ -74,6 +74,8 @@ Do **not** use `reason_unsupported` for "this backend doesn't implement X yet" �
 Depth clears and depth-enabled pipelines are valid only while the backbuffer is selected. Dynamic pipeline depth changes are checked again just before draw. Resource bindings persist for the frame across pipeline switches; when selecting a texture target, frame-managed bindings of that same texture are defensively removed. Shader-owned samplers must still avoid sampling the current render target.
 
 Primitive renderers own no device, effect, pipeline, or transform state. The caller binds a colored-vertex pipeline and owns its `basic_effect` world/projection matrices; re-derive the projection after every `set_target()`, and call `make_current(device)` before using `transform::ortho_ui`. Tessellators append absolute indices to any `primitive_sink`. Because the draw API uses deducing-this, call it on the concrete renderer type: a `generic_primitive_renderer&` is not a sink, while treating an immediate renderer as `primitive_renderer&` silently loses auto-flush. Polyline and rectangle outlines support miter and bevel joins with non-overlapping adjacent geometry for well-formed input. Batched `primitive_renderer` geometry is submitted only by `flush(frame)`; forgetting to flush silently drops it.
+
+Text drawing requires the caller to bind a `full_vertex` pipeline whose `basic_effect` uses `texture_operation::alpha_mask` and owns the projection. `draw_text` rebinds texture slot 0, whose binding persists for the frame, so callers relying on that slot must rebind it afterwards. Drawing submits immediately: one indexed draw per atlas page touched for `hardware_glyph_buffer`, or one for a baked `text`. Both text resource types bind to a device at construction and must not outlive it.
 
 ## Adding a new backend operation
 

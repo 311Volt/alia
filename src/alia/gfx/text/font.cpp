@@ -1,6 +1,7 @@
 #include "font.hpp"
 
 #include "alia/gfx/bitmap/pixel_types.hpp"
+#include "alia/gfx/frame.hpp"
 #include "alia/gfx/texture.hpp"
 #include "alia/util/utf8.hpp"
 
@@ -104,12 +105,14 @@ namespace alia {
         };
 
         struct hardware_glyph_buffer_impl {
+            gfx_device *device = nullptr;
             font *source = nullptr;
             vec2i page_size = {1024, 1024};
             std::unordered_map<uint32_t, cached_glyph> glyphs;
             std::vector<glyph_page> pages;
 
-            hardware_glyph_buffer_impl(font &source, vec2i page_size) : source(&source), page_size(page_size) {
+            hardware_glyph_buffer_impl(gfx_device &device, font &source, vec2i page_size)
+                : device(&device), source(&source), page_size(page_size) {
                 if (page_size.x <= glyph_atlas_border_size * 2 || page_size.y <= glyph_atlas_border_size * 2)
                     throw std::invalid_argument("hardware_glyph_buffer: page size is too small");
             }
@@ -119,9 +122,9 @@ namespace alia {
                 pages.clear();
             }
 
-            glyph_page &add_page(gfx_device &device) {
-                bitmap blank(page_size, px_bgra8888{255, 255, 255, 0});
-                texture atlas(device, blank, 1, texture_role::color, texture_usage::sampling_only);
+            glyph_page &add_page() {
+                bitmap blank(page_size, px_gray_u8{0});
+                texture atlas(*device, blank, 1, texture_role::alpha_mask, texture_usage::sampling_only);
 
                 atlas.set_sampler({
                     .min_filter = texture_filter::linear,
@@ -135,13 +138,13 @@ namespace alia {
                 return pages.back();
             }
 
-            glyph_page &page_with_space(gfx_device &device, vec2i size) {
+            glyph_page &page_with_space(vec2i size) {
                 if (size.x + glyph_atlas_border_size * 2 > page_size.x || size.y + glyph_atlas_border_size * 2 > page_size.y) {
                     throw std::runtime_error("hardware_glyph_buffer: glyph is larger than the atlas page");
                 }
 
                 if (pages.empty())
-                    return add_page(device);
+                    return add_page();
 
                 glyph_page *page = &pages.back();
                 if (page->cursor_x + size.x + glyph_atlas_border_size * 2 > page_size.x) {
@@ -151,12 +154,12 @@ namespace alia {
                 }
 
                 if (page->cursor_y + size.y + glyph_atlas_border_size * 2 > page_size.y)
-                    return add_page(device);
+                    return add_page();
 
                 return *page;
             }
 
-            cached_glyph &get(gfx_device &device, uint32_t codepoint) {
+            cached_glyph &get(uint32_t codepoint) {
                 if (auto it = glyphs.find(codepoint); it != glyphs.end())
                     return it->second;
 
@@ -165,7 +168,7 @@ namespace alia {
                 glyph.metrics = rendered.metrics;
 
                 if (rendered.has_bitmap()) {
-                    glyph_page &page = page_with_space(device, rendered.metrics.bitmap_size);
+                    glyph_page &page = page_with_space(rendered.metrics.bitmap_size);
                     glyph.page = static_cast<int>(pages.size()) - 1;
                     glyph.atlas_rect = rect_i::pos_size(
                         {page.cursor_x, page.cursor_y},
@@ -175,9 +178,9 @@ namespace alia {
                         }
                     );
 
-                    if (auto region = page.atlas.lock_write_only<px_bgra8888>(glyph.atlas_rect)) {
+                    if (auto region = page.atlas.lock_write_only<px_gray_u8>(glyph.atlas_rect)) {
                         auto &view = region.view();
-                        constexpr px_bgra8888 transparent{255, 255, 255, 0};
+                        constexpr px_gray_u8 transparent{0};
 
                         // write_only contract: every pixel in the locked region
                         // must be written. Fill the border with the atlas's
@@ -197,7 +200,7 @@ namespace alia {
                         for (int y = 0; y < rendered.metrics.bitmap_size.y; ++y) {
                             for (int x = 0; x < rendered.metrics.bitmap_size.x; ++x) {
                                 const auto alpha = rendered.coverage[static_cast<std::size_t>(y) * rendered.metrics.bitmap_size.x + x];
-                                view[x + glyph_atlas_border_size, y + glyph_atlas_border_size] = px_bgra8888{255, 255, 255, alpha};
+                                view[x + glyph_atlas_border_size, y + glyph_atlas_border_size] = px_gray_u8{alpha};
                             }
                         }
                     } else {
@@ -213,10 +216,6 @@ namespace alia {
             }
         };
 
-        struct laid_out_text_line {
-            float width = 0.0f;
-        };
-
         struct laid_out_text_glyph {
             int line = 0;
             float pen_x = 0.0f;
@@ -224,6 +223,7 @@ namespace alia {
         };
 
         struct text_impl {
+            gfx_device *device = nullptr;
             font *source = nullptr;
             std::string content;
             text_align align = text_align::left;
@@ -231,11 +231,10 @@ namespace alia {
             bool kerning = true;
             bool dirty = true;
             std::optional<texture> mask;
-            gfx_device *device = nullptr;
             vec2i texture_size;
             vec2i draw_offset;
 
-            explicit text_impl(font &source) : source(&source) {}
+            text_impl(gfx_device &device, font &source) : device(&device), source(&source) {}
         };
 
     } // namespace detail
@@ -258,18 +257,16 @@ namespace alia {
             return 0.0f;
         }
 
-        void layout_text(
+        template <class Visitor>
+        void walk_text(
             font &source,
             std::string_view value,
             bool kerning,
-            std::vector<detail::laid_out_text_line> &lines,
-            std::vector<detail::laid_out_text_glyph> &glyphs,
-            float &block_width
+            std::vector<float> &line_widths,
+            Visitor &&visit
         ) {
-            lines.clear();
-            glyphs.clear();
-            lines.push_back({});
-            block_width = 0.0f;
+            line_widths.clear();
+            line_widths.push_back(0.0f);
 
             float pen_x = 0.0f;
             uint32_t previous = 0;
@@ -280,9 +277,8 @@ namespace alia {
                 if (cp == '\r')
                     continue;
                 if (cp == '\n') {
-                    lines.back().width = pen_x;
-                    block_width = (std::max)(block_width, pen_x);
-                    lines.push_back({});
+                    line_widths.back() = pen_x;
+                    line_widths.push_back(0.0f);
                     pen_x = 0.0f;
                     previous = 0;
                     continue;
@@ -297,39 +293,44 @@ namespace alia {
                 if (kerning)
                     pen_x += source.kerning(previous, cp);
 
-                rendered_glyph rendered = source.render_glyph(cp);
-                const float advance = rendered.metrics.advance;
-                glyphs.push_back(detail::laid_out_text_glyph{
-                    .line = static_cast<int>(lines.size()) - 1,
-                    .pen_x = pen_x,
-                    .rendered = std::move(rendered),
-                });
-                pen_x += advance;
+                pen_x += visit(cp, static_cast<int>(line_widths.size()) - 1, pen_x);
                 previous = cp;
             }
 
-            lines.back().width = pen_x;
-            block_width = (std::max)(block_width, pen_x);
+            line_widths.back() = pen_x;
         }
 
-        // Kept for the future text_renderer.
-        [[maybe_unused]] void rebuild_text_texture(detail::text_impl &impl, gfx_device &device) {
+        void rebuild_text_texture(detail::text_impl &impl) {
             if (impl.content.empty()) {
                 impl.mask.reset();
-                impl.device = &device;
                 impl.texture_size = {};
                 impl.draw_offset = {};
                 impl.dirty = false;
                 return;
             }
 
-            std::vector<detail::laid_out_text_line> lines;
+            std::vector<float> line_widths;
             std::vector<detail::laid_out_text_glyph> glyphs;
-            float block_width = 0.0f;
-            layout_text(*impl.source, impl.content, impl.kerning, lines, glyphs, block_width);
+            walk_text(
+                *impl.source,
+                impl.content,
+                impl.kerning,
+                line_widths,
+                [&](uint32_t cp, int line, float pen_x) {
+                    rendered_glyph rendered = impl.source->render_glyph(cp);
+                    const float advance = rendered.metrics.advance;
+                    glyphs.push_back(detail::laid_out_text_glyph{
+                        .line = line,
+                        .pen_x = pen_x,
+                        .rendered = std::move(rendered),
+                    });
+                    return advance;
+                }
+            );
+            const float block_width = *std::max_element(line_widths.begin(), line_widths.end());
 
             const font_metrics metrics = impl.source->metrics();
-            const float block_height = metrics.line_height * static_cast<float>(lines.size());
+            const float block_height = metrics.line_height * static_cast<float>(line_widths.size());
 
             float min_x = 0.0f;
             float min_y = 0.0f;
@@ -341,8 +342,8 @@ namespace alia {
                 if (!glyph.rendered.has_bitmap())
                     continue;
 
-                const auto &line = lines[static_cast<std::size_t>(glyph.line)];
-                const float line_x = text_align_offset(impl.align, block_width, line.width);
+                const float line_width = line_widths[static_cast<std::size_t>(glyph.line)];
+                const float line_x = text_align_offset(impl.align, block_width, line_width);
                 const float baseline = metrics.ascender + metrics.line_height * static_cast<float>(glyph.line);
                 const float x0 = line_x + glyph.pen_x + static_cast<float>(glyph.rendered.metrics.bearing.x);
                 const float y0 = baseline - static_cast<float>(glyph.rendered.metrics.bearing.y);
@@ -358,7 +359,6 @@ namespace alia {
 
             if (!has_bitmap && block_width <= 0.0f) {
                 impl.mask.reset();
-                impl.device = &device;
                 impl.texture_size = {};
                 impl.draw_offset = {};
                 impl.dirty = false;
@@ -378,8 +378,8 @@ namespace alia {
                 if (!glyph.rendered.has_bitmap())
                     continue;
 
-                const auto &line = lines[static_cast<std::size_t>(glyph.line)];
-                const float line_x = text_align_offset(impl.align, block_width, line.width);
+                const float line_width = line_widths[static_cast<std::size_t>(glyph.line)];
+                const float line_x = text_align_offset(impl.align, block_width, line_width);
                 const float baseline = metrics.ascender + metrics.line_height * static_cast<float>(glyph.line);
                 const float x0 = line_x + glyph.pen_x + static_cast<float>(glyph.rendered.metrics.bearing.x);
                 const float y0 = baseline - static_cast<float>(glyph.rendered.metrics.bearing.y);
@@ -407,7 +407,7 @@ namespace alia {
                 }
             }
 
-            texture mask(device, coverage, 1, texture_role::alpha_mask, texture_usage::sampling_only);
+            texture mask(*impl.device, coverage, 1, texture_role::alpha_mask, texture_usage::sampling_only);
 
             const texture_filter filter = impl.antialiasing ? texture_filter::linear : texture_filter::nearest;
             mask.set_sampler({
@@ -419,7 +419,6 @@ namespace alia {
             });
 
             impl.mask = std::move(mask);
-            impl.device = &device;
             impl.texture_size = size;
             impl.draw_offset = {left, top};
             impl.dirty = false;
@@ -501,8 +500,8 @@ namespace alia {
         return from_26_6(delta.x);
     }
 
-    hardware_glyph_buffer::hardware_glyph_buffer(font &source, vec2i page_size)
-        : impl_(std::make_unique<detail::hardware_glyph_buffer_impl>(source, page_size)) {
+    hardware_glyph_buffer::hardware_glyph_buffer(gfx_device &device, font &source, vec2i page_size)
+        : impl_(std::make_unique<detail::hardware_glyph_buffer_impl>(device, source, page_size)) {
     }
 
     hardware_glyph_buffer::~hardware_glyph_buffer() = default;
@@ -517,7 +516,8 @@ namespace alia {
         impl_->clear();
     }
 
-    text::text(font &source) : impl_(std::make_unique<detail::text_impl>(source)) {
+    text::text(gfx_device &device, font &source)
+        : impl_(std::make_unique<detail::text_impl>(device, source)) {
     }
 
     text::~text() = default;
@@ -534,7 +534,6 @@ namespace alia {
         impl_->dirty = true;
         if (impl_->content.empty()) {
             impl_->mask.reset();
-            impl_->device = nullptr;
             impl_->texture_size = {};
             impl_->draw_offset = {};
             impl_->dirty = false;
@@ -595,43 +594,130 @@ namespace alia {
         return ttf_font(std::move(impl));
     }
 
-    vec2f measure_text(font &source, std::string_view text) {
+    vec2f measure_text(font &source, std::string_view text, bool kerning) {
         if (text.empty())
             return {};
 
-        const font_metrics metrics = source.metrics();
-        float pen_x = 0.0f;
-        float max_x = 0.0f;
-        int line_count = 1;
-        uint32_t previous = 0;
-
-        std::size_t offset = 0;
-        while (offset < text.size()) {
-            const uint32_t cp = utf8_read_next_codepoint(text, offset).value_or(utf8_replacement_codepoint);
-            if (cp == '\r')
-                continue;
-            if (cp == '\n') {
-                max_x = (std::max)(max_x, pen_x);
-                pen_x = 0.0f;
-                previous = 0;
-                ++line_count;
-                continue;
+        std::vector<float> line_widths;
+        walk_text(
+            source,
+            text,
+            kerning,
+            line_widths,
+            [&](uint32_t cp, int, float) {
+                return source.get_glyph_metrics(cp).advance;
             }
+        );
 
-            if (cp == '\t') {
-                const glyph_metrics space = source.get_glyph_metrics(' ');
-                pen_x += space.advance * 4.0f;
-                previous = 0;
-                continue;
+        const float width = *std::max_element(line_widths.begin(), line_widths.end());
+        return {
+            width,
+            source.metrics().line_height * static_cast<float>(line_widths.size()),
+        };
+    }
+
+    void draw_text(
+        frame &target,
+        vec2f position,
+        hardware_glyph_buffer &buffer,
+        std::string_view value,
+        color text_color
+    ) {
+        if (value.empty())
+            return;
+
+        auto &cache = *buffer.impl_;
+        std::vector<full_vertex> vertices;
+        std::vector<uint32_t> indices;
+        int batch_page = -1;
+
+        const auto flush = [&] {
+            if (vertices.empty())
+                return;
+
+            target.set_texture(0, cache.pages[static_cast<std::size_t>(batch_page)].atlas);
+            target.draw_indexed<full_vertex>(vertices, indices);
+            vertices.clear();
+            indices.clear();
+        };
+
+        const font_metrics metrics = cache.source->metrics();
+        const float first_baseline = position.y + metrics.ascender;
+        std::vector<float> line_widths;
+        walk_text(
+            *cache.source,
+            value,
+            true,
+            line_widths,
+            [&](uint32_t cp, int line, float pen_x) {
+                detail::cached_glyph &glyph = cache.get(cp);
+                if (glyph.page >= 0) {
+                    const int page_index = glyph.page;
+                    if (batch_page != page_index) {
+                        flush();
+                        batch_page = page_index;
+                    }
+
+                    const rect_i atlas_rect = glyph.atlas_rect;
+                    const float x0 = position.x + pen_x +
+                        static_cast<float>(glyph.metrics.bearing.x - glyph_atlas_border_size);
+                    const float baseline =
+                        first_baseline + metrics.line_height * static_cast<float>(line);
+                    const float y0 = baseline -
+                        static_cast<float>(glyph.metrics.bearing.y + glyph_atlas_border_size);
+                    const float x1 = x0 + static_cast<float>(atlas_rect.width());
+                    const float y1 = y0 + static_cast<float>(atlas_rect.height());
+                    const float u0 = static_cast<float>(atlas_rect.left()) /
+                        static_cast<float>(cache.page_size.x);
+                    const float v0 = static_cast<float>(atlas_rect.top()) /
+                        static_cast<float>(cache.page_size.y);
+                    const float u1 = static_cast<float>(atlas_rect.right()) /
+                        static_cast<float>(cache.page_size.x);
+                    const float v1 = static_cast<float>(atlas_rect.bottom()) /
+                        static_cast<float>(cache.page_size.y);
+
+                    const uint32_t base = static_cast<uint32_t>(vertices.size());
+                    vertices.insert(
+                        vertices.end(),
+                        {
+                            {{x0, y0}, text_color, {u0, v0}},
+                            {{x1, y0}, text_color, {u1, v0}},
+                            {{x1, y1}, text_color, {u1, v1}},
+                            {{x0, y1}, text_color, {u0, v1}},
+                        }
+                    );
+                    indices.insert(
+                        indices.end(),
+                        {base, base + 1, base + 2, base, base + 2, base + 3}
+                    );
+                }
+                return glyph.metrics.advance;
             }
+        );
+        flush();
+    }
 
-            pen_x += source.kerning(previous, cp);
-            pen_x += source.get_glyph_metrics(cp).advance;
-            max_x = (std::max)(max_x, pen_x);
-            previous = cp;
-        }
+    void draw_text(frame &target, vec2f position, text &value, color text_color) {
+        auto &impl = *value.impl_;
+        if (impl.dirty)
+            rebuild_text_texture(impl);
+        if (!impl.mask)
+            return;
 
-        return {max_x, metrics.line_height * static_cast<float>(line_count)};
+        const float x0 = position.x + static_cast<float>(impl.draw_offset.x);
+        const float y0 = position.y + static_cast<float>(impl.draw_offset.y);
+        const float x1 = x0 + static_cast<float>(impl.texture_size.x);
+        const float y1 = y0 + static_cast<float>(impl.texture_size.y);
+        const full_vertex vertices[]{
+            {{x0, y0}, text_color, {0.0f, 0.0f}},
+            {{x1, y0}, text_color, {1.0f, 0.0f}},
+            {{x1, y1}, text_color, {1.0f, 1.0f}},
+            {{x0, y1}, text_color, {0.0f, 1.0f}},
+        };
+        constexpr uint32_t indices[]{0, 1, 2, 0, 2, 3};
+
+        target.set_texture(0, *impl.mask);
+        target.draw_indexed<full_vertex>(vertices, indices);
     }
 
 } // namespace alia

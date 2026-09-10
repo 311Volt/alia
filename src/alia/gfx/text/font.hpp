@@ -11,6 +11,9 @@
 
 namespace alia {
 
+    class frame;
+    class gfx_device;
+
     struct font_metrics {
         float ascender = 0.0f;
         float descender = 0.0f;
@@ -73,7 +76,7 @@ namespace alia {
 
     class hardware_glyph_buffer {
     public:
-        explicit hardware_glyph_buffer(font &source, vec2i page_size = {1024, 1024});
+        hardware_glyph_buffer(gfx_device &device, font &source, vec2i page_size = {1024, 1024});
         ~hardware_glyph_buffer();
 
         hardware_glyph_buffer(hardware_glyph_buffer &&) noexcept;
@@ -85,6 +88,14 @@ namespace alia {
         void clear();
 
     private:
+        friend void draw_text(
+            frame &target,
+            vec2f position,
+            hardware_glyph_buffer &buffer,
+            std::string_view value,
+            color text_color
+        );
+
         std::unique_ptr<detail::hardware_glyph_buffer_impl> impl_;
     };
 
@@ -96,7 +107,7 @@ namespace alia {
 
     class text {
     public:
-        explicit text(font &source);
+        text(gfx_device &device, font &source);
         ~text();
 
         text(text &&) noexcept;
@@ -110,12 +121,26 @@ namespace alia {
         text &set_kerning(bool enabled);
 
     private:
+        friend void draw_text(frame &target, vec2f position, text &value, color text_color);
+
         std::unique_ptr<detail::text_impl> impl_;
     };
 
     [[nodiscard]] ttf_font load_ttf_font(std::string_view filename, int pixel_height = 32);
 
-    [[nodiscard]] vec2f measure_text(font &source, std::string_view text);
+    [[nodiscard]] vec2f measure_text(font &source, std::string_view text, bool kerning = true);
+
+    // The caller binds a full_vertex pipeline whose basic_effect uses
+    // texture_operation::alpha_mask and owns the projection. Both overloads
+    // rebind texture slot 0 and submit immediately.
+    void draw_text(
+        frame &target,
+        vec2f position,
+        hardware_glyph_buffer &buffer,
+        std::string_view value,
+        color text_color = white
+    );
+    void draw_text(frame &target, vec2f position, text &value, color text_color = white);
 
 } // namespace alia
 
