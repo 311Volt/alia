@@ -6,6 +6,16 @@
 #include <GL/gl.h>
 #include <GL/glext.h>
 
+#ifndef GL_TEXTURE_CUBE_MAP
+#define GL_TEXTURE_CUBE_MAP 0x8513
+#endif
+#ifndef GL_TEXTURE_CUBE_MAP_POSITIVE_X
+#define GL_TEXTURE_CUBE_MAP_POSITIVE_X 0x8515
+#endif
+#ifndef GL_TEXTURE_WRAP_R
+#define GL_TEXTURE_WRAP_R 0x8072
+#endif
+
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -46,6 +56,7 @@ namespace alia {
     };
     struct ogl_texture : texture_handle {
         GLuint tex_id = 0;
+        GLenum target = GL_TEXTURE_2D;
         int width = 0, height = 0, mip_levels = 1;
         pixel_format fmt = pixel_format::rgba8888;
         texture_role role = texture_role::color;
@@ -88,6 +99,11 @@ namespace alia {
     inline ogl_device *as_ogl_device(device_handle *h) { return static_cast<ogl_device *>(h); }
     inline ogl_texture *as_ogl_texture(texture_handle *h) { return static_cast<ogl_texture *>(h); }
     inline const ogl_texture *as_ogl_texture(const texture_handle *h) { return static_cast<const ogl_texture *>(h); }
+    inline GLenum ogl_face_target(const ogl_texture &texture, int face) {
+        return texture.target == GL_TEXTURE_CUBE_MAP
+            ? static_cast<GLenum>(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face)
+            : GL_TEXTURE_2D;
+    }
     inline ogl_vertex_buffer *as_ogl_vertex_buffer(vertex_buffer_handle *h) { return static_cast<ogl_vertex_buffer *>(h); }
     inline const ogl_vertex_buffer *as_ogl_vertex_buffer(const vertex_buffer_handle *h) { return static_cast<const ogl_vertex_buffer *>(h); }
     inline ogl_index_buffer *as_ogl_index_buffer(index_buffer_handle *h) { return static_cast<ogl_index_buffer *>(h); }
@@ -99,11 +115,13 @@ namespace alia {
 
     ogl_device *ogl_create_device(const gfx_device_config &); void ogl_destroy_device(device_handle *);
     texture_handle *ogl_create_texture(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage); void ogl_destroy_texture(texture_handle *);
+    texture_handle *ogl_create_cube_texture(device_handle *, pixel_format, int, int, texture_usage);
     pixel_format ogl_texture_format(const texture_handle *); int ogl_texture_width(const texture_handle *); int ogl_texture_height(const texture_handle *); int ogl_texture_mip_levels(const texture_handle *);
     sampler_state ogl_texture_sampler(const texture_handle *); void ogl_texture_set_sampler(texture_handle *, const sampler_state &);
     bool ogl_texture_lock(texture_handle *, rect_i, int, texture_lock_mode, texture_lock_info &); void ogl_texture_unlock(texture_handle *, const texture_lock_info &, bool);
+    bool ogl_cube_texture_lock(texture_handle *, cube_face, rect_i, int, texture_lock_mode, texture_lock_info &);
     void ogl_texture_generate_mipmaps(texture_handle *); texture_handle *ogl_texture_clone(const texture_handle *);
-    bool ogl_copy_render_target_to_texture(device_handle *, texture_handle *, rect_i, vec2i, vec2i, int);
+    bool ogl_copy_render_target_to_texture(device_handle *, texture_handle *, rect_i, vec2i, vec2i, int, int);
     vertex_buffer_handle *ogl_create_vertex_buffer(device_handle *, int, int, buffer_usage, const void *); void ogl_destroy_vertex_buffer(vertex_buffer_handle *);
     int ogl_vertex_buffer_count(const vertex_buffer_handle *); int ogl_vertex_buffer_stride(const vertex_buffer_handle *); buffer_usage ogl_vertex_buffer_usage(const vertex_buffer_handle *);
     bool ogl_vertex_buffer_lock(vertex_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void ogl_vertex_buffer_unlock(vertex_buffer_handle *, const buffer_lock_info &, bool);

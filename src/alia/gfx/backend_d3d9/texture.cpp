@@ -87,7 +87,12 @@ namespace alia {
             }
         }
 
-        bool d3d9_supports_texture_format(IDirect3DDevice9 *device, D3DFORMAT fmt, DWORD usage) {
+        bool d3d9_supports_texture_format(
+            IDirect3DDevice9 *device,
+            D3DFORMAT fmt,
+            DWORD usage,
+            D3DRESOURCETYPE resource_type
+        ) {
             if (fmt == D3DFMT_UNKNOWN)
                 return false;
 
@@ -102,16 +107,22 @@ namespace alia {
                 SUCCEEDED(d3d->GetAdapterDisplayMode(params.AdapterOrdinal, &display_mode)) &&
                 SUCCEEDED(d3d->CheckDeviceFormat(
                     params.AdapterOrdinal, params.DeviceType,
-                    display_mode.Format, usage, D3DRTYPE_TEXTURE, fmt
+                    display_mode.Format, usage, resource_type, fmt
                 ));
 
             d3d->Release();
             return supported;
         }
 
-        pixel_format choose_d3d9_texture_format(IDirect3DDevice9 *device, pixel_format requested, DWORD usage, texture_role role) {
+        pixel_format choose_d3d9_texture_format(
+            IDirect3DDevice9 *device,
+            pixel_format requested,
+            DWORD usage,
+            texture_role role,
+            D3DRESOURCETYPE resource_type
+        ) {
             const D3DFORMAT requested_fmt = to_d3d_format(requested, role);
-            if (d3d9_supports_texture_format(device, requested_fmt, usage))
+            if (d3d9_supports_texture_format(device, requested_fmt, usage, resource_type))
                 return requested;
 
             if (role == texture_role::alpha_mask)
@@ -124,7 +135,8 @@ namespace alia {
             case pixel_format::bgra8888:
             case pixel_format::rgb565:
             case pixel_format::gray_u8:
-                if (d3d9_supports_texture_format(device, D3DFMT_A8R8G8B8, usage))
+                if (d3d9_supports_texture_format(
+                        device, D3DFMT_A8R8G8B8, usage, resource_type))
                     return pixel_format::bgra8888;
                 break;
             default: break;
@@ -159,6 +171,29 @@ namespace alia {
             return {r.left(), r.top(), r.right(), r.bottom()};
         }
 
+        HRESULT lock_rect(
+            const d3d9_texture &texture,
+            int face,
+            int level,
+            D3DLOCKED_RECT *locked,
+            const RECT *region,
+            DWORD flags
+        ) {
+            return texture.cube
+                ? texture.cube->LockRect(
+                    static_cast<D3DCUBEMAP_FACES>(face), static_cast<UINT>(level),
+                    locked, region, flags)
+                : texture.texture->LockRect(
+                    static_cast<UINT>(level), locked, region, flags);
+        }
+
+        HRESULT unlock_rect(const d3d9_texture &texture, int face, int level) {
+            return texture.cube
+                ? texture.cube->UnlockRect(
+                    static_cast<D3DCUBEMAP_FACES>(face), static_cast<UINT>(level))
+                : texture.texture->UnlockRect(static_cast<UINT>(level));
+        }
+
         bool create_sysmem_surface_for_level(const d3d9_texture &t, int level, IDirect3DSurface9 **out) {
             const vec2i size = level_size(t, level);
             const D3DFORMAT fmt = to_d3d_format(t.fmt, t.role);
@@ -172,16 +207,25 @@ namespace alia {
             ));
         }
 
-        bool copy_render_target_level_to_sysmem(const d3d9_texture &t, int level, IDirect3DSurface9 *dst) {
+        bool copy_render_target_level_to_sysmem(
+            const d3d9_texture &t, int face, int level, IDirect3DSurface9 *dst
+        ) {
             com_ptr<IDirect3DSurface9> src;
-            if (FAILED(t.texture->GetSurfaceLevel(static_cast<UINT>(level), src.put())))
+            if (FAILED(d3d9_get_level_surface(t, face, level, src.put())))
                 return false;
             return SUCCEEDED(t.device->GetRenderTargetData(src.get(), dst));
         }
 
-        bool update_render_target_level_from_sysmem(d3d9_texture &t, int level, IDirect3DSurface9 *src, const RECT *src_rect, const POINT *dst_point) {
+        bool update_render_target_level_from_sysmem(
+            d3d9_texture &t,
+            int face,
+            int level,
+            IDirect3DSurface9 *src,
+            const RECT *src_rect,
+            const POINT *dst_point
+        ) {
             com_ptr<IDirect3DSurface9> dst;
-            if (FAILED(t.texture->GetSurfaceLevel(static_cast<UINT>(level), dst.put())))
+            if (FAILED(d3d9_get_level_surface(t, face, level, dst.put())))
                 return false;
             return SUCCEEDED(t.device->UpdateSurface(src, src_rect, dst.get(), dst_point));
         }
@@ -207,6 +251,79 @@ namespace alia {
             t.usage = usage;
         }
 
+        void fill_cube_texture_record(
+            d3d9_texture &t,
+            IDirect3DDevice9 *device,
+            IDirect3DCubeTexture9 *texture,
+            pixel_format fmt,
+            int edge,
+            bool autogen,
+            texture_usage usage
+        ) {
+            t.device = device;
+            t.cube = texture;
+            t.fmt = fmt;
+            t.width = edge;
+            t.height = edge;
+            t.autogen = autogen;
+            t.mip_levels = static_cast<int>(texture->GetLevelCount());
+            t.role = texture_role::color;
+            t.usage = usage;
+        }
+
+        bool lock_level(
+            d3d9_texture &texture,
+            int face,
+            rect_i region,
+            int level,
+            texture_lock_mode mode,
+            texture_lock_info &out
+        ) {
+            const int face_count = texture.cube ? cube_face_count : 1;
+            if (face < 0 || face >= face_count || level < 0 || level >= texture.mip_levels)
+                return false;
+            if (texture.autogen && level > 0)
+                return false;
+
+            const vec2i ls = level_size(texture, level);
+            const rect_i bounds{{0, 0}, ls};
+            const rect_i clipped = bounds.intersection_with(region);
+            if (clipped.width() <= 0 || clipped.height() <= 0)
+                return false;
+
+            const DWORD lock_flags =
+                mode == texture_lock_mode::read_only ? D3DLOCK_READONLY : 0u;
+            const RECT native_rect = to_rect(clipped);
+            D3DLOCKED_RECT locked = {};
+
+            if (texture.usage == texture_usage::sampling_only) {
+                if (FAILED(lock_rect(
+                        texture, face, level, &locked, &native_rect, lock_flags)))
+                    return false;
+            } else {
+                if (texture.lock_surface)
+                    return false;
+                com_ptr<IDirect3DSurface9> stage;
+                if (!create_sysmem_surface_for_level(texture, level, stage.put()))
+                    return false;
+                if (mode != texture_lock_mode::write_only &&
+                    !copy_render_target_level_to_sysmem(
+                        texture, face, level, stage.get()))
+                    return false;
+                if (FAILED(stage.get()->LockRect(&locked, &native_rect, lock_flags)))
+                    return false;
+                texture.lock_surface = stage.detach();
+            }
+
+            out.data = static_cast<std::byte *>(locked.pBits);
+            out.stride_bytes = static_cast<int>(locked.Pitch);
+            out.origin = clipped.p1;
+            out.extent = clipped.size();
+            out.level = level;
+            out.face = face;
+            return true;
+        }
+
     } // namespace
 
     texture_handle *d3d9_create_texture(
@@ -222,9 +339,11 @@ namespace alia {
         const DWORD d3d_usage = d3d_texture_usage_flags(autogen, usage);
         const UINT mips = autogen ? 0u : static_cast<UINT>(mip_levels);
         const D3DPOOL pool = d3d_texture_pool(usage);
-        const pixel_format actual_fmt = choose_d3d9_texture_format(dev->device, fmt, d3d_usage, role);
+        const pixel_format actual_fmt = choose_d3d9_texture_format(
+            dev->device, fmt, d3d_usage, role, D3DRTYPE_TEXTURE);
         const D3DFORMAT d3dfmt = to_d3d_format(actual_fmt, role);
-        if (!d3d9_supports_texture_format(dev->device, d3dfmt, d3d_usage))
+        if (!d3d9_supports_texture_format(
+                dev->device, d3dfmt, d3d_usage, D3DRTYPE_TEXTURE))
             return nullptr;
 
         IDirect3DTexture9 *tex = nullptr;
@@ -239,12 +358,53 @@ namespace alia {
         return t;
     }
 
+    texture_handle *d3d9_create_cube_texture(
+        device_handle *dev_h,
+        pixel_format fmt,
+        int edge,
+        int mip_levels,
+        texture_usage usage
+    ) {
+        auto *dev = as_d3d9_device(dev_h);
+        if (mip_levels != 1 &&
+            (dev->caps.TextureCaps & D3DPTEXTURECAPS_MIPCUBEMAP) == 0)
+            return nullptr;
+        if ((dev->caps.TextureCaps & D3DPTEXTURECAPS_CUBEMAP_POW2) != 0 &&
+            (edge <= 0 || (edge & (edge - 1)) != 0))
+            return nullptr;
+
+        const bool autogen = uses_autogen_mips(mip_levels);
+        const DWORD d3d_usage = d3d_texture_usage_flags(autogen, usage);
+        const UINT mips = autogen ? 0u : static_cast<UINT>(mip_levels);
+        const D3DPOOL pool = d3d_texture_pool(usage);
+        const pixel_format actual_fmt = choose_d3d9_texture_format(
+            dev->device, fmt, d3d_usage, texture_role::color,
+            D3DRTYPE_CUBETEXTURE);
+        const D3DFORMAT d3dfmt = to_d3d_format(actual_fmt, texture_role::color);
+        if (!d3d9_supports_texture_format(
+                dev->device, d3dfmt, d3d_usage, D3DRTYPE_CUBETEXTURE))
+            return nullptr;
+
+        IDirect3DCubeTexture9 *cube = nullptr;
+        if (FAILED(dev->device->CreateCubeTexture(
+                static_cast<UINT>(edge), mips, d3d_usage, d3dfmt, pool,
+                &cube, nullptr)) || !cube)
+            return nullptr;
+
+        auto *texture = new d3d9_texture;
+        fill_cube_texture_record(
+            *texture, dev->device, cube, actual_fmt, edge, autogen, usage);
+        return texture;
+    }
+
     void d3d9_destroy_texture(texture_handle *h) {
         auto *t = as_d3d9_texture(h);
         if (t->lock_surface)
             t->lock_surface->Release();
         if (t->texture)
             t->texture->Release();
+        if (t->cube)
+            t->cube->Release();
         delete t;
     }
 
@@ -268,50 +428,28 @@ namespace alia {
     }
 
     bool d3d9_texture_lock(texture_handle *h, rect_i region, int level, texture_lock_mode mode, texture_lock_info &out) {
-        auto *t = as_d3d9_texture(h);
-        if (level < 0 || level >= t->mip_levels)
+        return lock_level(*as_d3d9_texture(h), 0, region, level, mode, out);
+    }
+
+    bool d3d9_cube_texture_lock(
+        texture_handle *h,
+        cube_face face,
+        rect_i region,
+        int level,
+        texture_lock_mode mode,
+        texture_lock_info &out
+    ) {
+        auto *texture = as_d3d9_texture(h);
+        if (!texture->cube)
             return false;
-        if (t->autogen && level > 0)
-            return false;
-
-        const vec2i ls = level_size(*t, level);
-        const rect_i bounds{{0, 0}, ls};
-        const rect_i r = bounds.intersection_with(region);
-        if (r.width() <= 0 || r.height() <= 0)
-            return false;
-
-        const DWORD lock_flags = (mode == texture_lock_mode::read_only) ? D3DLOCK_READONLY : 0u;
-        const RECT dr = to_rect(r);
-        D3DLOCKED_RECT lr = {};
-
-        if (t->usage == texture_usage::sampling_only) {
-            if (FAILED(t->texture->LockRect(static_cast<UINT>(level), &lr, &dr, lock_flags)))
-                return false;
-        } else {
-            if (t->lock_surface)
-                return false;
-            com_ptr<IDirect3DSurface9> stage;
-            if (!create_sysmem_surface_for_level(*t, level, stage.put()))
-                return false;
-            if (mode != texture_lock_mode::write_only && !copy_render_target_level_to_sysmem(*t, level, stage.get()))
-                return false;
-            if (FAILED(stage.get()->LockRect(&lr, &dr, lock_flags)))
-                return false;
-            t->lock_surface = stage.detach();
-        }
-
-        out.data = static_cast<std::byte *>(lr.pBits);
-        out.stride_bytes = static_cast<int>(lr.Pitch);
-        out.origin = r.p1;
-        out.extent = r.size();
-        out.level = level;
-        return true;
+        return lock_level(
+            *texture, static_cast<int>(face), region, level, mode, out);
     }
 
     void d3d9_texture_unlock(texture_handle *h, const texture_lock_info &info, bool wrote) {
         auto *t = as_d3d9_texture(h);
         if (t->usage == texture_usage::sampling_only) {
-            t->texture->UnlockRect(static_cast<UINT>(info.level));
+            unlock_rect(*t, info.face, info.level);
             return;
         }
 
@@ -323,7 +461,9 @@ namespace alia {
             const rect_i updated = rect_i::pos_size(info.origin, info.extent);
             const RECT src_rect = to_rect(updated);
             const POINT dst_point{info.origin.x, info.origin.y};
-            update_render_target_level_from_sysmem(*t, info.level, t->lock_surface, &src_rect, &dst_point);
+            update_render_target_level_from_sysmem(
+                *t, info.face, info.level, t->lock_surface, &src_rect,
+                &dst_point);
         }
 
         t->lock_surface->Release();
@@ -331,7 +471,7 @@ namespace alia {
     }
 
     void d3d9_texture_generate_mipmaps(texture_handle *h) {
-        as_d3d9_texture(h)->texture->GenerateMipSubLevels();
+        d3d9_base_texture(*as_d3d9_texture(h))->GenerateMipSubLevels();
     }
 
     texture_handle *d3d9_texture_clone(const texture_handle *h) {
@@ -342,74 +482,104 @@ namespace alia {
 
         const DWORD usage_flags = d3d_texture_usage_flags(src->autogen, src->usage);
         const D3DPOOL pool = d3d_texture_pool(src->usage);
+        const bool is_cube = src->cube != nullptr;
         IDirect3DTexture9 *dst_tex = nullptr;
-        if (FAILED(src->device->CreateTexture(
-                static_cast<UINT>(src->width),
-                static_cast<UINT>(src->height),
-                src->autogen ? 0u : static_cast<UINT>(src->mip_levels),
-                usage_flags,
-                d3dfmt, pool, &dst_tex, nullptr
-            )) || !dst_tex)
+        IDirect3DCubeTexture9 *dst_cube = nullptr;
+        if (is_cube) {
+            if (FAILED(src->device->CreateCubeTexture(
+                    static_cast<UINT>(src->width),
+                    src->autogen ? 0u : static_cast<UINT>(src->mip_levels),
+                    usage_flags, d3dfmt, pool, &dst_cube, nullptr)) || !dst_cube)
+                return nullptr;
+        } else if (FAILED(src->device->CreateTexture(
+                       static_cast<UINT>(src->width),
+                       static_cast<UINT>(src->height),
+                       src->autogen ? 0u : static_cast<UINT>(src->mip_levels),
+                       usage_flags, d3dfmt, pool, &dst_tex, nullptr)) || !dst_tex) {
             return nullptr;
+        }
+
+        auto release_destination = [&]() {
+            if (dst_cube)
+                dst_cube->Release();
+            if (dst_tex)
+                dst_tex->Release();
+        };
+
+        d3d9_texture dst_record;
+        if (is_cube) {
+            fill_cube_texture_record(
+                dst_record, src->device, dst_cube, src->fmt, src->width,
+                src->autogen, src->usage);
+        } else {
+            fill_texture_record(
+                dst_record, src->device, dst_tex, src->fmt,
+                {src->width, src->height}, src->autogen, src->role, src->usage);
+        }
 
         const int mips_to_copy = src->autogen ? 1 : src->mip_levels;
         const int bpp = bytes_per_pixel_for_format(src->fmt);
+        const int face_count = is_cube ? cube_face_count : 1;
 
-        for (int lv = 0; lv < mips_to_copy; ++lv) {
-            const vec2i ls = level_size(*src, lv);
+        for (int face = 0; face < face_count; ++face) {
+            for (int level = 0; level < mips_to_copy; ++level) {
+                const vec2i ls = level_size(*src, level);
 
-            if (src->usage == texture_usage::render_target) {
-                com_ptr<IDirect3DSurface9> stage;
-                if (!create_sysmem_surface_for_level(*src, lv, stage.put()) ||
-                    !copy_render_target_level_to_sysmem(*src, lv, stage.get())) {
-                    dst_tex->Release();
+                if (src->usage == texture_usage::render_target) {
+                    com_ptr<IDirect3DSurface9> stage;
+                    if (!create_sysmem_surface_for_level(*src, level, stage.put()) ||
+                        !copy_render_target_level_to_sysmem(
+                            *src, face, level, stage.get()) ||
+                        !update_render_target_level_from_sysmem(
+                            dst_record, face, level, stage.get(), nullptr, nullptr)) {
+                        release_destination();
+                        return nullptr;
+                    }
+                    continue;
+                }
+
+                D3DLOCKED_RECT src_locked = {}, dst_locked = {};
+                if (FAILED(lock_rect(
+                        *src, face, level, &src_locked, nullptr,
+                        D3DLOCK_READONLY))) {
+                    release_destination();
+                    return nullptr;
+                }
+                if (FAILED(lock_rect(
+                        dst_record, face, level, &dst_locked, nullptr, 0))) {
+                    unlock_rect(*src, face, level);
+                    release_destination();
                     return nullptr;
                 }
 
-                d3d9_texture dst_record;
-                fill_texture_record(
-                    dst_record, src->device, dst_tex, src->fmt, {src->width, src->height},
-                    src->autogen, src->role, src->usage
-                );
-                if (!update_render_target_level_from_sysmem(dst_record, lv, stage.get(), nullptr, nullptr)) {
-                    dst_tex->Release();
-                    return nullptr;
+                const int row_bytes = ls.x * bpp;
+                for (int y = 0; y < ls.y; ++y) {
+                    std::memcpy(
+                        static_cast<std::byte *>(dst_locked.pBits) +
+                            y * dst_locked.Pitch,
+                        static_cast<const std::byte *>(src_locked.pBits) +
+                            y * src_locked.Pitch,
+                        row_bytes);
                 }
-                continue;
-            }
 
-            D3DLOCKED_RECT src_lr = {}, dst_lr = {};
-            if (FAILED(src->texture->LockRect(static_cast<UINT>(lv), &src_lr, nullptr, D3DLOCK_READONLY))) {
-                dst_tex->Release();
-                return nullptr;
+                unlock_rect(dst_record, face, level);
+                unlock_rect(*src, face, level);
             }
-            if (FAILED(dst_tex->LockRect(static_cast<UINT>(lv), &dst_lr, nullptr, 0))) {
-                src->texture->UnlockRect(static_cast<UINT>(lv));
-                dst_tex->Release();
-                return nullptr;
-            }
-
-            const int row_bytes = ls.x * bpp;
-            for (int y = 0; y < ls.y; ++y) {
-                std::memcpy(
-                    static_cast<std::byte *>(dst_lr.pBits) + y * dst_lr.Pitch,
-                    static_cast<const std::byte *>(src_lr.pBits) + y * src_lr.Pitch,
-                    row_bytes
-                );
-            }
-
-            dst_tex->UnlockRect(static_cast<UINT>(lv));
-            src->texture->UnlockRect(static_cast<UINT>(lv));
         }
 
         if (src->autogen)
-            dst_tex->GenerateMipSubLevels();
+            d3d9_base_texture(dst_record)->GenerateMipSubLevels();
 
         auto *t = new d3d9_texture;
-        fill_texture_record(
-            *t, src->device, dst_tex, src->fmt, {src->width, src->height},
-            src->autogen, src->role, src->usage
-        );
+        if (is_cube) {
+            fill_cube_texture_record(
+                *t, src->device, dst_cube, src->fmt, src->width,
+                src->autogen, src->usage);
+        } else {
+            fill_texture_record(
+                *t, src->device, dst_tex, src->fmt,
+                {src->width, src->height}, src->autogen, src->role, src->usage);
+        }
         t->sampler = src->sampler;
         return t;
     }
@@ -420,7 +590,8 @@ namespace alia {
         rect_i src_rect,
         vec2i,
         vec2i dst_pos,
-        int dst_level
+        int dst_level,
+        int dst_face
     ) {
         auto *device = as_d3d9_device(dev_h)->device;
         auto *dst = as_d3d9_texture(dst_h);
@@ -450,7 +621,8 @@ namespace alia {
         const RECT src = to_rect(src_rect);
         if (dst->usage == texture_usage::render_target) {
             const POINT dst_point{dst_pos.x, dst_pos.y};
-            return update_render_target_level_from_sysmem(*dst, dst_level, stage.get(), &src, &dst_point);
+            return update_render_target_level_from_sysmem(
+                *dst, dst_face, dst_level, stage.get(), &src, &dst_point);
         }
 
         const int src_bpp = bytes_per_d3d_format(source_desc.Format);
@@ -464,7 +636,8 @@ namespace alia {
 
         const rect_i dst_rect = rect_i::pos_size(dst_pos, src_rect.size());
         const RECT dst_lock = to_rect(dst_rect);
-        if (FAILED(dst->texture->LockRect(static_cast<UINT>(dst_level), &dst_lr, &dst_lock, 0))) {
+        if (FAILED(lock_rect(
+                *dst, dst_face, dst_level, &dst_lr, &dst_lock, 0))) {
             stage.get()->UnlockRect();
             return false;
         }
@@ -478,7 +651,7 @@ namespace alia {
             );
         }
 
-        dst->texture->UnlockRect(static_cast<UINT>(dst_level));
+        unlock_rect(*dst, dst_face, dst_level);
         stage.get()->UnlockRect();
         return true;
     }

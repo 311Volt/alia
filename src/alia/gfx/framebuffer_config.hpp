@@ -105,6 +105,7 @@ namespace alia {
         render_method render = render_method::hardware;
         int max_texture_size = 0;
         bool npot_textures = false;
+        bool cube_textures = false;
         bool render_to_texture = false;
         bool separate_alpha_blend = false;
         std::string renderer_name;

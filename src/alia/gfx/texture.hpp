@@ -21,14 +21,24 @@ namespace alia {
             texture_lock_info info = {};
         };
 
+        bool upload_bitmap_view(
+            texture_handle *,
+            const graphics_backend_interface *,
+            const any_bitmap_view &,
+            std::optional<cube_face> face = {}
+        );
+        void validate_texture_desc(
+            pixel_format, vec2i, int mip_levels, const char *operation
+        );
+
     } // namespace detail
 
     // ── locked_texture_region ─────────────────────────────────────────────
 
     /// @brief RAII handle granting CPU access to a texture mip level.
     ///
-    /// Obtained from @c texture::lock<TPixel>() (read-write),
-    /// @c texture::lock_read_only<TPixel>(), or @c texture::lock_write_only<TPixel>().
+    /// Obtained from the corresponding @c texture or @c cube_texture lock
+    /// method (read-write, read-only, or write-only).
     /// On destruction (or when @c release() is called) the modified region is
     /// committed back to GPU memory, unless this was a read-only lock.
     ///
@@ -106,6 +116,7 @@ namespace alia {
 
     private:
         friend class texture;
+        friend class cube_texture;
         std::unique_ptr<detail::texture_lock_state> impl_;
         bitmap_view<TPixel> view_{};
 

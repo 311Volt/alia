@@ -64,14 +64,26 @@ namespace alia {
         }
         void bind_texture_unit(int unit, texture_handle *texture) {
             if (ogl_s_glActiveTexture) ogl_s_glActiveTexture(GL_TEXTURE0 + unit);
-            glBindTexture(GL_TEXTURE_2D, texture ? as_ogl_texture(texture)->tex_id : 0);
+            auto *value = texture ? as_ogl_texture(texture) : nullptr;
+            if (!value) {
+                glBindTexture(GL_TEXTURE_2D, 0);
+                glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+            } else {
+                glBindTexture(value->target, value->tex_id);
+                glBindTexture(
+                    value->target == GL_TEXTURE_2D
+                        ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D,
+                    0);
+            }
         }
         void apply_sampler(const ogl_texture &texture, const sampler_state &state) {
             const auto filter = [](texture_filter value) { return value == texture_filter::nearest ? GL_NEAREST : GL_LINEAR; };
             const auto wrap = [](texture_wrap value) { switch (value) { case texture_wrap::clamp: return GL_CLAMP_TO_EDGE; case texture_wrap::repeat: return GL_REPEAT; case texture_wrap::mirror: return GL_MIRRORED_REPEAT; } return GL_CLAMP_TO_EDGE; };
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, texture.mip_levels <= 1 ? filter(state.min_filter) : (state.min_filter == texture_filter::nearest ? GL_NEAREST_MIPMAP_LINEAR : GL_LINEAR_MIPMAP_LINEAR));
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter(state.mag_filter));
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap(state.wrap_u)); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap(state.wrap_v));
+            glTexParameteri(texture.target, GL_TEXTURE_MIN_FILTER, texture.mip_levels <= 1 ? filter(state.min_filter) : (state.min_filter == texture_filter::nearest ? GL_NEAREST_MIPMAP_LINEAR : GL_LINEAR_MIPMAP_LINEAR));
+            glTexParameteri(texture.target, GL_TEXTURE_MAG_FILTER, filter(state.mag_filter));
+            glTexParameteri(texture.target, GL_TEXTURE_WRAP_S, wrap(state.wrap_u)); glTexParameteri(texture.target, GL_TEXTURE_WRAP_T, wrap(state.wrap_v));
+            if (texture.target == GL_TEXTURE_CUBE_MAP)
+                glTexParameteri(texture.target, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
         }
         void apply_texture_op(texture_operation operation) {
             switch (operation) {
@@ -137,7 +149,11 @@ namespace alia {
             if (!target_fbo) ogl_s_glGenFramebuffers(1, &target_fbo);
             if (!target_fbo) return false;
             ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, target_fbo);
-            ogl_s_glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, as_ogl_texture(info.target_texture)->tex_id, info.target_level);
+            auto *texture = as_ogl_texture(info.target_texture);
+            ogl_s_glFramebufferTexture2D(
+                GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                ogl_face_target(*texture, info.target_face), texture->tex_id,
+                info.target_level);
             if (ogl_s_glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0); return false; }
         } else if (fbo_available()) {
             ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0);

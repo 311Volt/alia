@@ -152,6 +152,9 @@ namespace alia {
         const bool gl30_or_later = (gl_major > 3 || (gl_major == 3 && gl_minor >= 0));
         const bool gl20_or_later = (gl_major > 2 || (gl_major == 2 && gl_minor >= 0));
         const bool gl15_or_later = (gl_major > 1 || (gl_major == 1 && gl_minor >= 5));
+        const bool gl13_or_later = (gl_major > 1 || (gl_major == 1 && gl_minor >= 3));
+        const bool has_cube_maps =
+            gl13_or_later || has_gl_extension("GL_ARB_texture_cube_map");
 
         if (gl30_or_later || has_generate_mipmap) {
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
@@ -183,6 +186,7 @@ namespace alia {
         iface.caps.max_texture_size = max_texture_size;
         iface.caps.npot_textures = gl20_or_later ||
             has_gl_extension("GL_ARB_texture_non_power_of_two");
+        iface.caps.cube_textures = has_cube_maps;
         iface.caps.render_to_texture = has_framebuffers;
         iface.caps.separate_alpha_blend =
             gl_major > 1 || (gl_major == 1 && gl_minor >= 4) ||
@@ -201,6 +205,14 @@ namespace alia {
         iface.destroy_device = {ogl_destroy_device};
 
         iface.create_texture           = {ogl_create_texture};
+        if (has_cube_maps) {
+            iface.create_cube_texture = {ogl_create_cube_texture};
+        } else {
+            iface.create_cube_texture = {
+                nullptr,
+                "cube textures require OpenGL 1.3 or GL_ARB_texture_cube_map"
+            };
+        }
         iface.destroy_texture          = {ogl_destroy_texture};
         iface.texture_format           = {ogl_texture_format};
         iface.texture_width            = {ogl_texture_width};
@@ -209,6 +221,7 @@ namespace alia {
         iface.texture_sampler          = {ogl_texture_sampler};
         iface.texture_set_sampler      = {ogl_texture_set_sampler};
         iface.texture_lock             = {ogl_texture_lock};
+        iface.cube_texture_lock        = {ogl_cube_texture_lock};
         iface.texture_unlock           = {ogl_texture_unlock};
         iface.texture_clone            = {ogl_texture_clone};
         iface.copy_render_target_to_texture = {ogl_copy_render_target_to_texture};

@@ -1,5 +1,6 @@
 #include "shader.hpp"
 
+#include "cube_texture.hpp"
 #include "texture.hpp"
 
 #include <stdexcept>
@@ -50,6 +51,12 @@ namespace alia {
     }
 
     void shader_sampler::set_texture(texture &tex) const {
+        if (!*this)
+            throw shader_error("shader_sampler::set_texture: invalid shader sampler");
+        backend_->shader_set_sampler.get_or_throw()(program_, slot_, tex.impl());
+    }
+
+    void shader_sampler::set_texture(cube_texture &tex) const {
         if (!*this)
             throw shader_error("shader_sampler::set_texture: invalid shader sampler");
         backend_->shader_set_sampler.get_or_throw()(program_, slot_, tex.impl());

@@ -61,9 +61,15 @@ namespace alia {
             }
         }
 
+    } // namespace
+
+    namespace detail {
+
         bool upload_bitmap_view(
-            texture_handle *dst_handle, const graphics_backend_interface *backend,
-            const any_bitmap_view &src
+            texture_handle *dst_handle,
+            const graphics_backend_interface *backend,
+            const any_bitmap_view &src,
+            std::optional<cube_face> face
         ) {
             const pixel_format src_fmt = src.format();
             const pixel_format dst_fmt = backend->texture_format.get_or_throw()(dst_handle);
@@ -74,7 +80,12 @@ namespace alia {
 
             texture_lock_info info{};
             const rect_i full{{0, 0}, {src.width(), src.height()}};
-            if (!backend->texture_lock.get_or_throw()(dst_handle, full, 0, texture_lock_mode::write_only, info))
+            const bool locked = face
+                ? backend->cube_texture_lock.get_or_throw()(
+                    dst_handle, *face, full, 0, texture_lock_mode::write_only, info)
+                : backend->texture_lock.get_or_throw()(
+                    dst_handle, full, 0, texture_lock_mode::write_only, info);
+            if (!locked)
                 return false;
 
             bool uploaded = true;
@@ -114,14 +125,7 @@ namespace alia {
                 throw std::invalid_argument(std::string(operation) + ": mip level count must be non-negative");
         }
 
-        [[nodiscard]] vec2i mip_size_for(vec2i base, int level) {
-            return {
-                std::max(1, base.x >> level),
-                std::max(1, base.y >> level)
-            };
-        }
-
-    } // namespace
+    } // namespace detail
 
     // ── Destructor / move ─────────────────────────────────────────────────
 
@@ -162,7 +166,7 @@ namespace alia {
     ) {
         if (!device.valid())
             throw std::runtime_error("texture: device is not valid");
-        validate_texture_desc(fmt, size, mip_levels, "texture");
+        detail::validate_texture_desc(fmt, size, mip_levels, "texture");
 
         const auto *b = device.backend();
         handle_ = b->create_texture.get_or_throw()(device.device(), fmt, size, mip_levels, role, usage);
@@ -184,7 +188,7 @@ namespace alia {
     ) {
         if (!device.valid())
             throw std::runtime_error("texture: device is not valid");
-        validate_texture_desc(src.format(), {src.width(), src.height()}, mip_levels, "texture");
+        detail::validate_texture_desc(src.format(), {src.width(), src.height()}, mip_levels, "texture");
 
         const auto *b = device.backend();
         handle_ = b->create_texture.get_or_throw()(
@@ -197,7 +201,7 @@ namespace alia {
         device_ = device.device();
         role_ = role;
         usage_ = usage;
-        if (!upload_bitmap_view(handle_, backend_, src)) {
+        if (!detail::upload_bitmap_view(handle_, backend_, src)) {
             backend_->destroy_texture.get_or_throw()(handle_);
             handle_ = nullptr;
             backend_ = nullptr;

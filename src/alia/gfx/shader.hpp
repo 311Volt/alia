@@ -16,6 +16,7 @@
 namespace alia {
 
     class texture;
+    class cube_texture;
 
     namespace detail {
 
@@ -207,6 +208,7 @@ namespace alia {
         }
 
         void set_texture(texture &tex) const;
+        void set_texture(cube_texture &tex) const;
 
     private:
         friend class shader_program;

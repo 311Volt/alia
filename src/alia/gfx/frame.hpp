@@ -1,9 +1,9 @@
 #ifndef ALIA_GFX_FRAME_HPP
 #define ALIA_GFX_FRAME_HPP
 
+#include "cube_texture.hpp"
 #include "pipeline.hpp"
 #include "prim_buffers.hpp"
-#include "texture.hpp"
 
 #include <optional>
 #include <span>
@@ -33,12 +33,16 @@ namespace alia {
         void set_target();
         // Select a render-target texture mip level (which has no depth attachment).
         void set_target(texture &, int level = 0);
+        // Select one face and mip level of a render-target cube texture.
+        void set_target(cube_texture &, cube_face, int level = 0);
         // Clear either attachment. A depth clear is valid only on the backbuffer.
         void clear(std::optional<color> color = {}, std::optional<float> depth = {});
 
         void set_pipeline(pipeline &);
         void set_texture(int slot, texture &tex);
         void set_texture(int slot, texture &tex, const sampler_state &sampler);
+        void set_texture(int slot, cube_texture &tex);
+        void set_texture(int slot, cube_texture &tex, const sampler_state &sampler);
         void set_viewport(const render_viewport &vp);
         [[nodiscard]] vec2i target_size() const noexcept { return target_size_; }
 
@@ -65,6 +69,13 @@ namespace alia {
         }
 
         void copy_to_texture(texture &dst, rect_i src_rect, vec2i dst_pos = {}, int dst_level = 0);
+        void copy_to_texture(
+            cube_texture &dst,
+            cube_face face,
+            rect_i src_rect,
+            vec2i dst_pos = {},
+            int dst_level = 0
+        );
         void present();
         void present(rect_i region);
         [[nodiscard]] bool valid() const noexcept { return active_; }

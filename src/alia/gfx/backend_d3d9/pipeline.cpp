@@ -82,7 +82,12 @@ namespace alia {
             }
             return D3DCMP_LESSEQUAL;
         }
-        void apply_sampler(IDirect3DDevice9 *device, DWORD slot, const sampler_state &state) {
+        void apply_sampler(
+            IDirect3DDevice9 *device,
+            DWORD slot,
+            const d3d9_texture &texture,
+            const sampler_state &state
+        ) {
             const auto filter = [](texture_filter f) { return f == texture_filter::nearest ? D3DTEXF_POINT : D3DTEXF_LINEAR; };
             const auto wrap = [](texture_wrap w) {
                 switch (w) { case texture_wrap::clamp: return D3DTADDRESS_CLAMP; case texture_wrap::repeat: return D3DTADDRESS_WRAP; case texture_wrap::mirror: return D3DTADDRESS_MIRROR; }
@@ -93,11 +98,12 @@ namespace alia {
             device->SetSamplerState(slot, D3DSAMP_MIPFILTER, filter(state.mip_filter));
             device->SetSamplerState(slot, D3DSAMP_ADDRESSU, wrap(state.wrap_u));
             device->SetSamplerState(slot, D3DSAMP_ADDRESSV, wrap(state.wrap_v));
+            if (texture.cube)
+                device->SetSamplerState(slot, D3DSAMP_ADDRESSW, D3DTADDRESS_CLAMP);
         }
         void apply_texture_op(IDirect3DDevice9 *device, texture_operation op) {
             switch (op) {
             case texture_operation::vertex_color:
-                device->SetTexture(0, nullptr);
                 device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1); device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
                 device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1); device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
                 break;
@@ -123,6 +129,16 @@ namespace alia {
                 d3d9_apply_program_state(device.device, pipeline->shader);
                 return;
             }
+            IDirect3DBaseTexture9 *bound_texture = nullptr;
+            const bool cube_bound =
+                SUCCEEDED(device.device->GetTexture(0, &bound_texture)) &&
+                bound_texture && bound_texture->GetType() == D3DRTYPE_CUBETEXTURE;
+            if (bound_texture)
+                bound_texture->Release();
+            apply_texture_op(
+                device.device,
+                cube_bound ? texture_operation::vertex_color
+                           : pipeline->effect->texture_op);
             device.device->SetTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX *>(&pipeline->effect->world.m[0][0]));
             D3DMATRIX identity{};
             identity._11 = identity._22 = identity._33 = identity._44 = 1.0f;
@@ -183,7 +199,8 @@ namespace alia {
         } else if (info.target_texture) {
             IDirect3DSurface9 *surface = nullptr;
             auto *texture = as_d3d9_texture(info.target_texture);
-            if (SUCCEEDED(texture->texture->GetSurfaceLevel(static_cast<UINT>(info.target_level), &surface))) {
+            if (SUCCEEDED(d3d9_get_level_surface(
+                    *texture, info.target_face, info.target_level, &surface))) {
                 result = device.device->SetRenderTarget(0, surface);
                 surface->Release();
             }
@@ -225,8 +242,13 @@ namespace alia {
     }
     void d3d9_bind_resources(device_handle *h, const texture_sampler_binding &binding) {
         auto *device = as_d3d9_device(h)->device; auto *texture = binding.texture ? as_d3d9_texture(binding.texture) : nullptr;
-        device->SetTexture(static_cast<DWORD>(binding.slot), texture ? texture->texture : nullptr);
-        if (texture) apply_sampler(device, static_cast<DWORD>(binding.slot), binding.sampler);
+        device->SetTexture(
+            static_cast<DWORD>(binding.slot),
+            texture ? d3d9_base_texture(*texture) : nullptr);
+        if (texture)
+            apply_sampler(
+                device, static_cast<DWORD>(binding.slot), *texture,
+                binding.sampler);
     }
     void d3d9_draw(device_handle *h, primitive_topology topology, int vertex_count, int first_vertex) {
         auto &device = *as_d3d9_device(h); prepare_draw(device); const int count = primitive_count(topology, vertex_count); if (!count) return;

@@ -107,6 +107,7 @@ namespace {
                   << "  render method        " << (caps.render == alia::render_method::hardware ? "hardware" : "software") << '\n'
                   << "  max texture size     " << caps.max_texture_size << '\n'
                   << "  NPOT textures        " << yes_no(caps.npot_textures) << '\n'
+                  << "  cube textures        " << yes_no(caps.cube_textures) << '\n'
                   << "  render to texture    " << yes_no(caps.render_to_texture) << '\n'
                   << "  separate alpha blend " << yes_no(caps.separate_alpha_blend) << '\n';
     }

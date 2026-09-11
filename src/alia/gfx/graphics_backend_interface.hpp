@@ -78,6 +78,15 @@ namespace alia {
         sampling_only,
         render_target
     };
+    enum class cube_face {
+        positive_x,
+        negative_x,
+        positive_y,
+        negative_y,
+        positive_z,
+        negative_z
+    };
+    inline constexpr int cube_face_count = 6;
     enum class texture_filter {
         nearest,
         linear
@@ -177,6 +186,7 @@ namespace alia {
         vec2i extent;
         int stride_bytes = 0;
         int level = 0;
+        int face = 0;
         std::byte *data = nullptr;
     };
     struct buffer_lock_info {
@@ -278,6 +288,7 @@ namespace alia {
         swapchain_handle *swapchain = nullptr;
         texture_handle *target_texture = nullptr;
         int target_level = 0;
+        int target_face = 0;
         vec2i target_size = {};
     };
 
@@ -292,6 +303,7 @@ namespace alia {
         gfx_backend_op<void(device_handle *)> destroy_device;
 
         gfx_backend_op<texture_handle *(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage)> create_texture;
+        gfx_backend_op<texture_handle *(device_handle *, pixel_format, int, int, texture_usage)> create_cube_texture;
         gfx_backend_op<void(texture_handle *)> destroy_texture;
         gfx_backend_op<pixel_format(const texture_handle *)> texture_format;
         gfx_backend_op<int(const texture_handle *)> texture_width;
@@ -300,10 +312,11 @@ namespace alia {
         gfx_backend_op<sampler_state(const texture_handle *)> texture_sampler;
         gfx_backend_op<void(texture_handle *, const sampler_state &)> texture_set_sampler;
         gfx_backend_op<bool(texture_handle *, rect_i, int, texture_lock_mode, texture_lock_info &)> texture_lock;
+        gfx_backend_op<bool(texture_handle *, cube_face, rect_i, int, texture_lock_mode, texture_lock_info &)> cube_texture_lock;
         gfx_backend_op<void(texture_handle *, const texture_lock_info &, bool)> texture_unlock;
         gfx_backend_op<void(texture_handle *)> texture_generate_mipmaps;
         gfx_backend_op<texture_handle *(const texture_handle *)> texture_clone;
-        gfx_backend_op<bool(device_handle *, texture_handle *, rect_i, vec2i, vec2i, int)> copy_render_target_to_texture;
+        gfx_backend_op<bool(device_handle *, texture_handle *, rect_i, vec2i, vec2i, int, int)> copy_render_target_to_texture;
 
         gfx_backend_op<vertex_buffer_handle *(device_handle *, int, int, buffer_usage, const void *)> create_vertex_buffer;
         gfx_backend_op<void(vertex_buffer_handle *)> destroy_vertex_buffer;

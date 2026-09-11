@@ -123,7 +123,12 @@ namespace alia {
             return code;
         }
 
-        void apply_d3d9_sampler_state(IDirect3DDevice9 *device, DWORD stage, const sampler_state &s) {
+        void apply_d3d9_sampler_state(
+            IDirect3DDevice9 *device,
+            DWORD stage,
+            const d3d9_texture &texture,
+            const sampler_state &s
+        ) {
             auto filt = [](texture_filter f) -> DWORD {
                 return f == texture_filter::nearest ? D3DTEXF_POINT : D3DTEXF_LINEAR;
             };
@@ -140,6 +145,8 @@ namespace alia {
             device->SetSamplerState(stage, D3DSAMP_MIPFILTER, filt(s.mip_filter));
             device->SetSamplerState(stage, D3DSAMP_ADDRESSU, addr(s.wrap_u));
             device->SetSamplerState(stage, D3DSAMP_ADDRESSV, addr(s.wrap_v));
+            if (texture.cube)
+                device->SetSamplerState(stage, D3DSAMP_ADDRESSW, D3DTADDRESS_CLAMP);
         }
 
         int register_count_for(shader_constant_value_type type) {
@@ -171,10 +178,12 @@ namespace alia {
             auto *d3d_texture = texture ? as_d3d9_texture(texture) : nullptr;
             device->SetTexture(
                 static_cast<DWORD>(slot),
-                d3d_texture ? d3d_texture->texture : nullptr
+                d3d_texture ? d3d9_base_texture(*d3d_texture) : nullptr
             );
             if (d3d_texture)
-                apply_d3d9_sampler_state(device, static_cast<DWORD>(slot), d3d_texture->sampler);
+                apply_d3d9_sampler_state(
+                    device, static_cast<DWORD>(slot), *d3d_texture,
+                    d3d_texture->sampler);
         }
 
     } // namespace

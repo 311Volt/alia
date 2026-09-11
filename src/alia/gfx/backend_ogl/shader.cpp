@@ -138,9 +138,18 @@ namespace alia {
         }
 
         void bind_texture_unit(int unit, texture_handle *texture) {
-            auto *ogl_texture = texture ? as_ogl_texture(texture) : nullptr;
+            auto *value = texture ? as_ogl_texture(texture) : nullptr;
             ogl_s_glActiveTexture(static_cast<GLenum>(GL_TEXTURE0 + unit));
-            glBindTexture(GL_TEXTURE_2D, ogl_texture ? ogl_texture->tex_id : 0);
+            if (!value) {
+                glBindTexture(GL_TEXTURE_2D, 0);
+                glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+            } else {
+                glBindTexture(value->target, value->tex_id);
+                glBindTexture(
+                    value->target == GL_TEXTURE_2D
+                        ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D,
+                    0);
+            }
         }
 
     } // namespace

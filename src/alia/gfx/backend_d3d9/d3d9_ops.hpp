@@ -57,6 +57,7 @@ namespace alia {
     struct d3d9_texture : texture_handle {
         IDirect3DDevice9 *device = nullptr;
         IDirect3DTexture9 *texture = nullptr;
+        IDirect3DCubeTexture9 *cube = nullptr;
         int width = 0, height = 0, mip_levels = 1;
         bool autogen = false;
         pixel_format fmt = pixel_format::bgra8888;
@@ -119,6 +120,19 @@ namespace alia {
     inline d3d9_device *as_d3d9_device(device_handle *h) { return static_cast<d3d9_device *>(h); }
     inline d3d9_texture *as_d3d9_texture(texture_handle *h) { return static_cast<d3d9_texture *>(h); }
     inline const d3d9_texture *as_d3d9_texture(const texture_handle *h) { return static_cast<const d3d9_texture *>(h); }
+    inline IDirect3DBaseTexture9 *d3d9_base_texture(const d3d9_texture &texture) {
+        return texture.cube
+            ? static_cast<IDirect3DBaseTexture9 *>(texture.cube)
+            : static_cast<IDirect3DBaseTexture9 *>(texture.texture);
+    }
+    inline HRESULT d3d9_get_level_surface(
+        const d3d9_texture &texture, int face, int level, IDirect3DSurface9 **out
+    ) {
+        return texture.cube
+            ? texture.cube->GetCubeMapSurface(
+                static_cast<D3DCUBEMAP_FACES>(face), static_cast<UINT>(level), out)
+            : texture.texture->GetSurfaceLevel(static_cast<UINT>(level), out);
+    }
     inline d3d9_vertex_buffer *as_d3d9_vertex_buffer(vertex_buffer_handle *h) { return static_cast<d3d9_vertex_buffer *>(h); }
     inline const d3d9_vertex_buffer *as_d3d9_vertex_buffer(const vertex_buffer_handle *h) { return static_cast<const d3d9_vertex_buffer *>(h); }
     inline d3d9_index_buffer *as_d3d9_index_buffer(index_buffer_handle *h) { return static_cast<d3d9_index_buffer *>(h); }
@@ -134,12 +148,14 @@ namespace alia {
 
     d3d9_device *d3d9_create_device(const gfx_device_config &); void d3d9_destroy_device(device_handle *);
     texture_handle *d3d9_create_texture(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage);
+    texture_handle *d3d9_create_cube_texture(device_handle *, pixel_format, int, int, texture_usage);
     void d3d9_destroy_texture(texture_handle *); pixel_format d3d9_texture_format(const texture_handle *);
     int d3d9_texture_width(const texture_handle *); int d3d9_texture_height(const texture_handle *); int d3d9_texture_mip_levels(const texture_handle *);
     sampler_state d3d9_texture_sampler(const texture_handle *); void d3d9_texture_set_sampler(texture_handle *, const sampler_state &);
     bool d3d9_texture_lock(texture_handle *, rect_i, int, texture_lock_mode, texture_lock_info &); void d3d9_texture_unlock(texture_handle *, const texture_lock_info &, bool);
+    bool d3d9_cube_texture_lock(texture_handle *, cube_face, rect_i, int, texture_lock_mode, texture_lock_info &);
     void d3d9_texture_generate_mipmaps(texture_handle *); texture_handle *d3d9_texture_clone(const texture_handle *);
-    bool d3d9_copy_render_target_to_texture(device_handle *, texture_handle *, rect_i, vec2i, vec2i, int);
+    bool d3d9_copy_render_target_to_texture(device_handle *, texture_handle *, rect_i, vec2i, vec2i, int, int);
     vertex_buffer_handle *d3d9_create_vertex_buffer(device_handle *, int, int, buffer_usage, const void *); void d3d9_destroy_vertex_buffer(vertex_buffer_handle *);
     int d3d9_vertex_buffer_count(const vertex_buffer_handle *); int d3d9_vertex_buffer_stride(const vertex_buffer_handle *); buffer_usage d3d9_vertex_buffer_usage(const vertex_buffer_handle *);
     bool d3d9_vertex_buffer_lock(vertex_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void d3d9_vertex_buffer_unlock(vertex_buffer_handle *, const buffer_lock_info &, bool);

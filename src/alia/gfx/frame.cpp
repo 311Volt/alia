@@ -129,7 +129,8 @@ namespace alia {
     }
     void frame::set_target() {
         ensure_active();
-        const render_target_info info{swapchain_->handle_, nullptr, 0, swapchain_->size_};
+        const render_target_info info{
+            swapchain_->handle_, nullptr, 0, 0, swapchain_->size_};
         if (!swapchain_->backend_->set_render_target.get_or_throw()(swapchain_->device_, info))
             throw std::runtime_error("frame::set_target: backend failed to select the swapchain backbuffer");
         target_size_ = info.target_size;
@@ -146,9 +147,43 @@ namespace alia {
         if (pipeline_ && pipeline_->depth_enabled())
             throw std::invalid_argument("frame::set_target: depth state requires a depth attachment");
         unbind_render_target_source(target.impl());
-        const render_target_info info{nullptr, target.impl(), level, mip_size(target.size(), level)};
+        const render_target_info info{
+            nullptr, target.impl(), level, 0, mip_size(target.size(), level)};
         if (!swapchain_->backend_->set_render_target.get_or_throw()(swapchain_->device_, info))
             throw std::runtime_error("frame::set_target: render-to-texture may be unsupported on this device");
+        target_size_ = info.target_size;
+        target_has_depth_ = false;
+    }
+    void frame::set_target(cube_texture &target, cube_face face, int level) {
+        ensure_active();
+        if (target.backend() != swapchain_->backend_ ||
+            target.device() != swapchain_->device_)
+            throw std::invalid_argument(
+                "frame::set_target: cube texture belongs to another gfx_device");
+        if (target.usage() != texture_usage::render_target)
+            throw std::invalid_argument(
+                "frame::set_target: cube texture is not a render target");
+        if (static_cast<int>(face) < 0 ||
+            static_cast<int>(face) >= cube_face_count)
+            throw std::out_of_range("frame::set_target: cube face out of range");
+        if (level < 0 || level >= target.mip_levels())
+            throw std::out_of_range(
+                "frame::set_target: cube texture mip level out of range");
+        if (pipeline_ && pipeline_->depth_enabled())
+            throw std::invalid_argument(
+                "frame::set_target: depth state requires a depth attachment");
+        unbind_render_target_source(target.impl());
+        const render_target_info info{
+            nullptr,
+            target.impl(),
+            level,
+            static_cast<int>(face),
+            mip_size(target.face_size(), level)
+        };
+        if (!swapchain_->backend_->set_render_target.get_or_throw()(
+                swapchain_->device_, info))
+            throw std::runtime_error(
+                "frame::set_target: render-to-cube-face may be unsupported on this device");
         target_size_ = info.target_size;
         target_has_depth_ = false;
     }
@@ -175,6 +210,23 @@ namespace alia {
         if (texture.backend() != swapchain_->backend_ || texture.device() != swapchain_->device_)
             throw std::invalid_argument("frame::set_texture: texture belongs to another gfx_device");
         swapchain_->backend_->bind_resources.get_or_throw()(swapchain_->device_, {slot, texture.impl(), sampler});
+        texture_bindings_[slot] = texture.impl();
+    }
+    void frame::set_texture(int slot, cube_texture &texture) {
+        set_texture(slot, texture, texture.sampler());
+    }
+    void frame::set_texture(
+        int slot, cube_texture &texture, const sampler_state &sampler
+    ) {
+        ensure_active();
+        if (slot < 0)
+            throw std::invalid_argument("frame::set_texture: slot must be non-negative");
+        if (texture.backend() != swapchain_->backend_ ||
+            texture.device() != swapchain_->device_)
+            throw std::invalid_argument(
+                "frame::set_texture: cube texture belongs to another gfx_device");
+        swapchain_->backend_->bind_resources.get_or_throw()(
+            swapchain_->device_, {slot, texture.impl(), sampler});
         texture_bindings_[slot] = texture.impl();
     }
     void frame::set_viewport(const render_viewport &viewport) {
@@ -211,7 +263,39 @@ namespace alia {
             throw std::invalid_argument("frame::copy_to_texture: source is outside the current target");
         if (!rect_i{{}, mip_size(dst.size(), dst_level)}.contains(rect_i::pos_size(dst_pos, src_rect.size())))
             throw std::invalid_argument("frame::copy_to_texture: destination is outside texture level");
-        if (!swapchain_->backend_->copy_render_target_to_texture.get_or_throw()(swapchain_->device_, dst.impl(), src_rect, target_size_, dst_pos, dst_level))
+        if (!swapchain_->backend_->copy_render_target_to_texture.get_or_throw()(swapchain_->device_, dst.impl(), src_rect, target_size_, dst_pos, dst_level, 0))
+            throw std::runtime_error("frame::copy_to_texture: backend copy failed");
+    }
+    void frame::copy_to_texture(
+        cube_texture &dst,
+        cube_face face,
+        rect_i src_rect,
+        vec2i dst_pos,
+        int dst_level
+    ) {
+        ensure_active();
+        if (dst.backend() != swapchain_->backend_ || dst.device() != swapchain_->device_)
+            throw std::invalid_argument(
+                "frame::copy_to_texture: cube texture belongs to another gfx_device");
+        if (static_cast<int>(face) < 0 || static_cast<int>(face) >= cube_face_count)
+            throw std::out_of_range("frame::copy_to_texture: cube face out of range");
+        if (dst_level < 0 || dst_level >= dst.mip_levels())
+            throw std::out_of_range(
+                "frame::copy_to_texture: destination mip level out of range");
+        if (src_rect.width() <= 0 || src_rect.height() <= 0 ||
+            dst_pos.x < 0 || dst_pos.y < 0)
+            throw std::invalid_argument(
+                "frame::copy_to_texture: invalid source rectangle or destination position");
+        if (!rect_i{{}, target_size_}.contains(src_rect))
+            throw std::invalid_argument(
+                "frame::copy_to_texture: source is outside the current target");
+        if (!rect_i{{}, mip_size(dst.face_size(), dst_level)}.contains(
+                rect_i::pos_size(dst_pos, src_rect.size())))
+            throw std::invalid_argument(
+                "frame::copy_to_texture: destination is outside cube texture level");
+        if (!swapchain_->backend_->copy_render_target_to_texture.get_or_throw()(
+                swapchain_->device_, dst.impl(), src_rect, target_size_, dst_pos,
+                dst_level, static_cast<int>(face)))
             throw std::runtime_error("frame::copy_to_texture: backend copy failed");
     }
 

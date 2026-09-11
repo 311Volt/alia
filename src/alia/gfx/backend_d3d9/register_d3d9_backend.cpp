@@ -30,6 +30,8 @@ namespace alia {
         iface.caps.npot_textures =
             (raw->caps.TextureCaps & D3DPTEXTURECAPS_POW2) == 0 ||
             (raw->caps.TextureCaps & D3DPTEXTURECAPS_NONPOW2CONDITIONAL) != 0;
+        iface.caps.cube_textures =
+            (raw->caps.TextureCaps & D3DPTEXTURECAPS_CUBEMAP) != 0;
         D3DDISPLAYMODE adapter_mode = {};
         const bool have_adapter_mode = SUCCEEDED(
             raw->d3d->GetAdapterDisplayMode(raw->adapter, &adapter_mode));
@@ -46,6 +48,12 @@ namespace alia {
         iface.destroy_device      = {d3d9_destroy_device};
 
         iface.create_texture              = {d3d9_create_texture};
+        if (iface.caps.cube_textures) {
+            iface.create_cube_texture = {d3d9_create_cube_texture};
+        } else {
+            iface.create_cube_texture = {
+                nullptr, "device lacks D3DPTEXTURECAPS_CUBEMAP"};
+        }
         iface.destroy_texture             = {d3d9_destroy_texture};
         iface.texture_format              = {d3d9_texture_format};
         iface.texture_width               = {d3d9_texture_width};
@@ -54,6 +62,7 @@ namespace alia {
         iface.texture_sampler             = {d3d9_texture_sampler};
         iface.texture_set_sampler         = {d3d9_texture_set_sampler};
         iface.texture_lock                = {d3d9_texture_lock};
+        iface.cube_texture_lock           = {d3d9_cube_texture_lock};
         iface.texture_unlock              = {d3d9_texture_unlock};
         iface.texture_clone               = {d3d9_texture_clone};
         iface.copy_render_target_to_texture = {d3d9_copy_render_target_to_texture};
