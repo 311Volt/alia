@@ -130,11 +130,13 @@ namespace alia {
     }
     bool ogl_set_render_target(device_handle *h, const render_target_info &info) {
         auto &device = *as_ogl_device(h);
+        GLuint &target_fbo = device.current_swapchain
+            ? device.current_swapchain->target_fbo : device.target_fbo;
         if (info.target_texture) {
             if (!fbo_available()) return false;
-            if (!device.target_fbo) ogl_s_glGenFramebuffers(1, &device.target_fbo);
-            if (!device.target_fbo) return false;
-            ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, device.target_fbo);
+            if (!target_fbo) ogl_s_glGenFramebuffers(1, &target_fbo);
+            if (!target_fbo) return false;
+            ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, target_fbo);
             ogl_s_glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, as_ogl_texture(info.target_texture)->tex_id, info.target_level);
             if (ogl_s_glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0); return false; }
         } else if (fbo_available()) {

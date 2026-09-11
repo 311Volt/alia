@@ -43,6 +43,8 @@ namespace alia {
         IDirect3DDevice9 *device = nullptr;
         HWND dummy = nullptr;
         D3DCAPS9 caps = {};
+        UINT adapter = D3DADAPTER_DEFAULT;
+        D3DDEVTYPE device_type = D3DDEVTYPE_HAL;
         std::vector<std::optional<d3d9_compiled_vertex_definition>> vertex_definitions;
         d3d9_pipeline *current_pipeline = nullptr;
         d3d9_vertex_buffer *current_vb = nullptr;
@@ -82,7 +84,13 @@ namespace alia {
         IDirect3DSurface9 *depth_stencil = nullptr;
         HWND hwnd = nullptr;
         vec2i size = {};
-        vsync_mode vsync = vsync_mode::disable;
+        D3DFORMAT backbuffer_fmt = D3DFMT_UNKNOWN;
+        D3DFORMAT depth_fmt = D3DFMT_UNKNOWN;
+        D3DMULTISAMPLE_TYPE msaa = D3DMULTISAMPLE_NONE;
+        DWORD msaa_quality = 0;
+        D3DSWAPEFFECT swap = D3DSWAPEFFECT_DISCARD;
+        UINT present_interval = D3DPRESENT_INTERVAL_IMMEDIATE;
+        framebuffer_properties props;
     };
     struct d3d9_stored_shader_constant {
         shader_constant_slot slot = {};
@@ -116,6 +124,7 @@ namespace alia {
     inline d3d9_index_buffer *as_d3d9_index_buffer(index_buffer_handle *h) { return static_cast<d3d9_index_buffer *>(h); }
     inline const d3d9_index_buffer *as_d3d9_index_buffer(const index_buffer_handle *h) { return static_cast<const d3d9_index_buffer *>(h); }
     inline d3d9_swapchain *as_d3d9_swapchain(swapchain_handle *h) { return static_cast<d3d9_swapchain *>(h); }
+    inline const d3d9_swapchain *as_d3d9_swapchain(const swapchain_handle *h) { return static_cast<const d3d9_swapchain *>(h); }
     inline d3d9_shader_program *as_d3d9_shader_program(shader_program_handle *h) { return static_cast<d3d9_shader_program *>(h); }
     inline d3d9_pipeline *as_d3d9_pipeline(pipeline_handle *h) { return static_cast<d3d9_pipeline *>(h); }
     inline DWORD to_d3d_color(color c) {
@@ -123,7 +132,7 @@ namespace alia {
         return D3DCOLOR_RGBA(clamp(c.r), clamp(c.g), clamp(c.b), clamp(c.a));
     }
 
-    d3d9_device *d3d9_create_device(); void d3d9_destroy_device(device_handle *);
+    d3d9_device *d3d9_create_device(const gfx_device_config &); void d3d9_destroy_device(device_handle *);
     texture_handle *d3d9_create_texture(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage);
     void d3d9_destroy_texture(texture_handle *); pixel_format d3d9_texture_format(const texture_handle *);
     int d3d9_texture_width(const texture_handle *); int d3d9_texture_height(const texture_handle *); int d3d9_texture_mip_levels(const texture_handle *);
@@ -141,8 +150,9 @@ namespace alia {
     shader_constant_slot d3d9_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type); void d3d9_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
     shader_sampler_slot d3d9_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type); void d3d9_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
     void d3d9_apply_program_state(IDirect3DDevice9 *, d3d9_shader_program *);
-    swapchain_handle *d3d9_create_swapchain(device_handle *, void *, vec2i, vsync_mode); void d3d9_destroy_swapchain(swapchain_handle *);
-    void d3d9_swapchain_begin_frame(swapchain_handle *); void d3d9_swapchain_end_frame(swapchain_handle *); void d3d9_swapchain_present(swapchain_handle *); void d3d9_swapchain_on_resize(swapchain_handle *, vec2i);
+    swapchain_handle *d3d9_create_swapchain(device_handle *, void *, vec2i, const swapchain_desc &); void d3d9_destroy_swapchain(swapchain_handle *);
+    framebuffer_properties d3d9_swapchain_properties(const swapchain_handle *);
+    void d3d9_swapchain_begin_frame(swapchain_handle *); void d3d9_swapchain_end_frame(swapchain_handle *); void d3d9_swapchain_present(swapchain_handle *); bool d3d9_swapchain_present_region(swapchain_handle *, rect_i); void d3d9_swapchain_on_resize(swapchain_handle *, vec2i);
     pipeline_handle *d3d9_create_pipeline(device_handle *, const pipeline_desc &); void d3d9_destroy_pipeline(pipeline_handle *); void d3d9_update_pipeline(pipeline_handle *, const pipeline_desc &); void d3d9_bind_pipeline(device_handle *, pipeline_handle *);
     bool d3d9_set_render_target(device_handle *, const render_target_info &); bool d3d9_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void d3d9_reset_frame_state(d3d9_device &); void d3d9_set_viewport(device_handle *, const render_viewport &);
     void d3d9_bind_vertex_buffer(device_handle *, vertex_buffer_handle *); void d3d9_bind_index_buffer(device_handle *, index_buffer_handle *);

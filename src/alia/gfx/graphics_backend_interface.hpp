@@ -5,6 +5,7 @@
 #include "../core/rect.hpp"
 #include "../core/vec.hpp"
 #include "bitmap/pixel.hpp"
+#include "framebuffer_config.hpp"
 #include "transform.hpp"
 #include "vertex.hpp"
 
@@ -64,6 +65,10 @@ namespace alia {
         disable, // Request immediate presentation; fail creation if rejected.
         suggest, // Request synchronization, but allow creation without control.
         require  // Request synchronization; fail creation if rejected.
+    };
+    struct swapchain_desc {
+        vsync_mode vsync = vsync_mode::disable;
+        framebuffer_config framebuffer;
     };
     enum class texture_role {
         color,
@@ -282,6 +287,7 @@ namespace alia {
     struct graphics_backend_interface {
         gfx_backend id = gfx_backend::auto_;
         vec2f pixel_center_offset = {};
+        gfx_device_caps caps;
 
         gfx_backend_op<void(device_handle *)> destroy_device;
 
@@ -320,11 +326,13 @@ namespace alia {
         gfx_backend_op<shader_sampler_slot(shader_program_handle *, std::string_view, shader_type)> shader_lookup_sampler;
         gfx_backend_op<void(shader_program_handle *, const shader_sampler_slot &, texture_handle *)> shader_set_sampler;
 
-        gfx_backend_op<swapchain_handle *(device_handle *, void *, vec2i, vsync_mode)> create_swapchain;
+        gfx_backend_op<swapchain_handle *(device_handle *, void *, vec2i, const swapchain_desc &)> create_swapchain;
         gfx_backend_op<void(swapchain_handle *)> destroy_swapchain;
+        gfx_backend_op<framebuffer_properties(const swapchain_handle *)> swapchain_properties;
         gfx_backend_op<void(swapchain_handle *)> swapchain_begin_frame;
         gfx_backend_op<void(swapchain_handle *)> swapchain_end_frame;
         gfx_backend_op<void(swapchain_handle *)> swapchain_present;
+        gfx_backend_op<bool(swapchain_handle *, rect_i)> swapchain_present_region;
         gfx_backend_op<void(swapchain_handle *, vec2i)> swapchain_on_resize;
 
         gfx_backend_op<pipeline_handle *(device_handle *, const pipeline_desc &)> create_pipeline;
@@ -349,7 +357,7 @@ namespace alia {
     };
     struct gfx_backend_factory {
         gfx_backend id;
-        created_device (*create)();
+        created_device (*create)(const gfx_device_config &);
     };
     void register_gfx_backend(gfx_backend_factory factory);
 

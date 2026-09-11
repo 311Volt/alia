@@ -179,8 +179,7 @@ int main(int argc, char **argv) {
             update_colors(grid, now, extent);
             const int lock_size = (std::max)(
                 1, static_cast<int>(vertex_buffer.count() * extent));
-            // NOTE (API feedback): write_only replaces the requested range,
-            // so preserving the old buffer contents is unnecessary.
+
             if (auto locked = vertex_buffer.lock_write_only(0, lock_size))
                 std::copy_n(grid.data.begin(), lock_size, locked.view().begin());
 

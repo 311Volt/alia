@@ -27,6 +27,7 @@ namespace alia {
     struct ogl_pipeline;
     struct ogl_vertex_buffer;
     struct ogl_index_buffer;
+    struct ogl_swapchain;
     struct ogl_device : device_handle {
         void *ctx = nullptr;
         std::vector<std::unique_ptr<ogl_compiled_vertex_definition>> vertex_definitions;
@@ -41,6 +42,7 @@ namespace alia {
         bool applied_shader_active = false;
         const void *applied_base = nullptr;
         GLuint target_fbo = 0;
+        ogl_swapchain *current_swapchain = nullptr;
     };
     struct ogl_texture : texture_handle {
         GLuint tex_id = 0;
@@ -54,7 +56,13 @@ namespace alia {
     };
     struct ogl_vertex_buffer : vertex_buffer_handle { GLuint buffer_id = 0; int stride = 0, count = 0; buffer_usage usage = buffer_usage::static_mesh; };
     struct ogl_index_buffer : index_buffer_handle { GLuint buffer_id = 0; int count = 0; buffer_usage usage = buffer_usage::static_mesh; };
-    struct ogl_swapchain : swapchain_handle { ogl_device *owner = nullptr; void *native = nullptr; void *surface = nullptr; void *ctx = nullptr; vec2i size = {}; };
+    struct ogl_swapchain : swapchain_handle {
+        ogl_device *owner = nullptr;
+        void *surface = nullptr;
+        vec2i size = {};
+        GLuint target_fbo = 0;
+        framebuffer_properties props;
+    };
     struct ogl_stored_shader_constant {
         shader_constant_slot slot = {};
         shader_constant_value_type type = shader_constant_value_type::float_1;
@@ -85,10 +93,11 @@ namespace alia {
     inline ogl_index_buffer *as_ogl_index_buffer(index_buffer_handle *h) { return static_cast<ogl_index_buffer *>(h); }
     inline const ogl_index_buffer *as_ogl_index_buffer(const index_buffer_handle *h) { return static_cast<const ogl_index_buffer *>(h); }
     inline ogl_swapchain *as_ogl_swapchain(swapchain_handle *h) { return static_cast<ogl_swapchain *>(h); }
+    inline const ogl_swapchain *as_ogl_swapchain(const swapchain_handle *h) { return static_cast<const ogl_swapchain *>(h); }
     inline ogl_shader_program *as_ogl_shader_program(shader_program_handle *h) { return static_cast<ogl_shader_program *>(h); }
     inline ogl_pipeline *as_ogl_pipeline(pipeline_handle *h) { return static_cast<ogl_pipeline *>(h); }
 
-    ogl_device *ogl_create_device(); void ogl_destroy_device(device_handle *);
+    ogl_device *ogl_create_device(const gfx_device_config &); void ogl_destroy_device(device_handle *);
     texture_handle *ogl_create_texture(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage); void ogl_destroy_texture(texture_handle *);
     pixel_format ogl_texture_format(const texture_handle *); int ogl_texture_width(const texture_handle *); int ogl_texture_height(const texture_handle *); int ogl_texture_mip_levels(const texture_handle *);
     sampler_state ogl_texture_sampler(const texture_handle *); void ogl_texture_set_sampler(texture_handle *, const sampler_state &);
@@ -105,7 +114,8 @@ namespace alia {
     shader_constant_slot ogl_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type); void ogl_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
     shader_sampler_slot ogl_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type); void ogl_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
     void ogl_apply_program_state(ogl_shader_program *);
-    swapchain_handle *ogl_create_swapchain(device_handle *, void *, vec2i, vsync_mode); void ogl_destroy_swapchain(swapchain_handle *);
+    swapchain_handle *ogl_create_swapchain(device_handle *, void *, vec2i, const swapchain_desc &); void ogl_destroy_swapchain(swapchain_handle *);
+    framebuffer_properties ogl_swapchain_properties(const swapchain_handle *);
     void ogl_swapchain_begin_frame(swapchain_handle *); void ogl_swapchain_end_frame(swapchain_handle *); void ogl_swapchain_present(swapchain_handle *); void ogl_swapchain_on_resize(swapchain_handle *, vec2i);
     pipeline_handle *ogl_create_pipeline(device_handle *, const pipeline_desc &); void ogl_destroy_pipeline(pipeline_handle *); void ogl_update_pipeline(pipeline_handle *, const pipeline_desc &); void ogl_bind_pipeline(device_handle *, pipeline_handle *);
     bool ogl_set_render_target(device_handle *, const render_target_info &); bool ogl_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void ogl_reset_frame_state(ogl_device &); void ogl_set_viewport(device_handle *, const render_viewport &);

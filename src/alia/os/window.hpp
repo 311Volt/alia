@@ -7,9 +7,13 @@
 #include "../events/event_source.hpp"
 #include "window_events.hpp"
 #include <memory>
+#include <span>
 #include <variant>
 
 namespace alia {
+
+class any_bitmap_view;
+struct display_mode;
 
 namespace detail { struct window_pos_centered_t {}; }
 inline constexpr detail::window_pos_centered_t window_pos_centered;
@@ -18,6 +22,11 @@ enum class window_fullscreen_mode {
     windowed,
     fullscreen,         // exclusive fullscreen
     fullscreen_window,  // borderless fullscreen
+};
+
+struct window_size_constraints {
+    vec2i min = {0, 0};
+    vec2i max = {0, 0};
 };
 
 // window creation/configuration options
@@ -31,6 +40,10 @@ struct window_options {
     bool borderless = false; // borderless window (no title bar)
     bool grab_mouse = false;
     bool high_dpi   = false;
+    int monitor = -1;
+    int refresh_rate = 0;
+    bool generate_expose_events = false;
+    window_size_constraints size_constraints = {};
 };
 
     // cursor types
@@ -65,7 +78,13 @@ struct window_impl {
     virtual bool is_focused()    const = 0;
     virtual bool is_minimized()  const = 0;
     virtual bool is_maximized()  const = 0;
-    virtual bool is_fullscreen() const = 0;
+    virtual window_fullscreen_mode fullscreen_mode() const = 0;
+    virtual bool is_resizable() const = 0;
+    virtual bool is_borderless() const = 0;
+    virtual bool generates_expose_events() const = 0;
+    virtual int refresh_rate() const = 0;
+    virtual int monitor() const = 0;
+    virtual window_size_constraints size_constraints() const = 0;
 
     // Modification
     virtual void set_title(cstring_view title) = 0;
@@ -76,8 +95,14 @@ struct window_impl {
     virtual void restore() = 0;
 
     // Fullscreen
-    virtual void set_fullscreen(bool fullscreen) = 0;
-    virtual void set_fullscreen_window(bool enable) = 0;
+    virtual void set_fullscreen_mode(
+        window_fullscreen_mode mode,
+        const display_mode *exclusive_mode) = 0;
+    virtual void set_resizable(bool value) = 0;
+    virtual void set_borderless(bool value) = 0;
+    virtual void set_size_constraints(window_size_constraints value) = 0;
+    virtual void apply_size_constraints(bool enable) = 0;
+    virtual void set_icons(std::span<const any_bitmap_view> icons) = 0;
 
     // Cursor
     virtual void show_cursor(bool show) = 0;
@@ -137,7 +162,15 @@ void register_window_backend(window_backend_entry entry);
         [[nodiscard]] bool is_focused()    const { return impl_->is_focused(); }
         [[nodiscard]] bool is_minimized()  const { return impl_->is_minimized(); }
         [[nodiscard]] bool is_maximized()  const { return impl_->is_maximized(); }
-        [[nodiscard]] bool is_fullscreen() const { return impl_->is_fullscreen(); }
+        [[nodiscard]] window_fullscreen_mode fullscreen_mode() const { return impl_->fullscreen_mode(); }
+        [[nodiscard]] bool is_fullscreen() const { return fullscreen_mode() != window_fullscreen_mode::windowed; }
+        [[nodiscard]] bool is_fullscreen_window() const { return fullscreen_mode() == window_fullscreen_mode::fullscreen_window; }
+        [[nodiscard]] bool is_resizable() const { return impl_->is_resizable(); }
+        [[nodiscard]] bool is_borderless() const { return impl_->is_borderless(); }
+        [[nodiscard]] bool generates_expose_events() const { return impl_->generates_expose_events(); }
+        [[nodiscard]] int refresh_rate() const { return impl_->refresh_rate(); }
+        [[nodiscard]] int monitor() const { return impl_->monitor(); }
+        [[nodiscard]] window_size_constraints size_constraints() const { return impl_->size_constraints(); }
 
         // Modification
         void set_title(cstring_view title)  { impl_->set_title(title); }
@@ -150,9 +183,29 @@ void register_window_backend(window_backend_entry entry);
         void restore()  { impl_->restore(); }
 
         // Fullscreen
-        void set_fullscreen(bool fullscreen)    { impl_->set_fullscreen(fullscreen); }
-        void toggle_fullscreen()                { impl_->set_fullscreen(!impl_->is_fullscreen()); }
-        void set_fullscreen_window(bool enable) { impl_->set_fullscreen_window(enable); }
+        void set_fullscreen(bool fullscreen) {
+            impl_->set_fullscreen_mode(
+                fullscreen ? window_fullscreen_mode::fullscreen : window_fullscreen_mode::windowed,
+                nullptr);
+        }
+        void set_fullscreen(const display_mode &mode) {
+            impl_->set_fullscreen_mode(window_fullscreen_mode::fullscreen, &mode);
+        }
+        void set_fullscreen_mode(window_fullscreen_mode mode) {
+            impl_->set_fullscreen_mode(mode, nullptr);
+        }
+        void toggle_fullscreen() { set_fullscreen(fullscreen_mode() != window_fullscreen_mode::fullscreen); }
+        void set_fullscreen_window(bool enable) {
+            impl_->set_fullscreen_mode(
+                enable ? window_fullscreen_mode::fullscreen_window : window_fullscreen_mode::windowed,
+                nullptr);
+        }
+        void set_resizable(bool value) { impl_->set_resizable(value); }
+        void set_borderless(bool value) { impl_->set_borderless(value); }
+        void set_size_constraints(window_size_constraints value) { impl_->set_size_constraints(value); }
+        void apply_size_constraints(bool enable = true) { impl_->apply_size_constraints(enable); }
+        void set_icon(const any_bitmap_view &icon);
+        void set_icons(std::span<const any_bitmap_view> icons);
 
         // Cursor
         void show_cursor(bool show = true)    { impl_->show_cursor(show); }
@@ -183,6 +236,8 @@ void register_window_backend(window_backend_entry entry);
     private:
         std::unique_ptr<window_impl> impl_;
     };
+
+    bool inhibit_screensaver(bool inhibit);
 
 } // namespace alia
 

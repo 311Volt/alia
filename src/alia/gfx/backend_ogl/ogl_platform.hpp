@@ -10,9 +10,14 @@ namespace alia {
     struct ogl_platform_ops {
         void *(*create_context)();
         void (*destroy_context)(void *ctx);
-        void *(*create_surface)(void *native_handle, void *ctx, vsync_mode vsync);
-        void (*destroy_surface)(void *native_handle, void *surface);
-        void (*make_current)(void *surface, void *ctx);
+        void *(*create_surface)(
+            void *native_handle,
+            void *root_ctx,
+            const swapchain_desc &,
+            framebuffer_properties &out);
+        void (*destroy_surface)(void *surface, void *root_ctx);
+        void (*make_current)(void *surface);
+        void (*make_root_current)(void *root_ctx);
         void (*swap_buffers)(void *surface);
         void (*make_none_current)();
     };

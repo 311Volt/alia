@@ -5,8 +5,8 @@
 
 namespace alia {
 
-    static created_device create_d3d9_device_and_interface() {
-        d3d9_device *raw = d3d9_create_device();
+    static created_device create_d3d9_device_and_interface(const gfx_device_config &config) {
+        d3d9_device *raw = d3d9_create_device(config);
         if (!raw)
             return {nullptr, {}};
 
@@ -23,6 +23,25 @@ namespace alia {
         graphics_backend_interface iface;
         iface.id = gfx_backend::d3d9;
         iface.pixel_center_offset = {-0.5f, -0.5f};
+        iface.caps.render = raw->device_type == D3DDEVTYPE_REF
+            ? render_method::software : render_method::hardware;
+        iface.caps.max_texture_size = static_cast<int>((std::min)(
+            raw->caps.MaxTextureWidth, raw->caps.MaxTextureHeight));
+        iface.caps.npot_textures =
+            (raw->caps.TextureCaps & D3DPTEXTURECAPS_POW2) == 0 ||
+            (raw->caps.TextureCaps & D3DPTEXTURECAPS_NONPOW2CONDITIONAL) != 0;
+        D3DDISPLAYMODE adapter_mode = {};
+        const bool have_adapter_mode = SUCCEEDED(
+            raw->d3d->GetAdapterDisplayMode(raw->adapter, &adapter_mode));
+        iface.caps.render_to_texture = have_adapter_mode && SUCCEEDED(
+            raw->d3d->CheckDeviceFormat(
+                raw->adapter, raw->device_type, adapter_mode.Format,
+                D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE, D3DFMT_A8R8G8B8));
+        iface.caps.separate_alpha_blend =
+            (raw->caps.PrimitiveMiscCaps & D3DPMISCCAPS_SEPARATEALPHABLEND) != 0;
+        D3DADAPTER_IDENTIFIER9 identifier = {};
+        if (SUCCEEDED(raw->d3d->GetAdapterIdentifier(raw->adapter, 0, &identifier)))
+            iface.caps.renderer_name = identifier.Description;
 
         iface.destroy_device      = {d3d9_destroy_device};
 
@@ -78,9 +97,11 @@ namespace alia {
 
         iface.create_swapchain   = {d3d9_create_swapchain};
         iface.destroy_swapchain  = {d3d9_destroy_swapchain};
+        iface.swapchain_properties = {d3d9_swapchain_properties};
         iface.swapchain_begin_frame = {d3d9_swapchain_begin_frame};
         iface.swapchain_end_frame   = {d3d9_swapchain_end_frame};
         iface.swapchain_present     = {d3d9_swapchain_present};
+        iface.swapchain_present_region = {d3d9_swapchain_present_region};
         iface.swapchain_on_resize   = {d3d9_swapchain_on_resize};
 
         iface.create_pipeline             = {d3d9_create_pipeline};

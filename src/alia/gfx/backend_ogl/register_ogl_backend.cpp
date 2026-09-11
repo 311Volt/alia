@@ -4,8 +4,12 @@
 #include "../gfx_device.hpp"
 
 #include <GL/gl.h>
+#include <algorithm>
+#include <cctype>
+#include <cstdio>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -128,12 +132,12 @@ namespace alia {
         return ok;
     }
 
-    static created_device create_ogl_device_and_interface() {
+    static created_device create_ogl_device_and_interface(const gfx_device_config &config) {
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
         register_win32_ogl_platform();
 #endif
 
-        ogl_device *raw = ogl_create_device();
+        ogl_device *raw = ogl_create_device(config);
         if (!raw)
             return {nullptr, {}};
 
@@ -142,9 +146,7 @@ namespace alia {
         parse_gl_version(gl_major, gl_minor);
 
         // Try to load glGenerateMipmap (GL 3.0+ core, or via EXT_framebuffer_object)
-        const bool has_generate_mipmap =
-            (gl_major > 3 || (gl_major == 3 && gl_minor >= 0)) &&
-            has_gl_extension("GL_EXT_framebuffer_object");
+        const bool has_generate_mipmap = has_gl_extension("GL_EXT_framebuffer_object");
 
         // For GL 3.0+ core, glGenerateMipmap is always available
         const bool gl30_or_later = (gl_major > 3 || (gl_major == 3 && gl_minor >= 0));
@@ -176,6 +178,25 @@ namespace alia {
         graphics_backend_interface iface;
         iface.id = gfx_backend::opengl;
         iface.pixel_center_offset = {0.0f, 0.0f};
+        GLint max_texture_size = 0;
+        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
+        iface.caps.max_texture_size = max_texture_size;
+        iface.caps.npot_textures = gl20_or_later ||
+            has_gl_extension("GL_ARB_texture_non_power_of_two");
+        iface.caps.render_to_texture = has_framebuffers;
+        iface.caps.separate_alpha_blend =
+            gl_major > 1 || (gl_major == 1 && gl_minor >= 4) ||
+            has_gl_extension("GL_EXT_blend_func_separate");
+        if (const auto *renderer = reinterpret_cast<const char *>(glGetString(GL_RENDERER)))
+            iface.caps.renderer_name = renderer;
+        std::string renderer_lower = iface.caps.renderer_name;
+        std::transform(renderer_lower.begin(), renderer_lower.end(), renderer_lower.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        iface.caps.render =
+            renderer_lower.find("gdi generic") != std::string::npos ||
+            renderer_lower.find("llvmpipe") != std::string::npos ||
+            renderer_lower.find("softpipe") != std::string::npos
+                ? render_method::software : render_method::hardware;
 
         iface.destroy_device = {ogl_destroy_device};
 
@@ -248,9 +269,12 @@ namespace alia {
 
         iface.create_swapchain       = {ogl_create_swapchain};
         iface.destroy_swapchain      = {ogl_destroy_swapchain};
+        iface.swapchain_properties   = {ogl_swapchain_properties};
         iface.swapchain_begin_frame  = {ogl_swapchain_begin_frame};
         iface.swapchain_end_frame    = {ogl_swapchain_end_frame};
         iface.swapchain_present      = {ogl_swapchain_present};
+        iface.swapchain_present_region = {
+            nullptr, "WGL has no partial buffer swap"};
         iface.swapchain_on_resize    = {ogl_swapchain_on_resize};
 
         iface.create_pipeline              = {ogl_create_pipeline};

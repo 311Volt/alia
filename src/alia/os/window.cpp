@@ -1,4 +1,5 @@
 #include "window.hpp"
+#include "../gfx/bitmap/bitmap.hpp"
 #include <stdexcept>
 #include <vector>
 #include <mutex>
@@ -62,6 +63,14 @@ window& window::operator=(window&& o) noexcept {
 }
 
 window::~window() = default;
+
+void window::set_icon(const any_bitmap_view &icon) {
+    impl_->set_icons(std::span<const any_bitmap_view>(&icon, 1));
+}
+
+void window::set_icons(std::span<const any_bitmap_view> icons) {
+    impl_->set_icons(icons);
+}
 
 window* window::current() { return s_current_window; }
 

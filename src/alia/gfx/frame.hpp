@@ -29,7 +29,7 @@ namespace alia {
         frame(const frame &) = delete;
         frame &operator=(const frame &) = delete;
 
-        // Select the swapchain backbuffer (which has a depth attachment).
+        // Select the swapchain backbuffer (which may have a depth attachment).
         void set_target();
         // Select a render-target texture mip level (which has no depth attachment).
         void set_target(texture &, int level = 0);
@@ -66,6 +66,7 @@ namespace alia {
 
         void copy_to_texture(texture &dst, rect_i src_rect, vec2i dst_pos = {}, int dst_level = 0);
         void present();
+        void present(rect_i region);
         [[nodiscard]] bool valid() const noexcept { return active_; }
 
     private:

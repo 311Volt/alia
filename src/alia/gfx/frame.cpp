@@ -72,6 +72,35 @@ namespace alia {
         active_ = false;
         swapchain_ = nullptr;
     }
+    void frame::present(rect_i region) {
+        ensure_active();
+        if (region.width() <= 0 || region.height() <= 0 ||
+            !rect_i{{}, swapchain_->size_}.contains(region))
+            throw std::invalid_argument("frame::present: region is outside the swapchain");
+        auto *swapchain = swapchain_;
+        swapchain->backend_->swapchain_end_frame.get_or_throw()(swapchain->handle_);
+        bool presented = true;
+        try {
+            if (swapchain->props_.update_display_region)
+                presented = swapchain->backend_->swapchain_present_region.get_or_throw()(swapchain->handle_, region);
+            else
+                swapchain->backend_->swapchain_present.get_or_throw()(swapchain->handle_);
+        } catch (...) {
+            swapchain->frame_active_ = false;
+            pipeline_ = nullptr;
+            texture_bindings_.clear();
+            active_ = false;
+            swapchain_ = nullptr;
+            throw;
+        }
+        swapchain->frame_active_ = false;
+        pipeline_ = nullptr;
+        texture_bindings_.clear();
+        active_ = false;
+        swapchain_ = nullptr;
+        if (!presented)
+            throw std::runtime_error("frame::present: backend failed to present region");
+    }
     frame swapchain::begin_frame() { return frame(*this); }
 
     void frame::ensure_active() const {
@@ -104,7 +133,7 @@ namespace alia {
         if (!swapchain_->backend_->set_render_target.get_or_throw()(swapchain_->device_, info))
             throw std::runtime_error("frame::set_target: backend failed to select the swapchain backbuffer");
         target_size_ = info.target_size;
-        target_has_depth_ = true;
+        target_has_depth_ = swapchain_->has_depth();
     }
     void frame::set_target(texture &target, int level) {
         ensure_active();

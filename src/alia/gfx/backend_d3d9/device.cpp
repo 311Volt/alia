@@ -1,6 +1,9 @@
 #ifdef ALIA_COMPILE_GFX_BACKEND_D3D9
 
 #include "d3d9_ops.hpp"
+#include "../../os/monitor_win32.hpp"
+
+#include <algorithm>
 
 namespace alia {
 
@@ -22,7 +25,7 @@ namespace alia {
         );
     }
 
-    d3d9_device *d3d9_create_device() {
+    d3d9_device *d3d9_create_device(const gfx_device_config &config) {
         IDirect3D9 *d3d = Direct3DCreate9(D3D_SDK_VERSION);
         if (!d3d)
             return nullptr;
@@ -41,16 +44,37 @@ namespace alia {
         pp.BackBufferHeight = 1;
         pp.hDeviceWindow = dummy;
 
+        UINT adapter = D3DADAPTER_DEFAULT;
+        if (config.adapter >= 0) {
+            void *wanted = nullptr;
+            try { wanted = detail::win32_monitor_handle(config.adapter); } catch (...) {}
+            for (UINT i = 0; wanted && i < d3d->GetAdapterCount(); ++i) {
+                if (d3d->GetAdapterMonitor(i) == static_cast<HMONITOR>(wanted)) {
+                    adapter = i;
+                    break;
+                }
+            }
+        }
+
+        auto try_create = [&](D3DDEVTYPE type, IDirect3DDevice9 **out) {
+            const DWORD first_flags = type == D3DDEVTYPE_HAL
+                ? D3DCREATE_HARDWARE_VERTEXPROCESSING
+                : D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+            HRESULT hr = d3d->CreateDevice(adapter, type, dummy, first_flags, &pp, out);
+            if (FAILED(hr) && type == D3DDEVTYPE_HAL)
+                hr = d3d->CreateDevice(
+                    adapter, type, dummy, D3DCREATE_SOFTWARE_VERTEXPROCESSING, &pp, out);
+            return hr;
+        };
+
+        const bool want_software = config.render.requested() &&
+            config.render.value == render_method::software;
+        D3DDEVTYPE device_type = want_software ? D3DDEVTYPE_REF : D3DDEVTYPE_HAL;
         IDirect3DDevice9 *device = nullptr;
-        HRESULT hr = d3d->CreateDevice(
-            D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, dummy,
-            D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &device
-        );
-        if (FAILED(hr)) {
-            hr = d3d->CreateDevice(
-                D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, dummy,
-                D3DCREATE_SOFTWARE_VERTEXPROCESSING, &pp, &device
-            );
+        HRESULT hr = try_create(device_type, &device);
+        if (FAILED(hr) && !config.render.required()) {
+            device_type = want_software ? D3DDEVTYPE_HAL : D3DDEVTYPE_REF;
+            hr = try_create(device_type, &device);
         }
         if (FAILED(hr)) {
             DestroyWindow(dummy);
@@ -62,6 +86,8 @@ namespace alia {
         dev->d3d = d3d;
         dev->device = device;
         dev->dummy = dummy;
+        dev->adapter = adapter;
+        dev->device_type = device_type;
         device->GetDeviceCaps(&dev->caps);
         return dev;
     }

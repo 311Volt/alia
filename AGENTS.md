@@ -6,7 +6,7 @@ The graphics subsystem in `src/alia/gfx/` follows a four-layer split.
 
 | Layer | Location | Role |
 |-------|----------|------|
-| L1 | `*.hpp` (public) | User-facing API: `texture`, `gfx_device`, `swapchain`, `pipeline`, `dynamic_pipeline`, `frame`, and the primitive renderer family |
+| L1 | `*.hpp` (public) | User-facing API: `texture`, `gfx_device`, `swapchain`, `framebuffer_config`, `pipeline`, `dynamic_pipeline`, `frame`, and the primitive renderer family |
 | L2 | `*.hpp` (detail/templates) | Type-erasure shims: `texture::lock<TPixel>` → `lock_impl`, and `frame::draw<TVertex>` → L3 submission helpers |
 | L3 | `*.cpp` (backend-agnostic) | Device/pipeline/frame lifetime and validation, texture format dispatch, and vertex-definition registry; calls into L4 |
 | L4 | `graphics_backend_interface` | Single function-pointer table per device; one slot per backend operation |
@@ -17,7 +17,7 @@ The graphics subsystem in `src/alia/gfx/` follows a four-layer split.
 
 **`graphics_backend_operation<R(Args...)>`** — wraps a raw function pointer with an optional `reason_unsupported` string. Call `.get_or_throw()` to retrieve the pointer (throws `unsupported_operation_exception` if null). Call `.is_supported()` to test without throwing. A null operation slot means the *hardware* does not support the feature (probed at device-creation time), not that the backend library lacks it.
 
-**`graphics_backend_interface`** — one instance per `gfx_device`, heap-allocated inside it (`unique_ptr`) for pointer stability. Contains every backend operation as a `graphics_backend_operation` slot. Device-owned objects hold a raw `const graphics_backend_interface*` alias into their owning device's copy; the device must outlive them.
+**`graphics_backend_interface`** — one instance per `gfx_device`, heap-allocated inside it (`unique_ptr`) for pointer stability. Contains every backend operation as a `graphics_backend_operation` slot, the probed `gfx_device_caps`, and swapchain property/partial-present operations. Device-owned objects hold a raw `const graphics_backend_interface*` alias into their owning device's copy; the device must outlive them.
 
 **Pipelines and effects** — `pipeline` is immutable and contains its vertex layout, effect/program selection, blend/depth/raster state. `dynamic_pipeline` has the same backend object but may change those fields; it is rebound before every draw, so mutations take effect at draw granularity. `pipeline_config::effect` is non-owning on both alternatives: `const basic_effect*` for fixed function and `shader_program*` for programmable drawing. The referenced object must outlive the pipeline. `basic_effect` owns mutable fixed-function world/projection matrices; shader programs retain their own constants and sampler records.
 
@@ -32,13 +32,14 @@ struct created_device {
 };
 ```
 
-**`gfx_backend_factory`** — registered at startup via `register_gfx_backend()`; holds a `created_device (*create)()` that creates the device and builds the full interface in one call.
+**`gfx_backend_factory`** — registered at startup via `register_gfx_backend()`; holds a `created_device (*create)(const gfx_device_config&)` that selects an adapter/render method, creates the device, probes capabilities, and builds the full interface in one call.
 
 ## Backend directories
 
 ```
 src/alia/gfx/
   graphics_backend_interface.hpp   — L4 types (opaque handles, operation slots, full interface struct)
+  framebuffer_config.hpp / .cpp    — display option requests, actual properties, and required-option validation
   gfx_device.hpp / gfx_device.cpp  — L1/L3 for device, swapchain, and backend registry
   pipeline.hpp / pipeline.cpp      — L1/L3 immutable and dynamic pipeline objects
   frame.hpp / frame.cpp            — L1/L2/L3 frame lifetime, target/clear commands, and draw validation
@@ -56,7 +57,11 @@ src/alia/gfx/
                                      builds + registers interface
     device.cpp / swapchain.cpp / texture.cpp / pipeline.cpp
     win32_platform.cpp             — Win32 WGL surface/context management
+  ../os/display.cpp                — platform-independent closest-video-mode selection
+  ../os/monitor_win32.cpp          — Win32 monitor and video-mode enumeration
 ```
+
+Each OpenGL swapchain owns an `HGLRC` whose objects are shared with the device's root dummy-window context. Render-to-texture FBOs are per context because FBOs are not shared. A window's first swapchain fixes its pixel format; later swapchains for that same window reuse it.
 
 ## Hardware capability probing
 
@@ -69,7 +74,7 @@ Do **not** use `reason_unsupported` for "this backend doesn't implement X yet" �
 
 ## Frames and primitive renderers
 
-`swapchain::begin_frame()` creates a move-only `frame`; a frame ends with `frame::present()` or, without presenting, its destructor. It initially targets the swapchain backbuffer without clearing. `set_target()` selects the backbuffer (with depth); `set_target(texture, level)` selects a render-target texture mip (without depth); `clear()` is an independent command. A pipeline must be selected before the first draw.
+`swapchain::begin_frame()` creates a move-only `frame`; a frame ends with `frame::present()`, `frame::present(region)`, or, without presenting, its destructor. It initially targets the swapchain backbuffer without clearing. `set_target()` selects the backbuffer (with depth only when the negotiated framebuffer has it); `set_target(texture, level)` selects a render-target texture mip (without depth); `clear()` is an independent command. A pipeline must be selected before the first draw.
 
 Depth clears and depth-enabled pipelines are valid only while the backbuffer is selected. Dynamic pipeline depth changes are checked again just before draw. Resource bindings persist for the frame across pipeline switches; when selecting a texture target, frame-managed bindings of that same texture are defensively removed. Shader-owned samplers must still avoid sampling the current render target.
 
@@ -79,7 +84,7 @@ Text drawing requires the caller to bind a `full_vertex` pipeline whose `basic_e
 
 ## Adding a new backend operation
 
-1. Add a `graphics_backend_operation<R(Args...)>` slot to `graphics_backend_interface` in `graphics_backend_interface.hpp`.
+1. Add a `graphics_backend_operation<R(Args...)>` slot to `graphics_backend_interface` in `graphics_backend_interface.hpp`. The swapchain readback operations are `swapchain_properties` and `swapchain_present_region`.
 2. Implement the function in each backend's appropriate `.cpp` file and declare it in `*_ops.hpp`.
 3. Wire the slot in `register_*_backend.cpp` (set `operation` pointer, or leave null + set `reason_unsupported` if hardware-conditional).
 4. Add the L3 free function or method in `gfx_device.cpp` / `texture.cpp` that calls `.get_or_throw()`.

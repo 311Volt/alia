@@ -69,15 +69,20 @@ namespace alia {
         }
         return *this;
     }
-    gfx_device gfx_device::create(gfx_backend pref) {
+    gfx_device gfx_device::create(gfx_backend pref, const gfx_device_config &config) {
         ensure_backends_registered();
         std::lock_guard lock(backend_factories_mutex());
         for (const auto &factory : backend_factories()) {
             if (pref != gfx_backend::auto_ && factory.id != pref)
                 continue;
-            created_device created = factory.create();
-            if (created.handle)
+            created_device created = factory.create(config);
+            if (created.handle) {
+                if (config.render.required() && created.iface.caps.render != config.render.value) {
+                    created.iface.destroy_device.get_or_throw()(created.handle);
+                    throw std::runtime_error("gfx_device::create: render requirement was not met");
+                }
                 return gfx_device(created.handle, std::make_unique<graphics_backend_interface>(std::move(created.iface)));
+            }
         }
         throw std::runtime_error("gfx_device::create: no usable graphics backend");
     }
@@ -85,13 +90,30 @@ namespace alia {
         if (!*this)
             throw std::runtime_error("gfx_device::create_swapchain: device is not valid");
         const vec2i size = config.target.size();
+        const swapchain_desc desc{config.vsync, config.framebuffer};
         swapchain_handle *handle = backend_->create_swapchain.get_or_throw()(
-            device_, config.target.native_handle(), size, config.vsync);
+            device_, config.target.native_handle(), size, desc);
         if (!handle)
             throw std::runtime_error("gfx_device::create_swapchain: backend failed to create swapchain");
-        return swapchain(handle, backend_.get(), device_, size);
+        framebuffer_properties props;
+        try {
+            props = backend_->swapchain_properties.get_or_throw()(handle);
+        } catch (...) {
+            backend_->destroy_swapchain.get_or_throw()(handle);
+            throw;
+        }
+        if (auto error = check_framebuffer_requirements(config.framebuffer, props)) {
+            backend_->destroy_swapchain.get_or_throw()(handle);
+            throw std::runtime_error("gfx_device::create_swapchain: " + *error);
+        }
+        return swapchain(handle, backend_.get(), device_, size, std::move(props));
     }
     vec2f gfx_device::pixel_center_offset() const { return backend_ ? backend_->pixel_center_offset : vec2f{}; }
+    const gfx_device_caps &gfx_device::caps() const {
+        if (!backend_)
+            throw std::logic_error("gfx_device::caps: device is not valid");
+        return backend_->caps;
+    }
 
     swapchain::~swapchain() {
         if (handle_)
@@ -100,6 +122,7 @@ namespace alia {
     swapchain::swapchain(swapchain &&other) noexcept
         : handle_(std::exchange(other.handle_, nullptr)), backend_(std::exchange(other.backend_, nullptr)),
           device_(std::exchange(other.device_, nullptr)), size_(std::exchange(other.size_, {})),
+          props_(std::exchange(other.props_, {})),
           frame_active_(std::exchange(other.frame_active_, false)) {}
     swapchain &swapchain::operator=(swapchain &&other) noexcept {
         if (this != &other) {
@@ -109,6 +132,7 @@ namespace alia {
             backend_ = std::exchange(other.backend_, nullptr);
             device_ = std::exchange(other.device_, nullptr);
             size_ = std::exchange(other.size_, {});
+            props_ = std::exchange(other.props_, {});
             frame_active_ = std::exchange(other.frame_active_, false);
         }
         return *this;
@@ -122,6 +146,7 @@ namespace alia {
             throw std::invalid_argument("swapchain::on_resize: size must be positive");
         backend_->swapchain_on_resize.get_or_throw()(handle_, new_size);
         size_ = new_size;
+        props_ = backend_->swapchain_properties.get_or_throw()(handle_);
     }
 
     void make_current(gfx_device &d) { tl_current_device = &d; }

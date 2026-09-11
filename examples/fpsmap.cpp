@@ -232,14 +232,17 @@ mesh create_skybox_mesh() {
     result.vertices.reserve(18);
     result.indices.reserve(36);
     for (std::size_t i = 0; i < wall_uv.size(); ++i) {
-        const alia::vec2f uv{wall_uv[i].x / 4.0f, wall_uv[i].y / 3.0f};
+        const alia::vec2f uv{
+            wall_uv[i].x / 4.0f,
+            1.0f - wall_uv[i].y / 3.0f,
+        };
         result.vertices.push_back({
             positions[(i % 5) % 4 + 4 * (i / 5)], alia::white, uv});
     }
     for (std::size_t i = 0; i < floor_ceiling_uv.size(); ++i) {
         const alia::vec2f uv{
             floor_ceiling_uv[i].x / 4.0f,
-            floor_ceiling_uv[i].y / 3.0f,
+            1.0f - floor_ceiling_uv[i].y / 3.0f,
         };
         result.vertices.push_back({positions[i], alia::white, uv});
     }
@@ -400,7 +403,7 @@ int main(int argc, char **argv) {
                     const alia::vec2i delta = mouse->position - last_mouse;
                     last_mouse = mouse->position;
                     player_camera.rotate_degrees({
-                        static_cast<float>(delta.y) * 0.022f * 4.0f,
+                        -static_cast<float>(delta.y) * 0.022f * 4.0f,
                         static_cast<float>(delta.x) * 0.022f * 4.0f,
                     });
                 }

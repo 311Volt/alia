@@ -18,7 +18,7 @@ namespace alia {
 
     // ── Device create / destroy ───────────────────────────────────────────
 
-    ogl_device *ogl_create_device() {
+    ogl_device *ogl_create_device(const gfx_device_config &) {
         void *ctx = get_ogl_platform().create_context();
         if (!ctx)
             return nullptr;
@@ -30,11 +30,11 @@ namespace alia {
 
     void ogl_destroy_device(device_handle *h) {
         auto *dev = as_ogl_device(h);
+        get_ogl_platform().make_root_current(dev->ctx);
         if (dev->target_fbo && ogl_s_glDeleteFramebuffers)
             ogl_s_glDeleteFramebuffers(1, &dev->target_fbo);
         dev->vertex_definitions.clear();
         const auto &ops = get_ogl_platform();
-        ops.make_none_current();
         ops.destroy_context(dev->ctx);
         delete dev;
     }

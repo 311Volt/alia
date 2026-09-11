@@ -3,6 +3,7 @@
 
 #include "../events/event.hpp"
 #include "../core/vec.hpp"
+#include "../core/rect.hpp"
 #include "../io/keycodes.hpp"
 
 namespace alia {
@@ -35,6 +36,11 @@ struct window_key_char_event {
     char32_t codepoint; // full Unicode codepoint (never a surrogate)
     key_mod  modifiers; // shift/ctrl/alt/super/caps/numlock state
     bool     is_repeat; // true if key was already held (auto-repeat)
+};
+
+struct window_expose_event {
+    static constexpr event_type_id_t alia_event_type_id = 0x0108;
+    rect_i area;
 };
 
 struct window_mouse_move_event {

@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <typeindex>
+#include <utility>
 
 namespace alia {
 
@@ -15,6 +16,7 @@ namespace alia {
     struct swapchain_config {
         window &target;
         vsync_mode vsync = vsync_mode::disable;
+        framebuffer_config framebuffer = {};
     };
 
     class gfx_device {
@@ -26,13 +28,16 @@ namespace alia {
         gfx_device(const gfx_device &) = delete;
         gfx_device &operator=(const gfx_device &) = delete;
 
-        static gfx_device create(gfx_backend pref = gfx_backend::auto_);
+        static gfx_device create(
+            gfx_backend pref = gfx_backend::auto_,
+            const gfx_device_config &config = {});
         [[nodiscard]] swapchain create_swapchain(const swapchain_config &config);
         [[nodiscard]] bool valid() const noexcept { return backend_ != nullptr; }
         [[nodiscard]] explicit operator bool() const noexcept { return valid(); }
         [[nodiscard]] const graphics_backend_interface *backend() const noexcept { return backend_.get(); }
         [[nodiscard]] device_handle *device() const noexcept { return device_; }
         [[nodiscard]] vec2f pixel_center_offset() const;
+        [[nodiscard]] const gfx_device_caps &caps() const;
 
     private:
         device_handle *device_ = nullptr;
@@ -57,6 +62,9 @@ namespace alia {
         [[nodiscard]] swapchain_handle *handle() const noexcept { return handle_; }
         [[nodiscard]] const graphics_backend_interface *backend() const noexcept { return backend_; }
         [[nodiscard]] vec2i size() const noexcept { return size_; }
+        [[nodiscard]] const framebuffer_properties &properties() const noexcept { return props_; }
+        [[nodiscard]] pixel_format color_format() const noexcept { return props_.color_format; }
+        [[nodiscard]] bool has_depth() const noexcept { return props_.depth_bits > 0; }
 
     private:
         friend class gfx_device;
@@ -65,9 +73,15 @@ namespace alia {
         const graphics_backend_interface *backend_ = nullptr;
         device_handle *device_ = nullptr;
         vec2i size_ = {};
+        framebuffer_properties props_ = {};
         bool frame_active_ = false;
-        explicit swapchain(swapchain_handle *handle, const graphics_backend_interface *backend, device_handle *device, vec2i size) noexcept
-            : handle_(handle), backend_(backend), device_(device), size_(size) {}
+        explicit swapchain(
+            swapchain_handle *handle,
+            const graphics_backend_interface *backend,
+            device_handle *device,
+            vec2i size,
+            framebuffer_properties props) noexcept
+            : handle_(handle), backend_(backend), device_(device), size_(size), props_(std::move(props)) {}
     };
 
     inline thread_local gfx_device *tl_current_device = nullptr;
