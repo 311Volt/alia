@@ -12,7 +12,10 @@ namespace alia {
     class frame;
     class swapchain;
 
-    struct swapchain_config { window &target; };
+    struct swapchain_config {
+        window &target;
+        vsync_mode vsync = vsync_mode::disable;
+    };
 
     class gfx_device {
     public:

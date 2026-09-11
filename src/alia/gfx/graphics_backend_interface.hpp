@@ -60,6 +60,11 @@ namespace alia {
         d3d9,
         opengl
     };
+    enum class vsync_mode {
+        disable, // Request immediate presentation; fail creation if rejected.
+        suggest, // Request synchronization, but allow creation without control.
+        require  // Request synchronization; fail creation if rejected.
+    };
     enum class texture_role {
         color,
         alpha_mask
@@ -315,7 +320,7 @@ namespace alia {
         gfx_backend_op<shader_sampler_slot(shader_program_handle *, std::string_view, shader_type)> shader_lookup_sampler;
         gfx_backend_op<void(shader_program_handle *, const shader_sampler_slot &, texture_handle *)> shader_set_sampler;
 
-        gfx_backend_op<swapchain_handle *(device_handle *, void *, vec2i)> create_swapchain;
+        gfx_backend_op<swapchain_handle *(device_handle *, void *, vec2i, vsync_mode)> create_swapchain;
         gfx_backend_op<void(swapchain_handle *)> destroy_swapchain;
         gfx_backend_op<void(swapchain_handle *)> swapchain_begin_frame;
         gfx_backend_op<void(swapchain_handle *)> swapchain_end_frame;

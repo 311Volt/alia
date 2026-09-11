@@ -54,7 +54,10 @@ int main(int argc, char **argv) {
         alia::window win({800, 600}, {.title = "Hello ALIA — pipelines", .resizable = true});
         auto device = alia::gfx_device::create(requested_backend(argc, argv));
         alia::make_current(device);
-        auto swapchain = device.create_swapchain({.target = win});
+        auto swapchain = device.create_swapchain({
+            .target = win,
+            .vsync = alia::vsync_mode::disable,
+        });
         alia::event_queue events;
         events.register_source(&win.get_event_source());
 

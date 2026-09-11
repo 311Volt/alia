@@ -4,6 +4,17 @@
 
 namespace alia {
     namespace {
+        UINT presentation_interval(vsync_mode mode) {
+            switch (mode) {
+            case vsync_mode::disable:
+                return D3DPRESENT_INTERVAL_IMMEDIATE;
+            case vsync_mode::suggest:
+                return D3DPRESENT_INTERVAL_DEFAULT;
+            case vsync_mode::require:
+                return D3DPRESENT_INTERVAL_ONE;
+            }
+            return D3DPRESENT_INTERVAL_IMMEDIATE;
+        }
         bool create_depth_stencil(d3d9_swapchain &swapchain) {
             if (SUCCEEDED(swapchain.device->CreateDepthStencilSurface(
                     static_cast<UINT>(swapchain.size.x), static_cast<UINT>(swapchain.size.y),
@@ -21,17 +32,20 @@ namespace alia {
             pp.BackBufferWidth = static_cast<UINT>(swapchain.size.x);
             pp.BackBufferHeight = static_cast<UINT>(swapchain.size.y);
             pp.hDeviceWindow = swapchain.hwnd;
+            pp.PresentationInterval = presentation_interval(swapchain.vsync);
             return SUCCEEDED(swapchain.device->CreateAdditionalSwapChain(&pp, &swapchain.swap_chain));
         }
     }
 
-    swapchain_handle *d3d9_create_swapchain(device_handle *dev_h, void *native_handle, vec2i size) {
+    swapchain_handle *d3d9_create_swapchain(
+        device_handle *dev_h, void *native_handle, vec2i size, vsync_mode vsync) {
         auto *dev = as_d3d9_device(dev_h);
         auto *swapchain = new d3d9_swapchain;
         swapchain->owner = dev;
         swapchain->device = dev->device;
         swapchain->hwnd = static_cast<HWND>(native_handle);
         swapchain->size = size;
+        swapchain->vsync = vsync;
         if (!create_native_swapchain(*swapchain) || !create_depth_stencil(*swapchain)) {
             if (swapchain->depth_stencil) swapchain->depth_stencil->Release();
             if (swapchain->swap_chain) swapchain->swap_chain->Release();

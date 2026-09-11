@@ -105,7 +105,7 @@ namespace alia {
     shader_constant_slot ogl_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type); void ogl_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
     shader_sampler_slot ogl_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type); void ogl_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
     void ogl_apply_program_state(ogl_shader_program *);
-    swapchain_handle *ogl_create_swapchain(device_handle *, void *, vec2i); void ogl_destroy_swapchain(swapchain_handle *);
+    swapchain_handle *ogl_create_swapchain(device_handle *, void *, vec2i, vsync_mode); void ogl_destroy_swapchain(swapchain_handle *);
     void ogl_swapchain_begin_frame(swapchain_handle *); void ogl_swapchain_end_frame(swapchain_handle *); void ogl_swapchain_present(swapchain_handle *); void ogl_swapchain_on_resize(swapchain_handle *, vec2i);
     pipeline_handle *ogl_create_pipeline(device_handle *, const pipeline_desc &); void ogl_destroy_pipeline(pipeline_handle *); void ogl_update_pipeline(pipeline_handle *, const pipeline_desc &); void ogl_bind_pipeline(device_handle *, pipeline_handle *);
     bool ogl_set_render_target(device_handle *, const render_target_info &); bool ogl_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void ogl_reset_frame_state(ogl_device &); void ogl_set_viewport(device_handle *, const render_viewport &);

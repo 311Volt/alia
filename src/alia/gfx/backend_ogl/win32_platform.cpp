@@ -6,6 +6,8 @@
 #include <windows.h>
 #include <GL/gl.h>
 
+#include <cstdint>
+
 #include "ogl_platform.hpp"
 
 namespace alia {
@@ -42,6 +44,25 @@ namespace alia {
         if (!pf)
             return false;
         return SetPixelFormat(hdc, pf, &pfd) == TRUE;
+    }
+
+    using wgl_swap_interval_ext_proc = BOOL (WINAPI *)(int);
+
+    static wgl_swap_interval_ext_proc load_wgl_swap_interval_ext() {
+        PROC proc = wglGetProcAddress("wglSwapIntervalEXT");
+        const std::intptr_t value = reinterpret_cast<std::intptr_t>(proc);
+        if (value == 0 || value == 1 || value == 2 || value == 3 || value == -1)
+            return nullptr;
+        return reinterpret_cast<wgl_swap_interval_ext_proc>(proc);
+    }
+
+    static bool apply_swap_interval(vsync_mode mode) {
+        const auto swap_interval = load_wgl_swap_interval_ext();
+        if (!swap_interval)
+            return mode == vsync_mode::suggest;
+
+        const int interval = mode == vsync_mode::disable ? 0 : 1;
+        return swap_interval(interval) == TRUE || mode == vsync_mode::suggest;
     }
 
     // ── Opaque context struct ─────────────────────────────────────────────
@@ -103,7 +124,8 @@ namespace alia {
         delete c;
     }
 
-    static void *win32_ogl_create_surface(void *native_handle, void *ctx) {
+    static void *win32_ogl_create_surface(
+        void *native_handle, void *ctx, vsync_mode vsync) {
         auto *c = static_cast<win_ogl_ctx *>(ctx);
         HWND hwnd = static_cast<HWND>(native_handle);
 
@@ -115,6 +137,12 @@ namespace alia {
         set_pixel_format(hdc);
 
         if (!wglMakeCurrent(hdc, c->hglrc)) {
+            ReleaseDC(hwnd, hdc);
+            return nullptr;
+        }
+
+        if (!apply_swap_interval(vsync)) {
+            wglMakeCurrent(c->dummy_hdc, c->hglrc);
             ReleaseDC(hwnd, hdc);
             return nullptr;
         }

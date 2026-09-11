@@ -5,9 +5,10 @@
 
 namespace alia {
 
-    swapchain_handle *ogl_create_swapchain(device_handle *dev_h, void *native_handle, vec2i size) {
+    swapchain_handle *ogl_create_swapchain(
+        device_handle *dev_h, void *native_handle, vec2i size, vsync_mode vsync) {
         auto *dev = as_ogl_device(dev_h);
-        void *surface = get_ogl_platform().create_surface(native_handle, dev->ctx);
+        void *surface = get_ogl_platform().create_surface(native_handle, dev->ctx, vsync);
         if (!surface)
             return nullptr;
 

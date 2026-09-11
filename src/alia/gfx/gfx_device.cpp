@@ -85,7 +85,8 @@ namespace alia {
         if (!*this)
             throw std::runtime_error("gfx_device::create_swapchain: device is not valid");
         const vec2i size = config.target.size();
-        swapchain_handle *handle = backend_->create_swapchain.get_or_throw()(device_, config.target.native_handle(), size);
+        swapchain_handle *handle = backend_->create_swapchain.get_or_throw()(
+            device_, config.target.native_handle(), size, config.vsync);
         if (!handle)
             throw std::runtime_error("gfx_device::create_swapchain: backend failed to create swapchain");
         return swapchain(handle, backend_.get(), device_, size);

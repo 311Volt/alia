@@ -3,12 +3,14 @@
 
 #ifdef ALIA_COMPILE_GFX_BACKEND_OPENGL
 
+#include "../graphics_backend_interface.hpp"
+
 namespace alia {
 
     struct ogl_platform_ops {
         void *(*create_context)();
         void (*destroy_context)(void *ctx);
-        void *(*create_surface)(void *native_handle, void *ctx);
+        void *(*create_surface)(void *native_handle, void *ctx, vsync_mode vsync);
         void (*destroy_surface)(void *native_handle, void *surface);
         void (*make_current)(void *surface, void *ctx);
         void (*swap_buffers)(void *surface);

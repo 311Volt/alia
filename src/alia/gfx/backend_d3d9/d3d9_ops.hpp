@@ -82,6 +82,7 @@ namespace alia {
         IDirect3DSurface9 *depth_stencil = nullptr;
         HWND hwnd = nullptr;
         vec2i size = {};
+        vsync_mode vsync = vsync_mode::disable;
     };
     struct d3d9_stored_shader_constant {
         shader_constant_slot slot = {};
@@ -140,7 +141,7 @@ namespace alia {
     shader_constant_slot d3d9_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type); void d3d9_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
     shader_sampler_slot d3d9_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type); void d3d9_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
     void d3d9_apply_program_state(IDirect3DDevice9 *, d3d9_shader_program *);
-    swapchain_handle *d3d9_create_swapchain(device_handle *, void *, vec2i); void d3d9_destroy_swapchain(swapchain_handle *);
+    swapchain_handle *d3d9_create_swapchain(device_handle *, void *, vec2i, vsync_mode); void d3d9_destroy_swapchain(swapchain_handle *);
     void d3d9_swapchain_begin_frame(swapchain_handle *); void d3d9_swapchain_end_frame(swapchain_handle *); void d3d9_swapchain_present(swapchain_handle *); void d3d9_swapchain_on_resize(swapchain_handle *, vec2i);
     pipeline_handle *d3d9_create_pipeline(device_handle *, const pipeline_desc &); void d3d9_destroy_pipeline(pipeline_handle *); void d3d9_update_pipeline(pipeline_handle *, const pipeline_desc &); void d3d9_bind_pipeline(device_handle *, pipeline_handle *);
     bool d3d9_set_render_target(device_handle *, const render_target_info &); bool d3d9_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void d3d9_reset_frame_state(d3d9_device &); void d3d9_set_viewport(device_handle *, const render_viewport &);
