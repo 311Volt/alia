@@ -76,18 +76,23 @@ int main(int argc, char **argv) {
         alia::texture checker(device, alia::load_image("./resources/test.png"));
 
         std::optional<alia::ttf_font> demo_font;
-        std::optional<alia::text> demo_text;
-        std::optional<alia::text> demo_numbers;
-        std::optional<alia::text> fps_text;
+        std::optional<alia::text_texture> demo_text;
+        std::optional<alia::text_texture> demo_numbers;
+        std::optional<alia::text_texture> fps_text;
         std::optional<alia::hardware_glyph_buffer> glyph_cache;
         try {
             demo_font.emplace(alia::load_ttf_font(demo_font_path(), 32));
-            demo_text.emplace(device, *demo_font);
-            demo_text->set_text("The quick brown fox jumps over the lazy dog");
-            demo_numbers.emplace(device, *demo_font);
-            demo_numbers->set_text("1234567890!@#$%^&*()");
-            fps_text.emplace(device, *demo_font);
-            fps_text->set_text("FPS: --");
+            demo_text.emplace(alia::create_text_texture(
+                device,
+                *demo_font,
+                "The quick brown fox jumps over the lazy dog"
+            ));
+            demo_numbers.emplace(alia::create_text_texture(
+                device,
+                *demo_font,
+                "1234567890!@#$%^&*()"
+            ));
+            fps_text.emplace(alia::create_text_texture(device, *demo_font, "FPS: --"));
             glyph_cache.emplace(device, *demo_font);
         } catch (const std::exception &error) {
             std::cerr << "text disabled: " << error.what() << '\n';
@@ -128,7 +133,11 @@ int main(int argc, char **argv) {
             if (fps_elapsed >= 1.0f) {
                 const int fps = static_cast<int>(static_cast<float>(fps_frames) / fps_elapsed + 0.5f);
                 if (fps_text)
-                    fps_text->set_text("FPS: " + std::to_string(fps));
+                    fps_text = alia::create_text_texture(
+                        device,
+                        *demo_font,
+                        "FPS: " + std::to_string(fps)
+                    );
                 const std::string title = "Hello ALIA — pipelines | FPS: " + std::to_string(fps);
                 win.set_title(title.c_str());
                 fps_window_start = now;
