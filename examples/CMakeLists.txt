@@ -1,22 +1,36 @@
-
 cmake_minimum_required(VERSION 3.10)
 project(alia_examples)
 
-add_executable(alia_example_hello hello.cpp)
-target_link_libraries(alia_example_hello PRIVATE alia)
-add_custom_command(TARGET alia_example_hello POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/resources"
-        "$<TARGET_FILE_DIR:alia_example_hello>/resources")
+function(alia_add_example name)
+    set(source "${name}.cpp")
+    if(ARGC GREATER 1)
+        set(source "${ARGV1}")
+    endif()
+    add_executable("alia_example_${name}" "${source}")
+    target_link_libraries("alia_example_${name}" PRIVATE alia)
+    add_custom_command(TARGET "alia_example_${name}" POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources"
+            "$<TARGET_FILE_DIR:alia_example_${name}>/resources")
+endfunction()
 
-add_executable(alia_example_shader shader.cpp)
-target_link_libraries(alia_example_shader PRIVATE alia)
+alia_add_example(hello)
+alia_add_example(shader)
+alia_add_example(buffered_mesh)
+alia_add_example(render_target)
+alia_add_example(mdspan mdspan_example.cpp)
 
-add_executable(alia_example_buffered_mesh buffered_mesh.cpp)
-target_link_libraries(alia_example_buffered_mesh PRIVATE alia)
-
-add_executable(alia_example_render_target render_target.cpp)
-target_link_libraries(alia_example_render_target PRIVATE alia)
-
-add_executable(alia_example_mdspan mdspan_example.cpp)
-target_link_libraries(alia_example_mdspan PRIVATE alia)
+alia_add_example(example1)
+alia_add_example(dvdlogo)
+alia_add_example(userevents)
+alia_add_example(vertices)
+alia_add_example(3dcam)
+alia_add_example(config)
+alia_add_example(shader2)
+alia_add_example(fpsmap)
+alia_add_example(audio)
+alia_add_example(video)
+alia_add_example(subbitmap)
+alia_add_example(benchmark)
+alia_add_example(microphone)
+alia_add_example(buffers)
