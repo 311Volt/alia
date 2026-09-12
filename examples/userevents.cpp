@@ -58,7 +58,6 @@ int main(int argc, char **argv) {
             {640, 480},
             {.title = "ALIA user events", .resizable = true});
         alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({.target = win});
 
         alia::ttf_font font = alia::load_ttf_font("./resources/roboto.ttf", 16);
@@ -114,7 +113,7 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::color::from_rgba8(0, 0, 60));
-            text_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
 
             constexpr std::string_view heading = "Press A or Z to emit events";

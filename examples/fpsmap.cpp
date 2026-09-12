@@ -35,51 +35,6 @@ alia::vec3f normalized(alia::vec3f value) {
     return length == 0.0f ? alia::vec3f{} : value / length;
 }
 
-alia::transform look_at(alia::vec3f eye, alia::vec3f target, alia::vec3f up) {
-    const alia::vec3f forward = normalized(target - eye);
-    const alia::vec3f side = normalized(forward.cross(up));
-    const alia::vec3f camera_up = side.cross(forward);
-    alia::transform result = alia::transform::identity();
-    result.m[0][0] = side.x;
-    result.m[0][1] = camera_up.x;
-    result.m[0][2] = -forward.x;
-    result.m[1][0] = side.y;
-    result.m[1][1] = camera_up.y;
-    result.m[1][2] = -forward.y;
-    result.m[2][0] = side.z;
-    result.m[2][1] = camera_up.z;
-    result.m[2][2] = -forward.z;
-    result.m[3][0] = -side.dot(eye);
-    result.m[3][1] = -camera_up.dot(eye);
-    result.m[3][2] = forward.dot(eye);
-    return result;
-}
-
-// NOTE (API feedback): transform::perspective should be backend-aware like
-// transform::ortho_ui instead of requiring this clip-depth switch at each call.
-alia::transform perspective_fov(
-    float fov_degrees,
-    float aspect,
-    float near_plane,
-    float far_plane,
-    bool zero_to_one
-) {
-    const float radians = fov_degrees * std::numbers::pi_v<float> / 180.0f;
-    const float y_scale = 1.0f / std::tan(radians * 0.5f);
-    alia::transform result{};
-    result.m[0][0] = y_scale / aspect;
-    result.m[1][1] = y_scale;
-    result.m[2][3] = -1.0f;
-    if (zero_to_one) {
-        result.m[2][2] = far_plane / (near_plane - far_plane);
-        result.m[3][2] = near_plane * far_plane / (near_plane - far_plane);
-    } else {
-        result.m[2][2] = (far_plane + near_plane) / (near_plane - far_plane);
-        result.m[3][2] = 2.0f * near_plane * far_plane / (near_plane - far_plane);
-    }
-    return result;
-}
-
 class perlin_noise_generator {
 public:
     explicit perlin_noise_generator(std::uint32_t seed = 0x12345678u)
@@ -288,7 +243,7 @@ struct camera {
     }
 
     [[nodiscard]] alia::transform view() const {
-        return look_at(pos, pos + forward(), up);
+        return alia::transform::look_at(pos, pos + forward(), up);
     }
 };
 
@@ -315,7 +270,6 @@ int main(int argc, char **argv) {
             {1024, 768},
             {.title = "ALIA terrain camera", .resizable = true});
         alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         // NOTE (API feedback): swapchain depth format and low-level presentation
         // flags are not configurable; the available vsync policy is disabled here.
         auto swapchain = device.create_swapchain({
@@ -428,14 +382,10 @@ int main(int argc, char **argv) {
             const float aspect = frame.target_size().y > 0
                 ? static_cast<float>(frame.target_size().x) / frame.target_size().y
                 : 1.0f;
-            scene_fx.projection = perspective_fov(
-                78.0f,
-                aspect,
-                0.01f,
-                10000.0f,
-                device.backend()->id == alia::gfx_backend::d3d9);
+            scene_fx.projection =
+                device.perspective_fov(78.0f, aspect, 0.01f, 10000.0f);
 
-            scene_fx.world = look_at(
+            scene_fx.world = alia::transform::look_at(
                 {0.0f, 0.0f, 0.0f},
                 player_camera.forward(),
                 camera::up);
@@ -447,7 +397,7 @@ int main(int argc, char **argv) {
             frame.set_texture(0, rock, alia::linear_wrap);
             frame.draw_indexed(terrain_vertices, terrain_indices);
 
-            text_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
             alia::draw_text(
                 frame,

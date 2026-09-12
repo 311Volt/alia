@@ -123,7 +123,6 @@ int main(int argc, char **argv) {
 
         alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
         auto swapchain = device.create_swapchain({.target = win});
-        alia::make_current(device);
 
         alia::bitmap checker_bmp = make_checker_bitmap();
         alia::texture checker_tex(device, checker_bmp);
@@ -218,7 +217,7 @@ int main(int argc, char **argv) {
                 alia::transform::rotate(t) *
                 alia::transform::translate({400.0f, 300.0f});
 
-            projection_constant.set_value(alia::transform::ortho_ui(win.size()));
+            projection_constant.set_value(device.ortho_ui(win.size()));
             transform_constant.set_value(model);
             tint_constant.set_value(alia::color(1.0f, 0.65f + 0.35f * pulse, 0.8f, 1.0f));
 
@@ -229,7 +228,7 @@ int main(int argc, char **argv) {
             frame.draw<alia::uv_vertex>(quad);
 
             prim_fx.world = alia::transform::identity();
-            prim_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            prim_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(prim_pipeline);
             renderer.draw_rect(
                 frame,

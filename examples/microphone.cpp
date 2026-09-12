@@ -73,7 +73,6 @@ struct ring_modulator {
 int main() {
     alia::window win({640, 480}, {.title = "ALIA microphone example"});
     alia::gfx_device device = alia::gfx_device::create();
-    alia::make_current(device);
     auto swapchain = device.create_swapchain({.target = win});
     alia::audio_device audio = alia::audio_device::create();
 
@@ -148,14 +147,14 @@ int main() {
         const float right = meter.right_peak.load();
         auto frame = swapchain.begin_frame();
         frame.clear(alia::black);
-        prim_fx.projection = alia::transform::ortho_ui(frame.target_size());
+        prim_fx.projection = device.ortho_ui(frame.target_size());
         frame.set_pipeline(prim_pipeline);
         renderer.fill_rect(frame, meter_left, alia::color::from_rgb_u32(0x141414));
         renderer.fill_rect(frame, meter_right, alia::color::from_rgb_u32(0x141414));
         renderer.fill_rect(frame, meter_left.scaled({left, 1}, meter_left.p1), alia::green);
         renderer.fill_rect(frame, meter_right.scaled({right, 1}, meter_right.p1), alia::green);
 
-        text_fx.projection = alia::transform::ortho_ui(frame.target_size());
+        text_fx.projection = device.ortho_ui(frame.target_size());
         frame.set_pipeline(text_pipeline);
         alia::draw_text(frame, {50, 50}, glyphs,
             std::format("peaks: L {:.1f} dB | R {:.1f} dB", db(left), db(right)));

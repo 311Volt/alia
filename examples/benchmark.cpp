@@ -56,7 +56,6 @@ int main(int argc, char **argv) {
             {800, 600},
             {.title = "ALIA primitive benchmark", .resizable = true});
         alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({.target = win});
 
         alia::basic_effect prim_fx;
@@ -103,7 +102,7 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::black);
-            prim_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            prim_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(prim_pipeline);
             std::uniform_int_distribution<int> x_distribution(
                 0, (std::max)(0, frame.target_size().x));
@@ -123,7 +122,7 @@ int main(int argc, char **argv) {
             // One transient submission: roughly 400k vertices and 600k indices.
             renderer.flush(frame);
 
-            text_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
             alia::draw_text(
                 frame,

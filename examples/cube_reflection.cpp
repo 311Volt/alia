@@ -219,50 +219,6 @@ void main() {
 }
 )";
 
-alia::vec3f normalized(alia::vec3f value) {
-    const float length = std::sqrt(value.dot(value));
-    return length > 0.0f ? value / length : alia::vec3f{};
-}
-
-alia::transform look_at(alia::vec3f eye, alia::vec3f target, alia::vec3f up) {
-    const alia::vec3f forward = normalized(target - eye);
-    const alia::vec3f side = normalized(forward.cross(up));
-    const alia::vec3f camera_up = side.cross(forward);
-    alia::transform result = alia::transform::identity();
-    result.m[0][0] = side.x;
-    result.m[0][1] = camera_up.x;
-    result.m[0][2] = -forward.x;
-    result.m[1][0] = side.y;
-    result.m[1][1] = camera_up.y;
-    result.m[1][2] = -forward.y;
-    result.m[2][0] = side.z;
-    result.m[2][1] = camera_up.z;
-    result.m[2][2] = -forward.z;
-    result.m[3][0] = -side.dot(eye);
-    result.m[3][1] = -camera_up.dot(eye);
-    result.m[3][2] = forward.dot(eye);
-    return result;
-}
-
-alia::transform perspective_fov(float aspect, bool zero_to_one) {
-    constexpr float near_plane = 0.05f;
-    constexpr float far_plane = 30.0f;
-    const float radians = 55.0f * std::numbers::pi_v<float> / 180.0f;
-    const float y_scale = 1.0f / std::tan(radians * 0.5f);
-    alia::transform result{};
-    result.m[0][0] = y_scale / aspect;
-    result.m[1][1] = y_scale;
-    result.m[2][3] = -1.0f;
-    if (zero_to_one) {
-        result.m[2][2] = far_plane / (near_plane - far_plane);
-        result.m[3][2] = near_plane * far_plane / (near_plane - far_plane);
-    } else {
-        result.m[2][2] = (far_plane + near_plane) / (near_plane - far_plane);
-        result.m[3][2] = 2.0f * near_plane * far_plane / (near_plane - far_plane);
-    }
-    return result;
-}
-
 alia::transform rotation_x(float angle) {
     alia::transform result = alia::transform::identity();
     const float cosine = std::cos(angle);
@@ -383,7 +339,6 @@ int main(int argc, char **argv) {
             {960, 640},
             {.title = "ALIA normal-mapped cube reflections", .resizable = true});
         auto device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         alia::swapchain_config swapchain_config{.target = window};
         swapchain_config.framebuffer.depth_bits = {24, alia::require};
         auto swapchain = device.create_swapchain(swapchain_config);
@@ -516,7 +471,7 @@ int main(int argc, char **argv) {
 
             const float time = static_cast<float>(alia::get_time());
             const alia::vec3f camera_position{0.0f, 0.1f, -3.35f};
-            const auto view = look_at(
+            const auto view = alia::transform::look_at(
                 camera_position, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f});
 
             auto frame = swapchain.begin_frame();
@@ -524,8 +479,8 @@ int main(int argc, char **argv) {
             const float aspect = frame.target_size().y > 0
                 ? static_cast<float>(frame.target_size().x) / frame.target_size().y
                 : 1.0f;
-            const auto projection = perspective_fov(
-                aspect, device.backend()->id == alia::gfx_backend::d3d9);
+            const auto projection =
+                device.perspective_fov(55.0f, aspect, 0.05f, 30.0f);
 
             auto sky_view = view;
             sky_view.m[3][0] = 0.0f;
@@ -545,7 +500,7 @@ int main(int argc, char **argv) {
                 std::span<const ball_vertex>(ball.vertices),
                 std::span<const std::uint32_t>(ball.indices));
 
-            text_effect.projection = alia::transform::ortho_ui(frame.target_size());
+            text_effect.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
             alia::draw_text(
                 frame, {16.0f, 16.0f}, glyphs,

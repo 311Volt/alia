@@ -53,7 +53,6 @@ int main(int argc, char **argv) {
     try {
         alia::window win({800, 600}, {.title = "Hello ALIA — pipelines", .resizable = true});
         auto device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({
             .target = win,
             .vsync = alia::vsync_mode::disable,
@@ -150,12 +149,12 @@ int main(int argc, char **argv) {
             auto frame = swapchain.begin_frame();
             frame.clear(alia::light_blue);
 
-            triangle_effect.projection = alia::transform::ortho_ui(frame.target_size());
+            triangle_effect.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(triangle_pipeline);
             frame.draw<alia::colored_vertex>(triangle);
 
             prim_fx.world = alia::transform::identity();
-            prim_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            prim_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(prim_pipeline);
             renderer.fill_rect(
                 frame,
@@ -190,7 +189,7 @@ int main(int argc, char **argv) {
                 alia::line_join::bevel
             );
 
-            tex_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            tex_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(tex_pipeline);
             frame.set_texture(0, checker);
             const auto checker_quad =
@@ -205,7 +204,7 @@ int main(int argc, char **argv) {
             renderer.draw_rect(frame, transformed_rect, alia::white, 5.0f);
             prim_fx.world = alia::transform::identity();
 
-            text_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
             if (demo_text)
                 alia::draw_text(frame, {310.0f, 58.0f}, *demo_text);

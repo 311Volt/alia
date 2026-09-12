@@ -54,18 +54,13 @@ namespace alia {
             backend_->destroy_device.get_or_throw()(device_);
     }
     gfx_device::gfx_device(gfx_device &&other) noexcept
-        : device_(std::exchange(other.device_, nullptr)), backend_(std::move(other.backend_)) {
-        if (tl_current_device == &other)
-            tl_current_device = this;
-    }
+        : device_(std::exchange(other.device_, nullptr)), backend_(std::move(other.backend_)) {}
     gfx_device &gfx_device::operator=(gfx_device &&other) noexcept {
         if (this != &other) {
             if (device_)
                 backend_->destroy_device.get_or_throw()(device_);
             device_ = std::exchange(other.device_, nullptr);
             backend_ = std::move(other.backend_);
-            if (tl_current_device == &other)
-                tl_current_device = this;
         }
         return *this;
     }
@@ -149,14 +144,7 @@ namespace alia {
         props_ = backend_->swapchain_properties.get_or_throw()(handle_);
     }
 
-    void make_current(gfx_device &d) { tl_current_device = &d; }
     void make_current(window &w) { tl_current_window = &w; }
-    gfx_device &current_device() {
-        if (!tl_current_device)
-            throw std::runtime_error("no current graphics device");
-        return *tl_current_device;
-    }
-    vec2f current_pixel_center_offset() { return current_device().pixel_center_offset(); }
     window &current_window() {
         if (!tl_current_window)
             throw std::runtime_error("no current window");

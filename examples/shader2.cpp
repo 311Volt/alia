@@ -123,7 +123,6 @@ int main(int argc, char **argv) {
             {800, 600},
             {.title = "ALIA cursor glow shader", .resizable = true});
         alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({.target = win});
 
         alia::texture noise(device, alia::load_image("./resources/bluenoise.png"));
@@ -205,7 +204,7 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::black);
-            projection_constant.set_value(alia::transform::ortho_ui(frame.target_size()));
+            projection_constant.set_value(device.ortho_ui(frame.target_size()));
             mouse_constant.set_value(mouse_position);
             dither_constant.set_value({
                 static_cast<float>(std::rand() % 64) / 64.0f,

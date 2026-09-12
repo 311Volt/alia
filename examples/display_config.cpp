@@ -198,7 +198,6 @@ int main(int argc, char **argv) {
         alia::gfx_device_config device_config;
         device_config.adapter = opts.monitor;
         auto device = alia::gfx_device::create(opts.backend, device_config);
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({
             .target = window,
             .vsync = opts.vsync,
@@ -284,7 +283,7 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::color{0.08f, 0.1f, 0.16f, 1.0f});
-            effect.projection = alia::transform::ortho_ui(frame.target_size());
+            effect.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(pipeline);
             frame.draw<alia::colored_vertex>(triangle);
             if (partial_present) {

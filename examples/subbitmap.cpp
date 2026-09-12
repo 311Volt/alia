@@ -49,7 +49,6 @@ int main(int argc, char **argv) {
             {800, 600},
             {.title = "ALIA bitmap subviews", .resizable = true});
         alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({.target = win});
 
         alia::bitmap atlas_bitmap = alia::load_image("./resources/terrain.png");
@@ -90,7 +89,7 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::black);
-            texture_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            texture_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(texture_pipeline);
             frame.set_texture(0, atlas, alia::nearest_clamp);
             const auto animated_quad = textured_quad(

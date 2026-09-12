@@ -83,7 +83,6 @@ int main(int argc, char **argv) {
             {1024, 768},
             {.title = "ALIA kitchen sink example", .resizable = true});
         alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({.target = win});
 
         alia::texture background(device, alia::load_image("./resources/bg.jpg"));
@@ -158,7 +157,7 @@ int main(int argc, char **argv) {
             frame.clear(alia::black);
 
             texture_fx.world = alia::transform::identity();
-            texture_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            texture_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(texture_pipeline);
             frame.set_texture(0, background, alia::linear_clamp);
             const auto background_quad = textured_quad(alia::rect_f::pos_size(
@@ -167,13 +166,13 @@ int main(int argc, char **argv) {
 
             // NOTE (API feedback): alia has no scoped world-transform helper.
             prim_fx.world = alia::transform::translate(text_position);
-            prim_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            prim_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(prim_pipeline);
             renderer.draw_line(
                 frame, {0.0f, 0.0f}, {max_width, 0.0f}, alia::red, 4.0f);
 
             text_fx.world = alia::transform::translate(text_position);
-            text_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
             alia::draw_text(frame, {0.0f, 0.0f}, glyphs, visible_text, alia::white);
             prim_fx.world = alia::transform::identity();
@@ -181,7 +180,7 @@ int main(int argc, char **argv) {
 
             const alia::rect_i r1 = alia::rect_i::pos_size({95, 160}, {70, 70});
             const alia::rect_i r2 = alia::rect_i::pos_size({70, 30}, {80, 80});
-            prim_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            prim_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(prim_pipeline);
             renderer.draw_rect(frame, to_rect_f(r1), alia::blue);
             renderer.draw_rect(frame, to_rect_f(r2), alia::blue);

@@ -17,7 +17,6 @@
 #include <exception>
 #include <format>
 #include <iostream>
-#include <numbers>
 #include <span>
 #include <stdexcept>
 #include <string_view>
@@ -81,51 +80,6 @@ void main() {
     gl_FragColor = textureCube(u_sky, normalize(v_direction));
 }
 )";
-
-alia::vec3f normalized(alia::vec3f value) {
-    const float length = std::sqrt(value.dot(value));
-    return length > 0.0f ? value / length : alia::vec3f{};
-}
-
-alia::transform look_at_rotation(alia::vec3f direction) {
-    const alia::vec3f forward = normalized(direction);
-    const alia::vec3f side = normalized(forward.cross({0.0f, 1.0f, 0.0f}));
-    const alia::vec3f up = side.cross(forward);
-    alia::transform result = alia::transform::identity();
-    result.m[0][0] = side.x;
-    result.m[0][1] = up.x;
-    result.m[0][2] = -forward.x;
-    result.m[1][0] = side.y;
-    result.m[1][1] = up.y;
-    result.m[1][2] = -forward.y;
-    result.m[2][0] = side.z;
-    result.m[2][1] = up.z;
-    result.m[2][2] = -forward.z;
-    return result;
-}
-
-alia::transform perspective_fov(
-    float fov_degrees,
-    float aspect,
-    float near_plane,
-    float far_plane,
-    bool zero_to_one
-) {
-    const float radians = fov_degrees * std::numbers::pi_v<float> / 180.0f;
-    const float y_scale = 1.0f / std::tan(radians * 0.5f);
-    alia::transform result{};
-    result.m[0][0] = y_scale / aspect;
-    result.m[1][1] = y_scale;
-    result.m[2][3] = -1.0f;
-    if (zero_to_one) {
-        result.m[2][2] = far_plane / (near_plane - far_plane);
-        result.m[3][2] = near_plane * far_plane / (near_plane - far_plane);
-    } else {
-        result.m[2][2] = (far_plane + near_plane) / (near_plane - far_plane);
-        result.m[3][2] = 2.0f * near_plane * far_plane / (near_plane - far_plane);
-    }
-    return result;
-}
 
 alia::bitmap make_face(alia::px_rgba8888 base) {
     constexpr int edge = 256;
@@ -214,7 +168,6 @@ int main(int argc, char **argv) {
         alia::window window(
             {960, 600}, {.title = "ALIA cube texture skybox", .resizable = true});
         auto device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({.target = window});
 
         if (!device.caps().cube_textures)
@@ -352,7 +305,7 @@ int main(int argc, char **argv) {
             frame.set_target(rendered, face);
             const float phase = static_cast<float>(std::fmod(now, 1.0));
             frame.clear(alia::color(0.025f, 0.035f, 0.06f, 1.0f));
-            primitive_effect.projection = alia::transform::ortho_ui(frame.target_size());
+            primitive_effect.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(primitive_pipeline);
             primitives.fill_rect(
                 frame,
@@ -375,10 +328,11 @@ int main(int argc, char **argv) {
                 std::sin(pitch),
                 std::cos(pitch) * std::cos(yaw),
             };
-            const auto projection = perspective_fov(
-                78.0f, aspect, 0.05f, 10.0f,
-                device.backend()->id == alia::gfx_backend::d3d9);
-            view_projection.set_value(look_at_rotation(direction) * projection);
+            const auto projection =
+                device.perspective_fov(78.0f, aspect, 0.05f, 10.0f);
+            view_projection.set_value(
+                alia::transform::look_at(
+                    {}, direction, {0.0f, 1.0f, 0.0f}) * projection);
             if (active_texture == 0)
                 sky_sampler.set_texture(sky);
             else if (active_texture == 1)
@@ -390,7 +344,7 @@ int main(int argc, char **argv) {
 
             static constexpr std::array<std::string_view, 3> labels{
                 "uploaded sky", "rendered faces", "copied faces"};
-            text_effect.projection = alia::transform::ortho_ui(frame.target_size());
+            text_effect.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
             alia::draw_text(
                 frame, {14.0f, 14.0f}, glyphs,

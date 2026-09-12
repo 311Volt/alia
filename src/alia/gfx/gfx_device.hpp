@@ -39,6 +39,22 @@ namespace alia {
         [[nodiscard]] vec2f pixel_center_offset() const;
         [[nodiscard]] const gfx_device_caps &caps() const;
 
+        // Top-left UI projection with backend-specific pixel-center correction.
+        [[nodiscard]] transform ortho_ui(float width, float height) const;
+        [[nodiscard]] transform ortho_ui(vec2f size) const {
+            return ortho_ui(size.x, size.y);
+        }
+        [[nodiscard]] transform ortho_ui(vec2i size) const {
+            return ortho_ui(static_cast<float>(size.x), static_cast<float>(size.y));
+        }
+
+        // Right-handed perspective projection with backend-specific clip depth.
+        [[nodiscard]] transform perspective_fov(
+            float fov_degrees,
+            float aspect,
+            float near_plane,
+            float far_plane) const;
+
     private:
         device_handle *device_ = nullptr;
         std::unique_ptr<graphics_backend_interface> backend_;
@@ -84,13 +100,9 @@ namespace alia {
             : handle_(handle), backend_(backend), device_(device), size_(size), props_(std::move(props)) {}
     };
 
-    inline thread_local gfx_device *tl_current_device = nullptr;
     inline thread_local window *tl_current_window = nullptr;
 
-    void make_current(gfx_device &d);
     void make_current(window &w);
-    gfx_device &current_device();
-    [[nodiscard]] vec2f current_pixel_center_offset();
     window &current_window();
 
     namespace detail {

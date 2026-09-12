@@ -70,7 +70,6 @@ int main(int argc, char **argv) {
             {1024, 768},
             {.title = "ALIA bouncing logo", .resizable = true});
         alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({.target = win});
 
         const int mips = device.backend()->texture_generate_mipmaps.is_supported()
@@ -123,7 +122,7 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::color::from_rgba8(150, 180, 240));
-            texture_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            texture_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(texture_pipeline);
             frame.set_texture(0, logo, alia::linear_clamp);
             const auto quad = textured_quad(logo_rect);

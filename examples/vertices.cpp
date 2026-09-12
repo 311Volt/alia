@@ -72,7 +72,6 @@ int main(int argc, char **argv) {
             {800, 600},
             {.title = "ALIA custom vertices", .resizable = true});
         alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({.target = win});
 
         alia::texture background(device, alia::load_image("./resources/bg.jpg"));
@@ -108,7 +107,7 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::black);
-            fx.projection = alia::transform::ortho_ui(frame.target_size());
+            fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(draw_pipeline);
             frame.set_texture(0, background, alia::linear_clamp);
             frame.draw<my_vertex>(vertices);

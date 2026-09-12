@@ -39,7 +39,6 @@ int main(int argc, char **argv) {
     try {
         alia::window win({900, 540}, {.title = "ALIA render target example", .resizable = true});
         auto device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({.target = win});
         constexpr alia::vec2i target_size{256, 256};
         const alia::vec2f target_size_f{256.0f, 256.0f};
@@ -68,7 +67,7 @@ int main(int argc, char **argv) {
             auto frame = swapchain.begin_frame();
             frame.set_target(offscreen);
             frame.clear(alia::color(0.04f, 0.06f, 0.08f, 1.0f));
-            prim_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            prim_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(prim_pipeline);
             renderer.fill_rect(
                 frame,
@@ -86,7 +85,7 @@ int main(int argc, char **argv) {
 
             frame.set_target();
             frame.clear(alia::color(0.08f, 0.09f, 0.11f, 1.0f));
-            tex_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            tex_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(tex_pipeline);
             frame.set_texture(0, offscreen);
             const auto offscreen_quad =
@@ -97,7 +96,7 @@ int main(int argc, char **argv) {
                 textured_quad(alia::rect_f::pos_size({554.0f, 142.0f}, target_size_f));
             frame.draw<alia::uv_vertex>(copied_quad);
 
-            prim_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            prim_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(prim_pipeline);
             renderer.draw_rect(
                 frame,

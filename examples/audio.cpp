@@ -18,7 +18,6 @@ int main() {
     try {
         alia::window win({640, 480}, {.title = "ALIA audio example"});
         alia::gfx_device device = alia::gfx_device::create();
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({.target = win});
 
         // HYPOTHETICAL alia API: decoded streams and samples share a mixer.
@@ -58,7 +57,7 @@ int main() {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::blue);
-            text_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
             alia::draw_text(frame, {100.0f, 100.0f}, glyphs, "press F to play the sound");
             frame.present();

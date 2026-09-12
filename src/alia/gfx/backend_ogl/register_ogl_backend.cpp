@@ -181,6 +181,7 @@ namespace alia {
         graphics_backend_interface iface;
         iface.id = gfx_backend::opengl;
         iface.pixel_center_offset = {0.0f, 0.0f};
+        iface.clip_depth = clip_depth_range::negative_one_to_one;
         GLint max_texture_size = 0;
         glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
         iface.caps.max_texture_size = max_texture_size;

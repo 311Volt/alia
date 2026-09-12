@@ -53,14 +53,8 @@ struct transform {
         return res;
     }
 
-    // Top-left UI projection with backend-specific pixel-center correction.
-    static transform ortho_ui(float width, float height);
-    static transform ortho_ui(vec2f size) {
-        return ortho_ui(size.x, size.y);
-    }
-    static transform ortho_ui(vec2i size) {
-        return ortho_ui(static_cast<float>(size.x), static_cast<float>(size.y));
-    }
+    // Right-handed view transform for row-vector multiplication.
+    static transform look_at(vec3f eye, vec3f target, vec3f up);
 
     transform operator*(const transform& o) const {
         transform res = {};

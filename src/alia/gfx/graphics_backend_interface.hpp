@@ -61,6 +61,10 @@ namespace alia {
         d3d9,
         opengl
     };
+    enum class clip_depth_range {
+        negative_one_to_one,
+        zero_to_one
+    };
     enum class vsync_mode {
         disable, // Request immediate presentation; fail creation if rejected.
         suggest, // Request synchronization, but allow creation without control.
@@ -298,6 +302,7 @@ namespace alia {
     struct graphics_backend_interface {
         gfx_backend id = gfx_backend::auto_;
         vec2f pixel_center_offset = {};
+        clip_depth_range clip_depth = clip_depth_range::negative_one_to_one;
         gfx_device_caps caps;
 
         gfx_backend_op<void(device_handle *)> destroy_device;

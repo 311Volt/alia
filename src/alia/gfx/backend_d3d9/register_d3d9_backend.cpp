@@ -23,6 +23,7 @@ namespace alia {
         graphics_backend_interface iface;
         iface.id = gfx_backend::d3d9;
         iface.pixel_center_offset = {-0.5f, -0.5f};
+        iface.clip_depth = clip_depth_range::zero_to_one;
         iface.caps.render = raw->device_type == D3DDEVTYPE_REF
             ? render_method::software : render_method::hardware;
         iface.caps.max_texture_size = static_cast<int>((std::min)(

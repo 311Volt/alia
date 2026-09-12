@@ -26,7 +26,6 @@ std::array<alia::uv_vertex, 6> textured_quad(alia::rect_f dst) {
 int main() {
     alia::window win({1024, 768}, {.title = "ALIA video example"});
     alia::gfx_device device = alia::gfx_device::create();
-    alia::make_current(device);
     auto swapchain = device.create_swapchain({.target = win});
     alia::audio_device audio = alia::audio_device::create();
 
@@ -69,13 +68,13 @@ int main() {
 
         auto frame = swapchain.begin_frame();
         frame.clear(alia::black);
-        video_fx.projection = alia::transform::ortho_ui(frame.target_size());
+        video_fx.projection = device.ortho_ui(frame.target_size());
         frame.set_pipeline(video_pipeline);
         frame.set_texture(0, vid.current_frame());
         const auto quad = textured_quad(alia::rect_f::pos_size(
             {0, 0}, alia::vec2f(vid.current_frame().size())));
         frame.draw<alia::uv_vertex>(quad);
-        text_fx.projection = alia::transform::ortho_ui(frame.target_size());
+        text_fx.projection = device.ortho_ui(frame.target_size());
         frame.set_pipeline(text_pipeline);
         alia::draw_text(
             frame,

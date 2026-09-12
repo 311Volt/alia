@@ -20,57 +20,6 @@
 
 namespace {
 
-alia::vec3f normalized(alia::vec3f value) {
-    const float length = std::sqrt(value.dot(value));
-    return length == 0.0f ? alia::vec3f{} : value / length;
-}
-
-// HYPOTHETICAL alia API: transform::look_at for row-vector transforms.
-alia::transform look_at(alia::vec3f eye, alia::vec3f target, alia::vec3f up) {
-    const alia::vec3f f = normalized(target - eye);
-    const alia::vec3f s = normalized(f.cross(up));
-    const alia::vec3f u = s.cross(f);
-    alia::transform result = alia::transform::identity();
-    result.m[0][0] = s.x;
-    result.m[0][1] = u.x;
-    result.m[0][2] = -f.x;
-    result.m[1][0] = s.y;
-    result.m[1][1] = u.y;
-    result.m[1][2] = -f.y;
-    result.m[2][0] = s.z;
-    result.m[2][1] = u.z;
-    result.m[2][2] = -f.z;
-    result.m[3][0] = -s.dot(eye);
-    result.m[3][1] = -u.dot(eye);
-    result.m[3][2] = f.dot(eye);
-    return result;
-}
-
-// NOTE (API feedback): transform::perspective should choose the backend's
-// clip-space depth convention just as transform::ortho_ui handles pixel centers.
-alia::transform perspective_fov(
-    float fov_degrees,
-    float aspect,
-    float near_plane,
-    float far_plane,
-    bool zero_to_one
-) {
-    const float radians = fov_degrees * std::numbers::pi_v<float> / 180.0f;
-    const float y_scale = 1.0f / std::tan(radians * 0.5f);
-    alia::transform result{};
-    result.m[0][0] = y_scale / aspect;
-    result.m[1][1] = y_scale;
-    result.m[2][3] = -1.0f;
-    if (zero_to_one) {
-        result.m[2][2] = far_plane / (near_plane - far_plane);
-        result.m[3][2] = near_plane * far_plane / (near_plane - far_plane);
-    } else {
-        result.m[2][2] = (far_plane + near_plane) / (near_plane - far_plane);
-        result.m[3][2] = 2.0f * near_plane * far_plane / (near_plane - far_plane);
-    }
-    return result;
-}
-
 std::size_t key_index(alia::key value) {
     return static_cast<std::size_t>(value);
 }
@@ -94,7 +43,6 @@ int main(int argc, char **argv) {
             {800, 600},
             {.title = "ALIA 3D camera", .resizable = true});
         alia::gfx_device device = alia::gfx_device::create(requested_backend(argc, argv));
-        alia::make_current(device);
         auto swapchain = device.create_swapchain({.target = win});
 
         const std::array triangle{
@@ -161,16 +109,16 @@ int main(int argc, char **argv) {
             const float aspect = frame.target_size().y > 0
                 ? static_cast<float>(frame.target_size().x) / frame.target_size().y
                 : 1.0f;
-            const bool zero_to_one = device.backend()->id == alia::gfx_backend::d3d9;
-            scene_fx.projection = perspective_fov(
-                78.0f, aspect, 0.01f, 100.0f, zero_to_one);
-            scene_fx.world = look_at(position, position + forward, {0.0f, 1.0f, 0.0f});
+            scene_fx.projection =
+                device.perspective_fov(78.0f, aspect, 0.01f, 100.0f);
+            scene_fx.world = alia::transform::look_at(
+                position, position + forward, {0.0f, 1.0f, 0.0f});
             frame.set_pipeline(scene_pipeline);
             frame.set_texture(0, background, alia::linear_clamp);
             frame.draw<alia::uv_vertex3d>(triangle);
 
             // Each pipeline owns its transform state; no global reset is needed.
-            text_fx.projection = alia::transform::ortho_ui(frame.target_size());
+            text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
             alia::draw_text(
                 frame,
