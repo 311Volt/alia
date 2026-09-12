@@ -136,7 +136,6 @@ sampler2D u_normal_map : register(s0);
 samplerCUBE u_environment : register(s1);
 float3 u_camera_position : register(c0);
 float3 u_light_direction : register(c1);
-float u_roughness : register(c2);
 
 float4 main(ps_in input) : COLOR0 {
     float3 geometric_normal = normalize(input.world_normal);
@@ -151,20 +150,11 @@ float4 main(ps_in input) : COLOR0 {
 
     float3 view_direction = normalize(u_camera_position - input.world_position);
     float3 reflection = reflect(-view_direction, normal);
-    float3 blur_axis = abs(reflection.y) < 0.95
-        ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
-    float3 blur_tangent = normalize(cross(blur_axis, reflection));
-    float3 blur_bitangent = cross(reflection, blur_tangent);
-    float spread = 0.24 * u_roughness;
-    float3 environment = texCUBE(u_environment, reflection).rgb * 0.40;
-    environment += texCUBE(u_environment, normalize(reflection + blur_tangent * spread)).rgb * 0.15;
-    environment += texCUBE(u_environment, normalize(reflection - blur_tangent * spread)).rgb * 0.15;
-    environment += texCUBE(u_environment, normalize(reflection + blur_bitangent * spread)).rgb * 0.15;
-    environment += texCUBE(u_environment, normalize(reflection - blur_bitangent * spread)).rgb * 0.15;
+    float3 environment = texCUBE(u_environment, reflection).rgb;
 
-    float diffuse = saturate(dot(normal, -normalize(u_light_direction)));
+    float diffuse = saturate(dot(normal, -normalize(u_light_direction))) * 0.0;
     float3 half_vector = normalize(view_direction - normalize(u_light_direction));
-    float specular = pow(saturate(dot(normal, half_vector)), lerp(70.0, 9.0, u_roughness));
+    float specular = pow(saturate(dot(normal, half_vector)), 32.0) * 0.0;
     float fresnel = pow(1.0 - saturate(dot(normal, view_direction)), 5.0);
     float reflection_amount = 0.07 + 0.18 * fresnel;
     float3 base = float3(0.34, 0.24, 0.17);
@@ -199,7 +189,6 @@ uniform sampler2D u_normal_map;
 uniform samplerCube u_environment;
 uniform vec3 u_camera_position;
 uniform vec3 u_light_direction;
-uniform float u_roughness;
 varying vec3 v_world_position;
 varying vec3 v_world_normal;
 varying vec2 v_uv;
@@ -217,20 +206,11 @@ void main() {
 
     vec3 view_direction = normalize(u_camera_position - v_world_position);
     vec3 reflection = reflect(-view_direction, normal);
-    vec3 blur_axis = abs(reflection.y) < 0.95
-        ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-    vec3 blur_tangent = normalize(cross(blur_axis, reflection));
-    vec3 blur_bitangent = cross(reflection, blur_tangent);
-    float spread = 0.24 * u_roughness;
-    vec3 environment = textureCube(u_environment, reflection).rgb * 0.40;
-    environment += textureCube(u_environment, normalize(reflection + blur_tangent * spread)).rgb * 0.15;
-    environment += textureCube(u_environment, normalize(reflection - blur_tangent * spread)).rgb * 0.15;
-    environment += textureCube(u_environment, normalize(reflection + blur_bitangent * spread)).rgb * 0.15;
-    environment += textureCube(u_environment, normalize(reflection - blur_bitangent * spread)).rgb * 0.15;
+    vec3 environment = textureCube(u_environment, reflection).rgb;
 
-    float diffuse = max(dot(normal, -normalize(u_light_direction)), 0.0);
+    float diffuse = max(dot(normal, -normalize(u_light_direction)), 0.0) * 0.0;
     vec3 half_vector = normalize(view_direction - normalize(u_light_direction));
-    float specular = pow(max(dot(normal, half_vector), 0.0), mix(70.0, 9.0, u_roughness));
+    float specular = pow(max(dot(normal, half_vector), 0.0), 32.0) * 0.0;
     float fresnel = pow(1.0 - max(dot(normal, view_direction), 0.0), 5.0);
     float reflection_amount = 0.07 + 0.18 * fresnel;
     vec3 base = vec3(0.34, 0.24, 0.17);
@@ -239,27 +219,15 @@ void main() {
 }
 )";
 
-float dot(alia::vec3f a, alia::vec3f b) {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-alia::vec3f cross(alia::vec3f a, alia::vec3f b) {
-    return {
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x,
-    };
-}
-
 alia::vec3f normalized(alia::vec3f value) {
-    const float length = std::sqrt(dot(value, value));
+    const float length = std::sqrt(value.dot(value));
     return length > 0.0f ? value / length : alia::vec3f{};
 }
 
 alia::transform look_at(alia::vec3f eye, alia::vec3f target, alia::vec3f up) {
     const alia::vec3f forward = normalized(target - eye);
-    const alia::vec3f side = normalized(cross(forward, up));
-    const alia::vec3f camera_up = cross(side, forward);
+    const alia::vec3f side = normalized(forward.cross(up));
+    const alia::vec3f camera_up = side.cross(forward);
     alia::transform result = alia::transform::identity();
     result.m[0][0] = side.x;
     result.m[0][1] = camera_up.x;
@@ -270,9 +238,9 @@ alia::transform look_at(alia::vec3f eye, alia::vec3f target, alia::vec3f up) {
     result.m[2][0] = side.z;
     result.m[2][1] = camera_up.z;
     result.m[2][2] = -forward.z;
-    result.m[3][0] = -dot(side, eye);
-    result.m[3][1] = -dot(camera_up, eye);
-    result.m[3][2] = dot(forward, eye);
+    result.m[3][0] = -side.dot(eye);
+    result.m[3][1] = -camera_up.dot(eye);
+    result.m[3][2] = forward.dot(eye);
     return result;
 }
 
@@ -413,7 +381,7 @@ int main(int argc, char **argv) {
     try {
         alia::window window(
             {960, 640},
-            {.title = "ALIA rough ball cube reflections", .resizable = true});
+            {.title = "ALIA normal-mapped cube reflections", .resizable = true});
         auto device = alia::gfx_device::create(requested_backend(argc, argv));
         alia::make_current(device);
         alia::swapchain_config swapchain_config{.target = window};
@@ -435,13 +403,13 @@ int main(int argc, char **argv) {
 
         const std::array<alia::shader_source, 4> sky_sources{{
             {alia::gfx_backend::d3d9, alia::shader_type::vertex,
-             d3d9_sky_vertex_shader, "main", {}, "rough_ball_sky_vs_hlsl"},
+             d3d9_sky_vertex_shader, "main", {}, "cube_reflection_sky_vs_hlsl"},
             {alia::gfx_backend::d3d9, alia::shader_type::pixel,
-             d3d9_sky_pixel_shader, "main", {}, "rough_ball_sky_ps_hlsl"},
+             d3d9_sky_pixel_shader, "main", {}, "cube_reflection_sky_ps_hlsl"},
             {alia::gfx_backend::opengl, alia::shader_type::vertex,
-             ogl_sky_vertex_shader, "main", {}, "rough_ball_sky_vs_glsl"},
+             ogl_sky_vertex_shader, "main", {}, "cube_reflection_sky_vs_glsl"},
             {alia::gfx_backend::opengl, alia::shader_type::pixel,
-             ogl_sky_pixel_shader, "main", {}, "rough_ball_sky_ps_glsl"},
+             ogl_sky_pixel_shader, "main", {}, "cube_reflection_sky_ps_glsl"},
         }};
         const std::array<alia::shader_constant_binding, 1> sky_constants{{
             {"u_sky_view_proj", alia::shader_type::vertex, 0, 4},
@@ -466,20 +434,19 @@ int main(int argc, char **argv) {
 
         const std::array<alia::shader_source, 4> ball_sources{{
             {alia::gfx_backend::d3d9, alia::shader_type::vertex,
-             d3d9_ball_vertex_shader, "main", {}, "rough_ball_vs_hlsl"},
+             d3d9_ball_vertex_shader, "main", {}, "cube_reflection_ball_vs_hlsl"},
             {alia::gfx_backend::d3d9, alia::shader_type::pixel,
-             d3d9_ball_pixel_shader, "main", {}, "rough_ball_ps_hlsl"},
+             d3d9_ball_pixel_shader, "main", {}, "cube_reflection_ball_ps_hlsl"},
             {alia::gfx_backend::opengl, alia::shader_type::vertex,
-             ogl_ball_vertex_shader, "main", {}, "rough_ball_vs_glsl"},
+             ogl_ball_vertex_shader, "main", {}, "cube_reflection_ball_vs_glsl"},
             {alia::gfx_backend::opengl, alia::shader_type::pixel,
-             ogl_ball_pixel_shader, "main", {}, "rough_ball_ps_glsl"},
+             ogl_ball_pixel_shader, "main", {}, "cube_reflection_ball_ps_glsl"},
         }};
-        const std::array<alia::shader_constant_binding, 5> ball_constants{{
+        const std::array<alia::shader_constant_binding, 4> ball_constants{{
             {"u_world", alia::shader_type::vertex, 0, 4},
             {"u_view_proj", alia::shader_type::vertex, 4, 4},
             {"u_camera_position", alia::shader_type::pixel, 0, 1},
             {"u_light_direction", alia::shader_type::pixel, 1, 1},
-            {"u_roughness", alia::shader_type::pixel, 2, 1},
         }};
         const std::array<alia::shader_sampler_binding, 2> ball_samplers{{
             {"u_normal_map", alia::shader_type::pixel, 0},
@@ -498,8 +465,6 @@ int main(int argc, char **argv) {
             "u_camera_position", alia::shader_type::pixel);
         auto light_constant = ball_shader.allocate_constant<alia::vec3f>(
             "u_light_direction", alia::shader_type::pixel);
-        auto roughness_constant = ball_shader.allocate_constant<float>(
-            "u_roughness", alia::shader_type::pixel);
         auto normal_sampler = ball_shader.allocate_sampler("u_normal_map");
         auto environment_sampler = ball_shader.allocate_sampler("u_environment");
         normal_sampler.set_texture(normal_map);
@@ -575,7 +540,6 @@ int main(int argc, char **argv) {
             view_projection_constant.set_value(view * projection);
             camera_constant.set_value(camera_position);
             light_constant.set_value({-0.45f, -0.8f, -0.35f});
-            roughness_constant.set_value(0.68f);
             frame.set_pipeline(ball_pipeline);
             frame.draw_indexed<ball_vertex>(
                 std::span<const ball_vertex>(ball.vertices),
@@ -585,7 +549,7 @@ int main(int argc, char **argv) {
             frame.set_pipeline(text_pipeline);
             alia::draw_text(
                 frame, {16.0f, 16.0f}, glyphs,
-                "normal-mapped rough ball | five-tap cubemap reflection",
+                "normal-mapped ball | one-tap cubemap reflection",
                 alia::white);
             frame.present();
         }

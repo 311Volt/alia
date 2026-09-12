@@ -23,6 +23,17 @@ target_link_libraries(array_map_tests
     GTest::gtest_main
 )
 
+add_executable(vec_tests
+    vec_test.cpp
+)
+
+target_link_libraries(vec_tests
+    PRIVATE
+    alia
+    GTest::gtest
+    GTest::gtest_main
+)
+
 add_executable(primitive_renderer_tests
     primitive_renderer_test.cpp
 )
@@ -100,6 +111,7 @@ target_link_libraries(vertex_definition_registry_tests
 include(GoogleTest)
 gtest_discover_tests(cstring_view_tests)
 gtest_discover_tests(array_map_tests)
+gtest_discover_tests(vec_tests)
 gtest_discover_tests(primitive_renderer_tests)
 gtest_discover_tests(text_layout_tests)
 gtest_discover_tests(soo_any_tests)

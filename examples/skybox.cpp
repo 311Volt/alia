@@ -82,27 +82,15 @@ void main() {
 }
 )";
 
-float dot(alia::vec3f a, alia::vec3f b) {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-alia::vec3f cross(alia::vec3f a, alia::vec3f b) {
-    return {
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x,
-    };
-}
-
 alia::vec3f normalized(alia::vec3f value) {
-    const float length = std::sqrt(dot(value, value));
+    const float length = std::sqrt(value.dot(value));
     return length > 0.0f ? value / length : alia::vec3f{};
 }
 
 alia::transform look_at_rotation(alia::vec3f direction) {
     const alia::vec3f forward = normalized(direction);
-    const alia::vec3f side = normalized(cross(forward, {0.0f, 1.0f, 0.0f}));
-    const alia::vec3f up = cross(side, forward);
+    const alia::vec3f side = normalized(forward.cross({0.0f, 1.0f, 0.0f}));
+    const alia::vec3f up = side.cross(forward);
     alia::transform result = alia::transform::identity();
     result.m[0][0] = side.x;
     result.m[0][1] = up.x;

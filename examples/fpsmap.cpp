@@ -30,28 +30,15 @@ float dot(alia::vec2f a, alia::vec2f b) {
     return a.x * b.x + a.y * b.y;
 }
 
-// NOTE (API feedback): vec3 currently has no dot or cross operations.
-float dot(alia::vec3f a, alia::vec3f b) {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-alia::vec3f cross(alia::vec3f a, alia::vec3f b) {
-    return {
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x,
-    };
-}
-
 alia::vec3f normalized(alia::vec3f value) {
-    const float length = std::sqrt(dot(value, value));
+    const float length = std::sqrt(value.dot(value));
     return length == 0.0f ? alia::vec3f{} : value / length;
 }
 
 alia::transform look_at(alia::vec3f eye, alia::vec3f target, alia::vec3f up) {
     const alia::vec3f forward = normalized(target - eye);
-    const alia::vec3f side = normalized(cross(forward, up));
-    const alia::vec3f camera_up = cross(side, forward);
+    const alia::vec3f side = normalized(forward.cross(up));
+    const alia::vec3f camera_up = side.cross(forward);
     alia::transform result = alia::transform::identity();
     result.m[0][0] = side.x;
     result.m[0][1] = camera_up.x;
@@ -62,9 +49,9 @@ alia::transform look_at(alia::vec3f eye, alia::vec3f target, alia::vec3f up) {
     result.m[2][0] = side.z;
     result.m[2][1] = camera_up.z;
     result.m[2][2] = -forward.z;
-    result.m[3][0] = -dot(side, eye);
-    result.m[3][1] = -dot(camera_up, eye);
-    result.m[3][2] = dot(forward, eye);
+    result.m[3][0] = -side.dot(eye);
+    result.m[3][1] = -camera_up.dot(eye);
+    result.m[3][2] = forward.dot(eye);
     return result;
 }
 
@@ -297,7 +284,7 @@ struct camera {
     }
 
     [[nodiscard]] alia::vec3f right() const {
-        return normalized(cross(forward(), up));
+        return normalized(forward().cross(up));
     }
 
     [[nodiscard]] alia::transform view() const {

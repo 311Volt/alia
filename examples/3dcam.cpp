@@ -20,29 +20,16 @@
 
 namespace {
 
-// NOTE (API feedback): vec3 currently has no dot or cross operations.
-float dot(alia::vec3f a, alia::vec3f b) {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-alia::vec3f cross(alia::vec3f a, alia::vec3f b) {
-    return {
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x,
-    };
-}
-
 alia::vec3f normalized(alia::vec3f value) {
-    const float length = std::sqrt(dot(value, value));
+    const float length = std::sqrt(value.dot(value));
     return length == 0.0f ? alia::vec3f{} : value / length;
 }
 
 // HYPOTHETICAL alia API: transform::look_at for row-vector transforms.
 alia::transform look_at(alia::vec3f eye, alia::vec3f target, alia::vec3f up) {
     const alia::vec3f f = normalized(target - eye);
-    const alia::vec3f s = normalized(cross(f, up));
-    const alia::vec3f u = cross(s, f);
+    const alia::vec3f s = normalized(f.cross(up));
+    const alia::vec3f u = s.cross(f);
     alia::transform result = alia::transform::identity();
     result.m[0][0] = s.x;
     result.m[0][1] = u.x;
@@ -53,9 +40,9 @@ alia::transform look_at(alia::vec3f eye, alia::vec3f target, alia::vec3f up) {
     result.m[2][0] = s.z;
     result.m[2][1] = u.z;
     result.m[2][2] = -f.z;
-    result.m[3][0] = -dot(s, eye);
-    result.m[3][1] = -dot(u, eye);
-    result.m[3][2] = dot(f, eye);
+    result.m[3][0] = -s.dot(eye);
+    result.m[3][1] = -u.dot(eye);
+    result.m[3][2] = f.dot(eye);
     return result;
 }
 

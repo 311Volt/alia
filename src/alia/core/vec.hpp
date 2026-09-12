@@ -58,10 +58,23 @@ struct vec3 {
     explicit constexpr vec3(const vec3<U>& v) : x(static_cast<T>(v.x)), y(static_cast<T>(v.y)), z(static_cast<T>(v.z)) {}
 
     template <typename U = T, typename ResultT = typename detail::square_type_trait<U>::type>
+    [[nodiscard]] constexpr ResultT dot(const vec3& other) const {
+        return static_cast<ResultT>(x) * static_cast<ResultT>(other.x) +
+               static_cast<ResultT>(y) * static_cast<ResultT>(other.y) +
+               static_cast<ResultT>(z) * static_cast<ResultT>(other.z);
+    }
+
+    [[nodiscard]] constexpr vec3 cross(const vec3& other) const {
+        return {
+            y * other.z - z * other.y,
+            z * other.x - x * other.z,
+            x * other.y - y * other.x,
+        };
+    }
+
+    template <typename U = T, typename ResultT = typename detail::square_type_trait<U>::type>
     [[nodiscard]] constexpr ResultT length_squared() const {
-        return static_cast<ResultT>(x) * static_cast<ResultT>(x) +
-               static_cast<ResultT>(y) * static_cast<ResultT>(y) +
-               static_cast<ResultT>(z) * static_cast<ResultT>(z);
+        return dot<U, ResultT>(*this);
     }
 
     template <typename U = T, typename ResultT = std::conditional_t<std::is_integral_v<U>, double, U>>
