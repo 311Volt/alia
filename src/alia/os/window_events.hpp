@@ -5,6 +5,7 @@
 #include "../core/vec.hpp"
 #include "../core/rect.hpp"
 #include "../io/keycodes.hpp"
+#include "../io/mouse.hpp"
 
 namespace alia {
 
@@ -43,21 +44,70 @@ struct window_expose_event {
     rect_i area;
 };
 
-struct window_mouse_move_event {
-    static constexpr event_type_id_t alia_event_type_id = 0x0104;
-    vec2i position;  // client-area coordinates
+// The retired 0x0104-0x0106 mouse IDs are deliberately not reused.
+struct mouse_axes_event {
+    static constexpr event_type_id_t alia_event_type_id = 0x0109;
+    vec2i position;
+    vec2i delta;
+    int z;
+    int w;
+    int dz;
+    int dw;
+    float pressure;
 };
 
-struct window_mouse_button_down_event {
-    static constexpr event_type_id_t alia_event_type_id = 0x0105;
+struct mouse_button_down_event {
+    static constexpr event_type_id_t alia_event_type_id = 0x010a;
     mouse_button button;
     vec2i position;
+    int z;
+    int w;
+    float pressure;
 };
 
-struct window_mouse_button_up_event {
-    static constexpr event_type_id_t alia_event_type_id = 0x0106;
+struct mouse_button_up_event {
+    static constexpr event_type_id_t alia_event_type_id = 0x010b;
     mouse_button button;
     vec2i position;
+    int z;
+    int w;
+    float pressure;
+};
+
+struct mouse_warped_event {
+    static constexpr event_type_id_t alia_event_type_id = 0x010c;
+    vec2i position;
+    vec2i delta;
+    int z;
+    int w;
+    int dz;
+    int dw;
+    float pressure;
+};
+
+struct mouse_enter_window_event {
+    static constexpr event_type_id_t alia_event_type_id = 0x010d;
+    vec2i position;
+    int z;
+    int w;
+};
+
+struct mouse_leave_window_event {
+    static constexpr event_type_id_t alia_event_type_id = 0x010e;
+    vec2i position;
+    int z;
+    int w;
+};
+
+struct mouse_relative_event {
+    static constexpr event_type_id_t alia_event_type_id = 0x010f;
+    vec2i delta;
+};
+
+struct mouse_mode_changed_event {
+    static constexpr event_type_id_t alia_event_type_id = 0x0110;
+    mouse_mode requested;
+    mouse_mode active;
 };
 
 } // namespace alia

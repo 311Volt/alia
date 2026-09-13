@@ -12,9 +12,11 @@
 #include "os/display.hpp"
 #include "os/dialog.hpp"
 #include "os/clipboard.hpp"
+#include "os/platform.hpp"
 
 #include "io/keycodes.hpp"
 #include "io/keyboard.hpp"
+#include "io/mouse.hpp"
 
 namespace alia {
 

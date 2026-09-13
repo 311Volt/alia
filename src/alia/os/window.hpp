@@ -13,6 +13,7 @@
 namespace alia {
 
 class any_bitmap_view;
+class window;
 struct display_mode;
 
 namespace detail { struct window_pos_centered_t {}; }
@@ -38,7 +39,7 @@ struct window_options {
     bool maximized  = false;
     bool minimized  = false;
     bool borderless = false; // borderless window (no title bar)
-    bool grab_mouse = false;
+    alia::mouse_mode mouse_mode = alia::mouse_mode::normal;
     bool high_dpi   = false;
     int monitor = -1;
     int refresh_rate = 0;
@@ -46,27 +47,12 @@ struct window_options {
     window_size_constraints size_constraints = {};
 };
 
-    // cursor types
-    enum class cursor {
-        default_cursor,
-        arrow,
-        ibeam,
-        wait,
-        crosshair,
-        resize_nwse,
-        resize_nesw,
-        resize_we,
-        resize_ns,
-        resize_all,
-        hand,
-        not_allowed,
-        hidden,
-    };
-
 // ── Implementation interface (internal) ──────────────────────────────
 
 struct window_impl {
     virtual ~window_impl() = default;
+
+    virtual void set_owner(window *owner) noexcept = 0;
 
     // Properties
     virtual vec2i        size()         const = 0;
@@ -106,13 +92,16 @@ struct window_impl {
 
     // Cursor
     virtual void show_cursor(bool show) = 0;
-    virtual void set_cursor(cursor c) = 0;
-    virtual void set_cursor_position(vec2i pos) = 0;
+    virtual bool set_cursor(system_mouse_cursor cursor) = 0;
+    virtual bool set_cursor(
+        std::shared_ptr<const detail::mouse_cursor_impl> cursor) = 0;
+    virtual bool set_cursor_position(vec2i pos) = 0;
     virtual bool is_cursor_visible() const = 0;
 
-    // Mouse grab
-    virtual void set_mouse_grab(bool grab) = 0;
-    virtual bool is_mouse_grabbed() const = 0;
+    // Mouse input mode
+    virtual bool set_mouse_mode(mouse_mode mode) = 0;
+    virtual mouse_mode requested_mouse_mode() const = 0;
+    virtual mouse_mode active_mouse_mode() const = 0;
 
     // Events
     virtual event_source& get_event_source() = 0;
@@ -210,13 +199,26 @@ void register_window_backend(window_backend_entry entry);
         // Cursor
         void show_cursor(bool show = true)    { impl_->show_cursor(show); }
         void hide_cursor()                    { impl_->show_cursor(false); }
-        void set_cursor(cursor c)             { impl_->set_cursor(c); }
-        void set_cursor_position(vec2i pos)   { impl_->set_cursor_position(pos); }
+        bool set_cursor(system_mouse_cursor cursor) {
+            return impl_->set_cursor(cursor);
+        }
+        bool set_cursor(const mouse_cursor &cursor) {
+            return impl_->set_cursor(cursor.impl_);
+        }
+        bool set_cursor_position(vec2i pos) {
+            return impl_->set_cursor_position(pos);
+        }
         [[nodiscard]] bool is_cursor_visible() const { return impl_->is_cursor_visible(); }
 
-        // Mouse grab
-        void set_mouse_grab(bool grab)              { impl_->set_mouse_grab(grab); }
-        [[nodiscard]] bool is_mouse_grabbed() const { return impl_->is_mouse_grabbed(); }
+        // Mouse input mode. requested_mouse_mode() records the caller's choice;
+        // active_mouse_mode() can temporarily be normal while inactive/minimized.
+        bool set_mouse_mode(mouse_mode mode) { return impl_->set_mouse_mode(mode); }
+        [[nodiscard]] mouse_mode requested_mouse_mode() const {
+            return impl_->requested_mouse_mode();
+        }
+        [[nodiscard]] mouse_mode active_mouse_mode() const {
+            return impl_->active_mouse_mode();
+        }
 
         // Event source
         event_source &get_event_source() { return impl_->get_event_source(); }
@@ -238,6 +240,10 @@ void register_window_backend(window_backend_entry entry);
     };
 
     bool inhibit_screensaver(bool inhibit);
+
+namespace detail {
+void set_current_window(window *value) noexcept;
+}
 
 } // namespace alia
 

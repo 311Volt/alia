@@ -1,5 +1,6 @@
 #include "window.hpp"
 #include "../gfx/bitmap/bitmap.hpp"
+#include "../io/mouse_impl.hpp"
 #include <stdexcept>
 #include <vector>
 #include <mutex>
@@ -48,21 +49,42 @@ window::window(vec2i size, window_options opts) {
     for (const auto& e : backend_registry()) {
         if (auto i = e.create(size, opts)) {
             impl_ = std::move(i);
+            impl_->set_owner(this);
             return;
         }
     }
     throw std::runtime_error("window: no platform backend available");
 }
 
-window::window(window&& o) noexcept : impl_(std::move(o.impl_)) {}
+window::window(window&& o) noexcept : impl_(std::move(o.impl_)) {
+    if (impl_)
+        impl_->set_owner(this);
+    detail::mouse_window_moved(&o, this);
+    if (s_current_window == &o)
+        s_current_window = this;
+}
 
 window& window::operator=(window&& o) noexcept {
-    if (this != &o)
+    if (this != &o) {
+        detail::mouse_window_destroyed(this);
+        if (s_current_window == this)
+            s_current_window = nullptr;
+        impl_.reset();
         impl_ = std::move(o.impl_);
+        if (impl_)
+            impl_->set_owner(this);
+        detail::mouse_window_moved(&o, this);
+        if (s_current_window == &o)
+            s_current_window = this;
+    }
     return *this;
 }
 
-window::~window() = default;
+window::~window() {
+    detail::mouse_window_destroyed(this);
+    if (s_current_window == this)
+        s_current_window = nullptr;
+}
 
 void window::set_icon(const any_bitmap_view &icon) {
     impl_->set_icons(std::span<const any_bitmap_view>(&icon, 1));
@@ -73,5 +95,11 @@ void window::set_icons(std::span<const any_bitmap_view> icons) {
 }
 
 window* window::current() { return s_current_window; }
+
+namespace detail {
+void set_current_window(window *value) noexcept {
+    s_current_window = value;
+}
+}
 
 } // namespace alia

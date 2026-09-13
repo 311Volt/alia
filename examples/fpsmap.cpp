@@ -8,6 +8,7 @@
 #include "alia/gfx/text/font.hpp"
 #include "alia/gfx/texture.hpp"
 #include "alia/io/keyboard.hpp"
+#include "alia/io/mouse.hpp"
 #include "alia/os/window.hpp"
 
 #include <algorithm>
@@ -308,8 +309,8 @@ int main(int argc, char **argv) {
         alia::event_queue events;
         events.register_source(&win.get_event_source());
         camera player_camera;
-        alia::vec2i last_mouse = win.size() / 2;
-        win.hide_cursor();
+        if (!win.set_mouse_mode(alia::mouse_mode::relative))
+            throw std::runtime_error("relative mouse input is unavailable");
 
         double last_time = alia::get_time();
         // NOTE (API feedback): frame timing and FPS measurement are local
@@ -329,22 +330,14 @@ int main(int argc, char **argv) {
                 } else if (const auto *key = event.get_if<alia::window_key_down_event>()) {
                     if (key->key == alia::key::escape)
                         running = false;
-                } else if (const auto *mouse = event.get_if<alia::window_mouse_move_event>()) {
-                    // NOTE (API feedback): there is no relative mouse mode or
-                    // mouse-delta event, so absolute positions must be differenced.
-                    const alia::vec2i delta = mouse->position - last_mouse;
-                    last_mouse = mouse->position;
-                    player_camera.rotate_degrees({
-                        -static_cast<float>(delta.y) * 0.022f * 4.0f,
-                        static_cast<float>(delta.x) * 0.022f * 4.0f,
-                    });
+                } else if (const auto *mouse = event.get_if<alia::mouse_relative_event>()) {
+                    if (win.active_mouse_mode() == alia::mouse_mode::relative) {
+                        player_camera.rotate_degrees({
+                            -static_cast<float>(mouse->delta.y) * 0.022f * 4.0f,
+                            static_cast<float>(mouse->delta.x) * 0.022f * 4.0f,
+                        });
+                    }
                 }
-            }
-
-            const alia::vec2i center = win.size() / 2;
-            if ((last_mouse - center).length() > 15.0) {
-                win.set_cursor_position(center);
-                last_mouse = center;
             }
 
             const double now = alia::get_time();

@@ -8,6 +8,7 @@
 #include "alia/gfx/primitive_renderer.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/gfx/texture.hpp"
+#include "alia/io/mouse.hpp"
 #include "alia/os/window.hpp"
 
 #include <array>
@@ -118,7 +119,7 @@ int main(int argc, char **argv) {
                     running = false;
                 } else if (const auto *resize = event.get_if<alia::window_resize_event>()) {
                     swapchain.on_resize(resize->new_size);
-                } else if (const auto *mouse = event.get_if<alia::window_mouse_button_down_event>();
+                } else if (const auto *mouse = event.get_if<alia::mouse_button_down_event>();
                            mouse && mouse->button == alia::mouse_button::left) {
                     text_position = alia::vec2f(mouse->position);
                 } else if (const auto *key = event.get_if<alia::window_key_down_event>()) {

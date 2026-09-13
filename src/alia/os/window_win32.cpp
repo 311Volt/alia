@@ -12,6 +12,7 @@
 #include "../events/event_source_impl.hpp"
 #include "../gfx/bitmap/bitmap.hpp"
 #include "../io/keyboard.hpp"
+#include "../io/mouse_impl.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -192,11 +193,39 @@ namespace alia {
         }
 
         constexpr const wchar_t *window_class_name = L"AliaWindow_v1";
+
+        LPCTSTR system_cursor_id(system_mouse_cursor cursor) {
+            switch (cursor) {
+            case system_mouse_cursor::busy: return IDC_WAIT;
+            case system_mouse_cursor::question: return IDC_HELP;
+            case system_mouse_cursor::edit: return IDC_IBEAM;
+            case system_mouse_cursor::move: return IDC_SIZEALL;
+            case system_mouse_cursor::resize_north:
+            case system_mouse_cursor::resize_south: return IDC_SIZENS;
+            case system_mouse_cursor::resize_east:
+            case system_mouse_cursor::resize_west: return IDC_SIZEWE;
+            case system_mouse_cursor::resize_northeast:
+            case system_mouse_cursor::resize_southwest: return IDC_SIZENESW;
+            case system_mouse_cursor::resize_northwest:
+            case system_mouse_cursor::resize_southeast: return IDC_SIZENWSE;
+            case system_mouse_cursor::progress: return IDC_APPSTARTING;
+            case system_mouse_cursor::precision: return IDC_CROSS;
+            case system_mouse_cursor::link: return IDC_HAND;
+            case system_mouse_cursor::alternate_selection: return IDC_UPARROW;
+            case system_mouse_cursor::unavailable: return IDC_NO;
+            default: return IDC_ARROW;
+            }
+        }
+
+        constexpr std::uint32_t mouse_button_bit(mouse_button button) {
+            return std::uint32_t{1} << (static_cast<unsigned>(button) - 1);
+        }
     }
 
     class win32_window_impl : public window_impl {
     public:
         ~win32_window_impl() override {
+            detail::platform_mouse_window_destroyed(this);
             restore_display_mode();
             if (hwnd) DestroyWindow(hwnd);
             if (big_icon_) DestroyIcon(big_icon_);
@@ -204,14 +233,28 @@ namespace alia {
         }
 
         HWND hwnd = nullptr;
+        window *owner = nullptr;
         event_source source;
         vec2i client_size = {};
         std::string title_utf8;
         bool cursor_visible = true;
-        bool mouse_grabbed = false;
+        system_mouse_cursor system_cursor_ = system_mouse_cursor::default_cursor;
+        std::shared_ptr<const detail::mouse_cursor_impl> custom_cursor_;
+        bool tracking_mouse_leave_ = false;
+        std::uint32_t pressed_mouse_buttons_ = 0;
+        vec2i last_mouse_position_{};
+        detail::mouse_warp_filter pending_warps_;
         key last_key_down = key::unknown;
         WCHAR high_surrogate = 0;
         bool suppress_altgr_control_up = false;
+
+        void set_owner(window *value) noexcept override {
+            owner = value;
+            if (owner && tracking_mouse_leave_)
+                detail::mouse_update_position(owner, last_mouse_position_);
+            if (owner && is_focused())
+                detail::set_current_window(owner);
+        }
 
         vec2i size() const override { return client_size; }
         float aspect_ratio() const override {
@@ -255,6 +298,7 @@ namespace alia {
             if (hwnd) SetWindowPos(
                 hwnd, nullptr, value.x, value.y, 0, 0,
                 SWP_NOSIZE | SWP_NOZORDER);
+            detail::platform_refresh_mouse_bounds(this);
         }
         void resize(vec2i value) override {
             if (!hwnd) return;
@@ -265,6 +309,7 @@ namespace alia {
             SetWindowPos(
                 hwnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top,
                 SWP_NOMOVE | SWP_NOZORDER);
+            detail::platform_refresh_mouse_bounds(this);
         }
         void minimize() override { if (hwnd) ShowWindow(hwnd, SW_MINIMIZE); }
         void maximize() override { if (hwnd) ShowWindow(hwnd, SW_MAXIMIZE); }
@@ -293,8 +338,10 @@ namespace alia {
             mode_suspended_ = false;
             if (previous != window_fullscreen_mode::windowed)
                 restore_windowed_placement();
-            if (requested == window_fullscreen_mode::windowed)
+            if (requested == window_fullscreen_mode::windowed) {
+                detail::platform_refresh_mouse_bounds(this);
                 return;
+            }
 
             const int target_monitor = monitor_opt_ >= 0 ? monitor_opt_ : monitor();
             if (requested == window_fullscreen_mode::fullscreen) {
@@ -319,6 +366,7 @@ namespace alia {
                 hwnd, HWND_TOP, bounds.left, bounds.top,
                 bounds.right - bounds.left, bounds.bottom - bounds.top,
                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            detail::platform_refresh_mouse_bounds(this);
         }
 
         void set_resizable(bool value) override {
@@ -371,42 +419,63 @@ namespace alia {
 
         void show_cursor(bool show) override {
             cursor_visible = show;
-            if (hwnd && is_focused())
-                SetCursor(show ? LoadCursor(nullptr, IDC_ARROW) : nullptr);
+            apply_cursor();
         }
-        void set_cursor(cursor value) override {
-            if (!hwnd) return;
-            LPCTSTR id = IDC_ARROW;
-            switch (value) {
-            case cursor::ibeam: id = IDC_IBEAM; break;
-            case cursor::wait: id = IDC_WAIT; break;
-            case cursor::crosshair: id = IDC_CROSS; break;
-            case cursor::resize_we: id = IDC_SIZEWE; break;
-            case cursor::resize_ns: id = IDC_SIZENS; break;
-            case cursor::resize_nwse: id = IDC_SIZENWSE; break;
-            case cursor::resize_nesw: id = IDC_SIZENESW; break;
-            case cursor::resize_all: id = IDC_SIZEALL; break;
-            case cursor::hand: id = IDC_HAND; break;
-            case cursor::not_allowed: id = IDC_NO; break;
-            case cursor::hidden: cursor_visible = false; SetCursor(nullptr); return;
-            default: break;
+        bool set_cursor(system_mouse_cursor value) override {
+            HCURSOR cursor = LoadCursor(nullptr, system_cursor_id(value));
+            if (!cursor)
+                return false;
+            system_cursor_ = value;
+            custom_cursor_.reset();
+            apply_cursor();
+            return true;
+        }
+        bool set_cursor(
+            std::shared_ptr<const detail::mouse_cursor_impl> value) override {
+            if (!value || !value->native_handle())
+                return false;
+            custom_cursor_ = std::move(value);
+            apply_cursor();
+            return true;
+        }
+        bool set_cursor_position(vec2i value) override {
+            if (!hwnd ||
+                GetWindowThreadProcessId(hwnd, nullptr) != GetCurrentThreadId())
+                return false;
+
+            // Preserve physical motion already waiting ahead of this warp.
+            MSG pending{};
+            while (PeekMessageW(
+                       &pending, hwnd, WM_MOUSEMOVE, WM_MOUSEMOVE, PM_REMOVE)) {
+                TranslateMessage(&pending);
+                DispatchMessageW(&pending);
             }
-            cursor_visible = true;
-            SetCursor(LoadCursor(nullptr, id));
-        }
-        void set_cursor_position(vec2i value) override {
-            if (!hwnd) return;
+
             POINT point{value.x, value.y};
-            ClientToScreen(hwnd, &point);
-            SetCursorPos(point.x, point.y);
+            if (!ClientToScreen(hwnd, &point) || !SetCursorPos(point.x, point.y))
+                return false;
+            vec2i actual = value;
+            POINT resulting{};
+            if (GetCursorPos(&resulting) && ScreenToClient(hwnd, &resulting))
+                actual = {resulting.x, resulting.y};
+            last_mouse_position_ = actual;
+            pending_warps_.record(actual);
+            detail::mouse_handle_warped(owner, source, actual);
+            return true;
         }
         bool is_cursor_visible() const override { return cursor_visible; }
-        void set_mouse_grab(bool grab) override {
-            if (!hwnd) return;
-            mouse_grabbed = grab;
-            if (grab) SetCapture(hwnd); else ReleaseCapture();
+        bool set_mouse_mode(mouse_mode mode) override {
+            return detail::platform_set_mouse_mode(
+                this, static_cast<void *>(hwnd), source, mode);
         }
-        bool is_mouse_grabbed() const override { return mouse_grabbed; }
+        mouse_mode requested_mouse_mode() const override {
+            return detail::platform_requested_mouse_mode(
+                const_cast<win32_window_impl *>(this));
+        }
+        mouse_mode active_mouse_mode() const override {
+            return detail::platform_active_mouse_mode(
+                const_cast<win32_window_impl *>(this));
+        }
         event_source &get_event_source() override { return source; }
         void poll() override {
             MSG message;
@@ -416,6 +485,70 @@ namespace alia {
             }
         }
         void *native_handle() const override { return static_cast<void *>(hwnd); }
+
+        HCURSOR selected_cursor() const {
+            if (custom_cursor_)
+                return static_cast<HCURSOR>(custom_cursor_->native_handle());
+            return LoadCursor(nullptr, system_cursor_id(system_cursor_));
+        }
+
+        void apply_cursor() const {
+            if (!hwnd)
+                return;
+            const bool relative =
+                detail::platform_active_mouse_mode(
+                    const_cast<win32_window_impl *>(this)) == mouse_mode::relative;
+            SetCursor(cursor_visible && !relative ? selected_cursor() : nullptr);
+        }
+
+        bool begin_mouse_tracking(vec2i position) {
+            if (tracking_mouse_leave_)
+                return false;
+            TRACKMOUSEEVENT tracking{};
+            tracking.cbSize = sizeof(tracking);
+            tracking.dwFlags = TME_LEAVE;
+            tracking.hwndTrack = hwnd;
+            tracking_mouse_leave_ = TrackMouseEvent(&tracking) != FALSE;
+            last_mouse_position_ = position;
+            detail::mouse_handle_enter(owner, source, position);
+            return true;
+        }
+
+        bool suppress_warp_message(vec2i position) {
+            return pending_warps_.should_suppress(position);
+        }
+
+        void handle_mouse_button(
+            mouse_button button, bool down, vec2i position) {
+            begin_mouse_tracking(position);
+            last_mouse_position_ = position;
+            const auto bit = mouse_button_bit(button);
+            if (down) {
+                if (pressed_mouse_buttons_ == 0)
+                    SetCapture(hwnd);
+                pressed_mouse_buttons_ |= bit;
+                SetFocus(hwnd);
+            } else {
+                pressed_mouse_buttons_ &= ~bit;
+            }
+            detail::mouse_handle_button(
+                owner, source, button, down, position);
+            if (!down && pressed_mouse_buttons_ == 0 && GetCapture() == hwnd)
+                ReleaseCapture();
+        }
+
+        void release_mouse_buttons() {
+            const auto pressed = pressed_mouse_buttons_;
+            pressed_mouse_buttons_ = 0;
+            for (unsigned index = 1; index <= 5; ++index) {
+                const auto button = static_cast<mouse_button>(index);
+                if ((pressed & mouse_button_bit(button)) != 0)
+                    detail::mouse_handle_button(
+                        owner, source, button, false, last_mouse_position_);
+            }
+            if (GetCapture() == hwnd)
+                ReleaseCapture();
+        }
 
         static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
         static bool ensure_class_registered();
@@ -561,6 +694,9 @@ namespace alia {
             impl->source.emit(window_close_event{});
             return 0;
         case WM_DESTROY:
+            impl->release_mouse_buttons();
+            detail::platform_mouse_window_destroyed(impl);
+            detail::mouse_window_destroyed(impl->owner);
             impl->hwnd = nullptr;
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
             return 0;
@@ -570,8 +706,16 @@ namespace alia {
             impl->client_size = {width, height};
             if (wp != SIZE_MINIMIZED)
                 impl->source.emit(window_resize_event{{width, height}});
+            detail::platform_mouse_window_focus_changed(
+                impl, impl->is_focused(), wp == SIZE_MINIMIZED);
+            detail::platform_refresh_mouse_bounds(impl);
             return 0;
         }
+        case WM_MOVE:
+        case WM_WINDOWPOSCHANGED:
+        case WM_DPICHANGED:
+            detail::platform_refresh_mouse_bounds(impl);
+            break;
         case WM_PAINT:
             if (impl->expose_) {
                 RECT update{};
@@ -622,6 +766,9 @@ namespace alia {
                 }
                 impl->activation_transition_ = false;
             }
+            detail::platform_mouse_window_focus_changed(
+                impl, LOWORD(wp) != WA_INACTIVE,
+                HIWORD(wp) != 0 || impl->is_minimized());
             break;
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN: {
@@ -668,44 +815,100 @@ namespace alia {
                 impl->last_key_down, codepoint, modifiers, repeat});
             return 0;
         }
-        case WM_MOUSEMOVE:
-            impl->source.emit(window_mouse_move_event{{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)}});
+        case WM_MOUSEMOVE: {
+            const vec2i position{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+            const bool entered = impl->begin_mouse_tracking(position);
+            impl->last_mouse_position_ = position;
+            if (impl->suppress_warp_message(position))
+                return 0;
+            if (impl->active_mouse_mode() == mouse_mode::relative) {
+                if (!entered)
+                    detail::mouse_update_position(impl->owner, position);
+                return 0;
+            }
+            if (!entered)
+                detail::mouse_handle_axes(
+                    impl->owner, impl->source, position);
             return 0;
+        }
+        case WM_MOUSELEAVE: {
+            impl->tracking_mouse_leave_ = false;
+            POINT point{};
+            vec2i position = impl->last_mouse_position_;
+            if (GetCursorPos(&point) && ScreenToClient(hwnd, &point))
+                position = {point.x, point.y};
+            impl->last_mouse_position_ = position;
+            detail::mouse_handle_leave(
+                impl->owner, impl->source, position);
+            return 0;
+        }
+        case WM_MOUSEWHEEL:
+        case WM_MOUSEHWHEEL: {
+            POINT point{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+            ScreenToClient(hwnd, &point);
+            const vec2i position{point.x, point.y};
+            impl->last_mouse_position_ = position;
+            const int wheel_delta = GET_WHEEL_DELTA_WPARAM(wp);
+            detail::mouse_handle_wheel(
+                impl->owner, impl->source, position,
+                msg == WM_MOUSEWHEEL ? wheel_delta : 0,
+                msg == WM_MOUSEHWHEEL ? wheel_delta : 0);
+            return 0;
+        }
         case WM_LBUTTONDOWN:
-            impl->source.emit(window_mouse_button_down_event{
-                mouse_button::left, {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)}});
-            return 0;
         case WM_LBUTTONUP:
-            impl->source.emit(window_mouse_button_up_event{
-                mouse_button::left, {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)}});
+            impl->handle_mouse_button(
+                mouse_button::left, msg == WM_LBUTTONDOWN,
+                {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)});
             return 0;
         case WM_RBUTTONDOWN:
-            impl->source.emit(window_mouse_button_down_event{
-                mouse_button::right, {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)}});
-            return 0;
         case WM_RBUTTONUP:
-            impl->source.emit(window_mouse_button_up_event{
-                mouse_button::right, {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)}});
+            impl->handle_mouse_button(
+                mouse_button::right, msg == WM_RBUTTONDOWN,
+                {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)});
             return 0;
         case WM_MBUTTONDOWN:
-            impl->source.emit(window_mouse_button_down_event{
-                mouse_button::middle, {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)}});
-            return 0;
         case WM_MBUTTONUP:
-            impl->source.emit(window_mouse_button_up_event{
-                mouse_button::middle, {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)}});
+            impl->handle_mouse_button(
+                mouse_button::middle, msg == WM_MBUTTONDOWN,
+                {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)});
             return 0;
+        case WM_XBUTTONDOWN:
+        case WM_XBUTTONUP:
+            impl->handle_mouse_button(
+                GET_XBUTTON_WPARAM(wp) == XBUTTON1
+                    ? mouse_button::x1 : mouse_button::x2,
+                msg == WM_XBUTTONDOWN,
+                {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)});
+            return TRUE;
+        case WM_CAPTURECHANGED:
+            if (reinterpret_cast<HWND>(lp) != hwnd)
+                impl->release_mouse_buttons();
+            return 0;
+        case WM_CANCELMODE:
+            impl->release_mouse_buttons();
+            break;
+        case WM_INPUT:
+            detail::platform_mouse_handle_raw_input(
+                impl, reinterpret_cast<void *>(lp));
+            break;
         case WM_SETCURSOR:
-            if (!impl->cursor_visible && LOWORD(lp) == HTCLIENT) {
-                SetCursor(nullptr);
+            if (LOWORD(lp) == HTCLIENT) {
+                impl->apply_cursor();
                 return TRUE;
             }
             break;
         case WM_SETFOCUS:
             detail::refresh_keyboard_modifiers(get_lock_modifiers());
-            // TODO: update window::current().
+            detail::set_current_window(impl->owner);
+            detail::platform_mouse_window_focus_changed(
+                impl, true, impl->is_minimized());
             break;
         case WM_KILLFOCUS: {
+            impl->release_mouse_buttons();
+            detail::platform_mouse_window_focus_changed(impl, false, false);
+            if (window::current() == impl->owner)
+                detail::set_current_window(nullptr);
             const keyboard_state state = get_keyboard_state();
             detail::clear_keyboard_state(get_lock_modifiers());
             impl->last_key_down = key::unknown;
@@ -811,8 +1014,9 @@ namespace alia {
         UpdateWindow(hwnd);
         if (impl->constraints_enabled_)
             impl->apply_size_constraints(true);
-        if (options.grab_mouse)
-            impl->set_mouse_grab(true);
+        if (options.mouse_mode != mouse_mode::normal &&
+            !impl->set_mouse_mode(options.mouse_mode))
+            return nullptr;
         return impl;
     }
 

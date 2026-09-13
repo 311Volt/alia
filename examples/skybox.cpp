@@ -8,6 +8,7 @@
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/io/keyboard.hpp"
+#include "alia/io/mouse.hpp"
 #include "alia/os/window.hpp"
 
 #include <algorithm>
@@ -242,8 +243,6 @@ int main(int argc, char **argv) {
 
         alia::event_queue events;
         events.register_source(&window.get_event_source());
-        alia::vec2i last_mouse{};
-        bool have_mouse = false;
         float yaw = 0.0f;
         float pitch = 0.0f;
         int active_texture = 0;
@@ -265,13 +264,9 @@ int main(int argc, char **argv) {
                         active_texture = (active_texture + 1) % 3;
                     else if (key->key == alia::key::L)
                         stamp_positive_z(sky);
-                } else if (const auto *mouse = event.get_if<alia::window_mouse_move_event>()) {
-                    if (have_mouse) {
-                        yaw += static_cast<float>(mouse->position.x - last_mouse.x) * 0.004f;
-                        pitch -= static_cast<float>(mouse->position.y - last_mouse.y) * 0.004f;
-                    }
-                    last_mouse = mouse->position;
-                    have_mouse = true;
+                } else if (const auto *mouse = event.get_if<alia::mouse_axes_event>()) {
+                    yaw += static_cast<float>(mouse->delta.x) * 0.004f;
+                    pitch -= static_cast<float>(mouse->delta.y) * 0.004f;
                 }
             }
 

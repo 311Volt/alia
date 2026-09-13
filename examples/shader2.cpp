@@ -5,6 +5,7 @@
 #include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/texture.hpp"
+#include "alia/io/mouse.hpp"
 #include "alia/os/window.hpp"
 
 #include <array>
@@ -182,8 +183,6 @@ int main(int argc, char **argv) {
 
         alia::event_queue events;
         events.register_source(&win.get_event_source());
-        // NOTE (API feedback): mouse position must be tracked from events;
-        // alia has no mouse-state polling API.
         alia::vec2f mouse_position{400.0f, 300.0f};
 
         bool running = true;
@@ -198,7 +197,7 @@ int main(int argc, char **argv) {
                 else if (const auto *key = event.get_if<alia::window_key_down_event>();
                          key && key->key == alia::key::escape)
                     running = false;
-                else if (const auto *mouse = event.get_if<alia::window_mouse_move_event>())
+                else if (const auto *mouse = event.get_if<alia::mouse_axes_event>())
                     mouse_position = alia::vec2f(mouse->position);
             }
 

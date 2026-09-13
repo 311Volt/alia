@@ -81,6 +81,7 @@ endif()
 
 if(ALIA_COMPILE_PLATFORM_BACKEND_WIN32)
   target_compile_definitions(alia PUBLIC ALIA_COMPILE_PLATFORM_BACKEND_WIN32)
+  target_link_libraries(alia PRIVATE user32 gdi32)
 endif()
 
 if(ALIA_COMPILE_PLATFORM_BACKEND_X11)

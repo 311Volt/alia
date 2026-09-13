@@ -100,6 +100,9 @@ target_link_libraries(display_mode_tests PRIVATE alia GTest::gtest GTest::gtest_
 add_executable(framebuffer_config_tests framebuffer_config_test.cpp)
 target_link_libraries(framebuffer_config_tests PRIVATE alia GTest::gtest GTest::gtest_main)
 
+add_executable(mouse_tests mouse_test.cpp)
+target_link_libraries(mouse_tests PRIVATE alia GTest::gtest GTest::gtest_main)
+
 target_link_libraries(vertex_definition_registry_tests
     PRIVATE
     alia
@@ -120,3 +123,4 @@ gtest_discover_tests(pixel_bitmap_tests)
 gtest_discover_tests(vertex_definition_registry_tests)
 gtest_discover_tests(display_mode_tests)
 gtest_discover_tests(framebuffer_config_tests)
+gtest_discover_tests(mouse_tests)
