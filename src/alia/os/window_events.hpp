@@ -34,7 +34,7 @@ struct window_key_char_event {
     static constexpr event_type_id_t alia_event_type_id = 0x0107;
     key      key;       // physical key that generated this character
     char32_t codepoint; // full Unicode codepoint (never a surrogate)
-    key_mod  modifiers; // shift/ctrl/alt/super/caps/numlock state
+    key_mod  modifiers; // held modifiers and lock-key toggle state
     bool     is_repeat; // true if key was already held (auto-repeat)
 };
 

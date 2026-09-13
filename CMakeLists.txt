@@ -24,7 +24,7 @@ check_cxx_source_compiles([[
   int main() { return 0; }
 ]] ALIA_MDSPAN_FEATURE_TEST_OK)
 
-file(GLOB_RECURSE alia_headers CONFIGURE_DEPENDS "src/*.hpp" "src/*.h")
+file(GLOB_RECURSE alia_headers CONFIGURE_DEPENDS "src/*.hpp" "src/*.h" "src/*.inc")
 file(GLOB_RECURSE alia_sources CONFIGURE_DEPENDS "src/*.cpp" "src/*.c")
 
 option(ALIA_STATIC "Build alia as a static library" ON)

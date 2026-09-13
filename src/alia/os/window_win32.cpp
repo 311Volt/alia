@@ -11,7 +11,7 @@
 #include "window_events.hpp"
 #include "../events/event_source_impl.hpp"
 #include "../gfx/bitmap/bitmap.hpp"
-#include "../io/keycodes.hpp"
+#include "../io/keyboard.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -32,16 +32,17 @@ namespace alia {
             case VK_RETURN: return extended ? key::numpad_enter : key::enter;
             case VK_ESCAPE: return key::escape;
             case VK_SPACE: return key::space;
-            case VK_PRIOR: return key::page_up;
-            case VK_NEXT: return key::page_down;
-            case VK_END: return key::end;
-            case VK_HOME: return key::home;
-            case VK_LEFT: return key::left;
-            case VK_UP: return key::up;
-            case VK_RIGHT: return key::right;
-            case VK_DOWN: return key::down;
-            case VK_INSERT: return key::insert;
-            case VK_DELETE: return key::del;
+            case VK_PRIOR: return extended ? key::page_up : key::numpad9;
+            case VK_NEXT: return extended ? key::page_down : key::numpad3;
+            case VK_END: return extended ? key::end : key::numpad1;
+            case VK_HOME: return extended ? key::home : key::numpad7;
+            case VK_LEFT: return extended ? key::left : key::numpad4;
+            case VK_UP: return extended ? key::up : key::numpad8;
+            case VK_RIGHT: return extended ? key::right : key::numpad6;
+            case VK_DOWN: return extended ? key::down : key::numpad2;
+            case VK_INSERT: return extended ? key::insert : key::numpad0;
+            case VK_DELETE: return extended ? key::del : key::numpad_decimal;
+            case VK_CLEAR: return key::numpad5;
             case VK_LWIN: return key::lsuper;
             case VK_RWIN: return key::rsuper;
             case VK_APPS: return key::menu;
@@ -50,8 +51,15 @@ namespace alia {
             case VK_SUBTRACT: return key::numpad_subtract;
             case VK_DECIMAL: return key::numpad_decimal;
             case VK_DIVIDE: return key::numpad_divide;
+            case VK_OEM_NEC_EQUAL: return key::numpad_equals;
             case VK_NUMLOCK: return key::num_lock;
             case VK_SCROLL: return key::scroll_lock;
+            case VK_SHIFT:
+                return MapVirtualKeyW(
+                    static_cast<UINT>((lp >> 16) & 0xff), MAPVK_VSC_TO_VK_EX) == VK_RSHIFT
+                    ? key::rshift : key::lshift;
+            case VK_CONTROL: return extended ? key::rctrl : key::lctrl;
+            case VK_MENU: return extended ? key::ralt : key::lalt;
             case VK_LSHIFT: return key::lshift;
             case VK_RSHIFT: return key::rshift;
             case VK_LCONTROL: return key::lctrl;
@@ -72,6 +80,7 @@ namespace alia {
             case VK_OEM_COMMA: return key::comma;
             case VK_OEM_PERIOD: return key::period;
             case VK_OEM_2: return key::slash;
+            case VK_OEM_102: return key::oem_102;
             default:
                 if (vk >= '0' && vk <= '9')
                     return static_cast<key>(static_cast<int>(key::num0) + static_cast<int>(vk - '0'));
@@ -85,16 +94,40 @@ namespace alia {
             }
         }
 
-        key_mod get_modifiers() {
+        key_mod get_lock_modifiers() {
             key_mod modifiers = key_mod::none;
-            if (GetKeyState(VK_SHIFT) & 0x8000) modifiers |= key_mod::shift;
-            if (GetKeyState(VK_CONTROL) & 0x8000) modifiers |= key_mod::ctrl;
-            if (GetKeyState(VK_MENU) & 0x8000) modifiers |= key_mod::alt;
-            if ((GetKeyState(VK_LWIN) & 0x8000) || (GetKeyState(VK_RWIN) & 0x8000))
-                modifiers |= key_mod::super;
             if (GetKeyState(VK_CAPITAL) & 0x0001) modifiers |= key_mod::caps_lock;
             if (GetKeyState(VK_NUMLOCK) & 0x0001) modifiers |= key_mod::num_lock;
+            if (GetKeyState(VK_SCROLL) & 0x0001) modifiers |= key_mod::scroll_lock;
             return modifiers;
+        }
+
+        key_mod get_modifiers() {
+            const keyboard_state state = get_keyboard_state();
+            key_mod modifiers = get_lock_modifiers();
+            if (state.shift()) modifiers |= key_mod::shift;
+            if (state.ctrl()) modifiers |= key_mod::ctrl;
+            if (state.alt()) modifiers |= key_mod::alt;
+            if (state.alt_gr()) modifiers |= key_mod::alt_gr;
+            if (state.super()) modifiers |= key_mod::super;
+            return modifiers;
+        }
+
+        bool is_altgr_control_message(
+            HWND hwnd, UINT message, WPARAM virtual_key, LPARAM message_data) {
+            if ((message != WM_KEYDOWN && message != WM_SYSKEYDOWN) ||
+                (virtual_key != VK_CONTROL && virtual_key != VK_LCONTROL) ||
+                ((message_data >> 24) & 1) != 0)
+                return false;
+
+            MSG next{};
+            if (!PeekMessageW(&next, nullptr, 0, 0, PM_NOREMOVE))
+                return false;
+            return next.hwnd == hwnd &&
+                   (next.message == WM_KEYDOWN || next.message == WM_SYSKEYDOWN) &&
+                   (next.wParam == VK_MENU || next.wParam == VK_RMENU) &&
+                   ((next.lParam >> 24) & 1) != 0 &&
+                   next.time == static_cast<DWORD>(GetMessageTime());
         }
 
         std::wstring utf8_to_wide(std::string_view text) {
@@ -178,6 +211,7 @@ namespace alia {
         bool mouse_grabbed = false;
         key last_key_down = key::unknown;
         WCHAR high_surrogate = 0;
+        bool suppress_altgr_control_up = false;
 
         vec2i size() const override { return client_size; }
         float aspect_ratio() const override {
@@ -590,14 +624,30 @@ namespace alia {
             }
             break;
         case WM_KEYDOWN:
-        case WM_SYSKEYDOWN:
+        case WM_SYSKEYDOWN: {
+            if (is_altgr_control_message(hwnd, msg, wp, lp)) {
+                impl->suppress_altgr_control_up = true;
+                return 0;
+            }
             impl->last_key_down = vk_to_key(wp, lp);
+            detail::update_keyboard_state(
+                impl->last_key_down, true, get_modifiers());
             impl->source.emit(window_key_down_event{impl->last_key_down});
             return 0;
+        }
         case WM_KEYUP:
-        case WM_SYSKEYUP:
-            impl->source.emit(window_key_up_event{vk_to_key(wp, lp)});
+        case WM_SYSKEYUP: {
+            const key released = vk_to_key(wp, lp);
+            if (released == key::lctrl &&
+                impl->suppress_altgr_control_up &&
+                !is_key_down(key::lctrl)) {
+                impl->suppress_altgr_control_up = false;
+                return 0;
+            }
+            detail::update_keyboard_state(released, false, get_modifiers());
+            impl->source.emit(window_key_up_event{released});
             return 0;
+        }
         case WM_CHAR:
         case WM_SYSCHAR: {
             const WCHAR value = static_cast<WCHAR>(wp);
@@ -612,8 +662,10 @@ namespace alia {
                     ((impl->high_surrogate - 0xD800u) << 10) +
                     (value - 0xDC00u);
             impl->high_surrogate = 0;
+            const key_mod modifiers = get_modifiers();
+            detail::refresh_keyboard_modifiers(modifiers);
             impl->source.emit(window_key_char_event{
-                impl->last_key_down, codepoint, get_modifiers(), repeat});
+                impl->last_key_down, codepoint, modifiers, repeat});
             return 0;
         }
         case WM_MOUSEMOVE:
@@ -650,8 +702,23 @@ namespace alia {
             }
             break;
         case WM_SETFOCUS:
+            detail::refresh_keyboard_modifiers(get_lock_modifiers());
             // TODO: update window::current().
             break;
+        case WM_KILLFOCUS: {
+            const keyboard_state state = get_keyboard_state();
+            detail::clear_keyboard_state(get_lock_modifiers());
+            impl->last_key_down = key::unknown;
+            impl->high_surrogate = 0;
+            impl->suppress_altgr_control_up = false;
+            for (int value = static_cast<int>(key::unknown) + 1;
+                 value < static_cast<int>(key::key_count); ++value) {
+                const auto released = static_cast<key>(value);
+                if (state.is_key_down(released))
+                    impl->source.emit(window_key_up_event{released});
+            }
+            break;
+        }
         default:
             break;
         }

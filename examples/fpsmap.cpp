@@ -7,6 +7,7 @@
 #include "alia/gfx/prim_buffers.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/gfx/texture.hpp"
+#include "alia/io/keyboard.hpp"
 #include "alia/os/window.hpp"
 
 #include <algorithm>
@@ -247,10 +248,6 @@ struct camera {
     }
 };
 
-std::size_t key_index(alia::key value) {
-    return static_cast<std::size_t>(value);
-}
-
 alia::gfx_backend requested_backend(int argc, char **argv) {
     if (argc < 2)
         return alia::gfx_backend::auto_;
@@ -310,9 +307,6 @@ int main(int argc, char **argv) {
 
         alia::event_queue events;
         events.register_source(&win.get_event_source());
-        // NOTE (API feedback): key state is reconstructed from events because
-        // alia has no keyboard-state polling API.
-        std::array<bool, static_cast<std::size_t>(alia::key::key_count)> keys{};
         camera player_camera;
         alia::vec2i last_mouse = win.size() / 2;
         win.hide_cursor();
@@ -333,11 +327,8 @@ int main(int argc, char **argv) {
                 } else if (const auto *resize = event.get_if<alia::window_resize_event>()) {
                     swapchain.on_resize(resize->new_size);
                 } else if (const auto *key = event.get_if<alia::window_key_down_event>()) {
-                    keys[key_index(key->key)] = true;
                     if (key->key == alia::key::escape)
                         running = false;
-                } else if (const auto *key = event.get_if<alia::window_key_up_event>()) {
-                    keys[key_index(key->key)] = false;
                 } else if (const auto *mouse = event.get_if<alia::window_mouse_move_event>()) {
                     // NOTE (API feedback): there is no relative mouse mode or
                     // mouse-delta event, so absolute positions must be differenced.
@@ -360,13 +351,14 @@ int main(int argc, char **argv) {
             const float dt = static_cast<float>(now - last_time);
             last_time = now;
             const float movement = dt * 30.0f;
-            if (keys[key_index(alia::key::W)])
+            const alia::keyboard_state keyboard = alia::get_keyboard_state();
+            if (keyboard[alia::key::W])
                 player_camera.pos += player_camera.forward() * movement;
-            if (keys[key_index(alia::key::S)])
+            if (keyboard[alia::key::S])
                 player_camera.pos -= player_camera.forward() * movement;
-            if (keys[key_index(alia::key::A)])
+            if (keyboard[alia::key::A])
                 player_camera.pos -= player_camera.right() * movement;
-            if (keys[key_index(alia::key::D)])
+            if (keyboard[alia::key::D])
                 player_camera.pos += player_camera.right() * movement;
 
             ++fps_frames;

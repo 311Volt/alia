@@ -7,6 +7,7 @@
 #include "alia/gfx/primitive_renderer.hpp"
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/text/font.hpp"
+#include "alia/io/keyboard.hpp"
 #include "alia/os/window.hpp"
 
 #include <algorithm>
@@ -146,10 +147,6 @@ void stamp_positive_z(alia::cube_texture &texture) {
     }
 }
 
-std::size_t key_index(alia::key value) {
-    return static_cast<std::size_t>(value);
-}
-
 alia::gfx_backend requested_backend(int argc, char **argv) {
     if (argc < 2)
         return alia::gfx_backend::auto_;
@@ -245,7 +242,6 @@ int main(int argc, char **argv) {
 
         alia::event_queue events;
         events.register_source(&window.get_event_source());
-        std::array<bool, static_cast<std::size_t>(alia::key::key_count)> keys{};
         alia::vec2i last_mouse{};
         bool have_mouse = false;
         float yaw = 0.0f;
@@ -263,15 +259,12 @@ int main(int argc, char **argv) {
                 } else if (const auto *resize = event.get_if<alia::window_resize_event>()) {
                     swapchain.on_resize(resize->new_size);
                 } else if (const auto *key = event.get_if<alia::window_key_down_event>()) {
-                    keys[key_index(key->key)] = true;
                     if (key->key == alia::key::escape)
                         running = false;
                     else if (key->key == alia::key::space)
                         active_texture = (active_texture + 1) % 3;
                     else if (key->key == alia::key::L)
                         stamp_positive_z(sky);
-                } else if (const auto *key = event.get_if<alia::window_key_up_event>()) {
-                    keys[key_index(key->key)] = false;
                 } else if (const auto *mouse = event.get_if<alia::window_mouse_move_event>()) {
                     if (have_mouse) {
                         yaw += static_cast<float>(mouse->position.x - last_mouse.x) * 0.004f;
@@ -285,13 +278,14 @@ int main(int argc, char **argv) {
             const double now = alia::get_time();
             const float dt = static_cast<float>(now - last_time);
             last_time = now;
-            if (keys[key_index(alia::key::left)])
+            const alia::keyboard_state keyboard = alia::get_keyboard_state();
+            if (keyboard[alia::key::left])
                 yaw -= 1.25f * dt;
-            if (keys[key_index(alia::key::right)])
+            if (keyboard[alia::key::right])
                 yaw += 1.25f * dt;
-            if (keys[key_index(alia::key::up)])
+            if (keyboard[alia::key::up])
                 pitch += 1.25f * dt;
-            if (keys[key_index(alia::key::down)])
+            if (keyboard[alia::key::down])
                 pitch -= 1.25f * dt;
             pitch = std::clamp(pitch, -1.45f, 1.45f);
 
