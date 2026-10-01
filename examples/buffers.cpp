@@ -1,4 +1,4 @@
-#include "alia/core/get_time.hpp"
+#include "alia/core/timing.hpp"
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
@@ -153,10 +153,7 @@ int main(int argc, char **argv) {
 
         alia::event_queue events;
         events.register_source(&win.get_event_source());
-        // NOTE (API feedback): the rolling FPS counter is local because alia
-        // has no event-loop FPS helper.
-        double fps_window_start = alia::get_time();
-        int fps_frames = 0;
+        alia::fps_counter fps(0.25);
         int displayed_fps = 0;
 
         bool running = true;
@@ -182,14 +179,6 @@ int main(int argc, char **argv) {
             if (auto locked = vertex_buffer.lock_write_only(0, lock_size))
                 std::copy_n(grid.data.begin(), lock_size, locked.view().begin());
 
-            ++fps_frames;
-            const double fps_elapsed = now - fps_window_start;
-            if (fps_elapsed >= 0.25) {
-                displayed_fps = static_cast<int>(fps_frames / fps_elapsed + 0.5);
-                fps_frames = 0;
-                fps_window_start = now;
-            }
-
             auto frame = swapchain.begin_frame();
             frame.clear(alia::black);
             prim_fx.world = alia::transform::scale(alia::vec2f(frame.target_size()));
@@ -204,6 +193,8 @@ int main(int argc, char **argv) {
             alia::draw_text(frame, {16.0f, 16.0f}, glyphs, fps_text, alia::black);
             alia::draw_text(frame, {15.0f, 15.0f}, glyphs, fps_text, alia::white);
             frame.present();
+            if (fps.count_frame())
+                displayed_fps = static_cast<int>(fps.interval().fps() + 0.5);
         }
     } catch (const std::exception &error) {
         std::cerr << "buffers example failed: " << error.what() << '\n';

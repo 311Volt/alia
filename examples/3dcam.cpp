@@ -1,4 +1,4 @@
-#include "alia/core/get_time.hpp"
+#include "alia/core/timing.hpp"
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/bitmap/image_io.hpp"
 #include "alia/gfx/frame.hpp"
@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
         float rotation_degrees = 0.0f;
         alia::vec3f position{0.0f, 0.0f, -5.0f};
         alia::vec3f forward{0.0f, 0.0f, 1.0f};
-        double last_time = alia::get_time();
+        alia::frame_clock clock;
 
         bool running = true;
         while (running) {
@@ -79,9 +79,7 @@ int main(int argc, char **argv) {
                 }
             }
 
-            const double now = alia::get_time();
-            const float dt = static_cast<float>(now - last_time);
-            last_time = now;
+            const float dt = static_cast<float>(clock.tick().delta);
             const alia::keyboard_state keyboard = alia::get_keyboard_state();
             if (keyboard[alia::key::left])
                 rotation_degrees += dt * 100.0f;

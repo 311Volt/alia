@@ -1,4 +1,4 @@
-#include "alia/core/get_time.hpp"
+#include "alia/core/timing.hpp"
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/bitmap/image_io.hpp"
 #include "alia/gfx/frame.hpp"
@@ -312,11 +312,8 @@ int main(int argc, char **argv) {
         if (!win.set_mouse_mode(alia::mouse_mode::relative))
             throw std::runtime_error("relative mouse input is unavailable");
 
-        double last_time = alia::get_time();
-        // NOTE (API feedback): frame timing and FPS measurement are local
-        // because alia has no event-loop timing helpers.
-        double fps_window_start = last_time;
-        int fps_frames = 0;
+        alia::frame_clock clock;
+        alia::fps_counter fps(0.25);
         int displayed_fps = 0;
         bool running = true;
         while (running) {
@@ -340,9 +337,7 @@ int main(int argc, char **argv) {
                 }
             }
 
-            const double now = alia::get_time();
-            const float dt = static_cast<float>(now - last_time);
-            last_time = now;
+            const float dt = static_cast<float>(clock.tick().delta);
             const float movement = dt * 30.0f;
             const alia::keyboard_state keyboard = alia::get_keyboard_state();
             if (keyboard[alia::key::W])
@@ -353,14 +348,6 @@ int main(int argc, char **argv) {
                 player_camera.pos -= player_camera.right() * movement;
             if (keyboard[alia::key::D])
                 player_camera.pos += player_camera.right() * movement;
-
-            ++fps_frames;
-            const double fps_elapsed = now - fps_window_start;
-            if (fps_elapsed >= 0.25) {
-                displayed_fps = static_cast<int>(fps_frames / fps_elapsed + 0.5);
-                fps_frames = 0;
-                fps_window_start = now;
-            }
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::black, 1.0f);
@@ -390,6 +377,8 @@ int main(int argc, char **argv) {
                 glyphs,
                 std::format("{} fps", displayed_fps));
             frame.present();
+            if (fps.count_frame())
+                displayed_fps = static_cast<int>(fps.interval().fps() + 0.5);
         }
     } catch (const std::exception &error) {
         std::cerr << "fpsmap example failed: " << error.what() << '\n';

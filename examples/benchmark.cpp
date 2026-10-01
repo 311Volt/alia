@@ -1,4 +1,4 @@
-#include "alia/core/get_time.hpp"
+#include "alia/core/timing.hpp"
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
@@ -19,22 +19,6 @@
 
 namespace {
 
-class avg {
-public:
-    void add(double value) {
-        sum_ += value;
-        ++count_;
-    }
-
-    [[nodiscard]] double value() const {
-        return count_ == 0 ? 0.0 : sum_ / static_cast<double>(count_);
-    }
-
-private:
-    double sum_ = 0.0;
-    std::uint64_t count_ = 0;
-};
-
 alia::gfx_backend requested_backend(int argc, char **argv) {
     if (argc < 2)
         return alia::gfx_backend::auto_;
@@ -50,7 +34,7 @@ alia::gfx_backend requested_backend(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     constexpr std::uint64_t benchmark_ticks = 700;
-    avg frame_times;
+    alia::frame_statistics measured;
     try {
         alia::window win(
             {800, 600},
@@ -73,10 +57,8 @@ int main(int argc, char **argv) {
         events.register_source(&win.get_event_source());
         std::random_device seed;
         std::mt19937_64 random(seed());
-        // NOTE (API feedback): tick and frame-time averaging are local because
-        // alia has no event-loop tick or FPS helpers.
-        std::uint64_t tick = 0;
-        double last_time = alia::get_time();
+        alia::frame_clock clock;
+        alia::fps_counter fps;
         bool running = true;
         while (running) {
             win.poll();
@@ -91,12 +73,7 @@ int main(int argc, char **argv) {
                     running = false;
             }
 
-            const double now = alia::get_time();
-            const double dt = now - last_time;
-            last_time = now;
-            ++tick;
-            if (tick > 1)
-                frame_times.add(dt);
+            const auto tick = clock.tick().tick;
             if (tick >= benchmark_ticks)
                 running = false;
 
@@ -131,18 +108,23 @@ int main(int argc, char **argv) {
                 std::format(
                     "tick={}, avg frametime: {:.9f} ms",
                     tick,
-                    1000.0 * frame_times.value()),
+                    1000.0 * fps.total().mean_frame_time()),
                 alia::pure_yellow);
             frame.present();
+            if (tick == 1)
+                fps.reset(); // Exclude the first completed frame as warm-up.
+            else
+                fps.count_frame();
         }
+        measured = fps.total();
     } catch (const std::exception &error) {
         std::cerr << "benchmark example failed: " << error.what() << '\n';
         return 1;
     }
 
     std::printf(
-        "average frametime over %llu ticks: %.9f ms\n",
-        static_cast<unsigned long long>(benchmark_ticks),
-        1000.0 * frame_times.value());
+        "average frametime over %llu measured frames: %.9f ms\n",
+        static_cast<unsigned long long>(measured.frames),
+        1000.0 * measured.mean_frame_time());
     return 0;
 }

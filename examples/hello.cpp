@@ -6,9 +6,9 @@
 #include "alia/gfx/bitmap/image_io.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/events/event_queue.hpp"
+#include "alia/core/timing.hpp"
 
 #include <array>
-#include <chrono>
 #include <exception>
 #include <iostream>
 #include <optional>
@@ -116,12 +116,10 @@ int main(int argc, char **argv) {
         const alia::vec2f transformed_center = transformed_rect.center();
 
         bool running = true;
-        const auto animation_start = std::chrono::steady_clock::now();
-        auto fps_window_start = animation_start;
-        int fps_frames = 0;
+        alia::frame_clock clock;
+        alia::fps_counter counter;
         while (running) {
             win.poll();
-            ++fps_frames;
             while (!events.empty()) {
                 const auto event = events.pop();
                 if (event.get_if<alia::window_close_event>()) running = false;
@@ -129,22 +127,7 @@ int main(int argc, char **argv) {
                 else if (const auto *key = event.get_if<alia::window_key_down_event>(); key && key->key == alia::key::escape) running = false;
             }
 
-            const auto now = std::chrono::steady_clock::now();
-            const float elapsed = std::chrono::duration<float>(now - animation_start).count();
-            const float fps_elapsed = std::chrono::duration<float>(now - fps_window_start).count();
-            if (fps_elapsed >= 1.0f) {
-                const int fps = static_cast<int>(static_cast<float>(fps_frames) / fps_elapsed + 0.5f);
-                if (fps_text)
-                    fps_text = alia::create_text_texture(
-                        device,
-                        *demo_font,
-                        "FPS: " + std::to_string(fps)
-                    );
-                const std::string title = "Hello ALIA — pipelines | FPS: " + std::to_string(fps);
-                win.set_title(title.c_str());
-                fps_window_start = now;
-                fps_frames = 0;
-            }
+            const float elapsed = static_cast<float>(clock.tick().elapsed);
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::light_blue);
@@ -228,6 +211,17 @@ int main(int argc, char **argv) {
             }
 
             frame.present();
+            if (counter.count_frame()) {
+                const int fps = static_cast<int>(counter.interval().fps() + 0.5);
+                if (fps_text)
+                    fps_text = alia::create_text_texture(
+                        device,
+                        *demo_font,
+                        "FPS: " + std::to_string(fps)
+                    );
+                const std::string title = "Hello ALIA — pipelines | FPS: " + std::to_string(fps);
+                win.set_title(title.c_str());
+            }
         }
     } catch (const std::exception &error) {
         std::cerr << "hello example failed: " << error.what() << '\n';

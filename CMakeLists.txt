@@ -66,6 +66,9 @@ endif()
 find_package(Freetype REQUIRED)
 target_link_libraries(alia PRIVATE Freetype::Freetype)
 
+find_package(Threads REQUIRED)
+target_link_libraries(alia PRIVATE Threads::Threads)
+
 target_include_directories(alia PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:include>)

@@ -1,4 +1,4 @@
-#include "alia/core/get_time.hpp"
+#include "alia/core/timing.hpp"
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/bitmap/image_io.hpp"
 #include "alia/gfx/bitmap/pixel_types.hpp"
@@ -107,9 +107,7 @@ int main(int argc, char **argv) {
 
         alia::vec2f text_position{320.0f, 240.0f};
         std::string text = "Click to move this text; use the arrow keys";
-        // NOTE (API feedback): tick and delta-time bookkeeping are application
-        // code because alia has no event-loop timing helpers.
-        std::uint64_t tick = 0;
+        alia::frame_clock clock;
         bool running = true;
         while (running) {
             win.poll();
@@ -136,7 +134,7 @@ int main(int argc, char **argv) {
                 }
             }
 
-            ++tick;
+            const auto tick = clock.tick().tick;
             const float max_width =
                 10.0f + (0.5f + 0.5f * std::sin(static_cast<float>(alia::get_time()))) * 300.0f;
             const std::string full_text = std::format("{}. tick={}", text, tick);

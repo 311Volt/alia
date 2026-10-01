@@ -6,9 +6,9 @@
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/transform.hpp"
 #include "alia/events/event_queue.hpp"
+#include "alia/core/timing.hpp"
 
 #include <array>
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <exception>
@@ -267,9 +267,6 @@ int main(int argc, char **argv) {
         bool running = true;
         bool use_buffered = true;
         int displayed_fps = 0;
-        int fps_frames = 0;
-        auto fps_window_start = std::chrono::steady_clock::now();
-        const auto start = std::chrono::steady_clock::now();
         std::string title;
         auto update_title = [&]() {
             title = make_title(use_buffered, displayed_fps, mesh.vertices.size(), mesh.indices.size());
@@ -278,9 +275,10 @@ int main(int argc, char **argv) {
 
         update_title();
 
+        alia::frame_clock clock;
+        alia::fps_counter fps;
         while (running) {
             win.poll();
-            ++fps_frames;
 
             while (!events.empty()) {
                 auto ev = events.pop();
@@ -298,15 +296,7 @@ int main(int argc, char **argv) {
                 }
             }
 
-            const auto now = std::chrono::steady_clock::now();
-            const float t = std::chrono::duration<float>(now - start).count();
-            const float fps_elapsed = std::chrono::duration<float>(now - fps_window_start).count();
-            if (fps_elapsed >= 1.0f) {
-                displayed_fps = static_cast<int>(static_cast<float>(fps_frames) / fps_elapsed + 0.5f);
-                fps_frames = 0;
-                fps_window_start = now;
-                update_title();
-            }
+            const float t = static_cast<float>(clock.tick().elapsed);
 
             const alia::transform projection = make_projection(win.size());
             const alia::transform model =
@@ -325,6 +315,10 @@ int main(int argc, char **argv) {
             else
                 frame.draw_indexed(vertex_span, index_span);
             frame.present();
+            if (fps.count_frame()) {
+                displayed_fps = static_cast<int>(fps.interval().fps() + 0.5);
+                update_title();
+            }
         }
     } catch (const std::exception &e) {
         std::cerr << "buffered mesh example failed: " << e.what() << '\n';

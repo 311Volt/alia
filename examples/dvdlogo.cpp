@@ -1,4 +1,4 @@
-#include "alia/core/get_time.hpp"
+#include "alia/core/timing.hpp"
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/bitmap/image_io.hpp"
 #include "alia/gfx/frame.hpp"
@@ -91,8 +91,7 @@ int main(int argc, char **argv) {
         alia::rect_f logo_rect =
             alia::rect_f::pos_size({40.0f, 70.0f}, {128.0f, 128.0f});
         alia::vec2f speed{256.0f, 256.0f};
-        // NOTE (API feedback): alia has no event-loop delta-time helper.
-        double last_time = alia::get_time();
+        alia::frame_clock clock;
         bool running = true;
         while (running) {
             win.poll();
@@ -107,9 +106,7 @@ int main(int argc, char **argv) {
                     running = false;
             }
 
-            const double now = alia::get_time();
-            const float dt = static_cast<float>(now - last_time);
-            last_time = now;
+            const float dt = static_cast<float>(clock.tick().delta);
             logo_rect.translate_inplace(speed * dt);
 
             const alia::rect_f screen = alia::rect_f::pos_size(
