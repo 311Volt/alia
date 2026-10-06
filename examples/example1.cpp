@@ -2,6 +2,7 @@
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/bitmap/image_io.hpp"
 #include "alia/gfx/bitmap/pixel_types.hpp"
+#include "alia/gfx/draw_texture.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
 #include "alia/gfx/pipeline.hpp"
@@ -11,7 +12,6 @@
 #include "alia/io/mouse.hpp"
 #include "alia/os/window.hpp"
 
-#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -23,21 +23,6 @@
 #include <string_view>
 
 namespace {
-
-// NOTE (API feedback): alia currently has no sprite or texture-blit helper.
-std::array<alia::uv_vertex, 6> textured_quad(
-    alia::rect_f dst,
-    alia::rect_f uv = {{0.0f, 0.0f}, {1.0f, 1.0f}}
-) {
-    return {{
-        {{dst.left(), dst.top()}, {uv.left(), uv.top()}},
-        {{dst.right(), dst.top()}, {uv.right(), uv.top()}},
-        {{dst.left(), dst.bottom()}, {uv.left(), uv.bottom()}},
-        {{dst.right(), dst.top()}, {uv.right(), uv.top()}},
-        {{dst.right(), dst.bottom()}, {uv.right(), uv.bottom()}},
-        {{dst.left(), dst.bottom()}, {uv.left(), uv.bottom()}},
-    }};
-}
 
 // Avoid rect::f32()/cast(), which currently depends on a missing vec2::cast().
 alia::rect_f to_rect_f(alia::rect_i value) {
@@ -92,11 +77,11 @@ int main(int argc, char **argv) {
         alia::hardware_glyph_buffer glyphs(device, font);
 
         alia::basic_effect prim_fx;
-        alia::basic_effect texture_fx{.texture_op = alia::texture_operation::replace};
+        alia::basic_effect texture_fx{.texture_op = alia::texture_operation::modulate};
         alia::basic_effect text_fx{.texture_op = alia::texture_operation::alpha_mask};
         auto prim_pipeline = alia::pipeline::create<alia::colored_vertex>(
             device, {.effect = &prim_fx});
-        auto texture_pipeline = alia::pipeline::create<alia::uv_vertex>(
+        auto texture_pipeline = alia::pipeline::create<alia::full_vertex>(
             device, {.effect = &texture_fx});
         auto text_pipeline = alia::pipeline::create<alia::full_vertex>(
             device, {.effect = &text_fx});
@@ -158,10 +143,13 @@ int main(int argc, char **argv) {
             texture_fx.world = alia::transform::identity();
             texture_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(texture_pipeline);
-            frame.set_texture(0, background, alia::linear_clamp);
-            const auto background_quad = textured_quad(alia::rect_f::pos_size(
-                {0.0f, 0.0f}, alia::vec2f(frame.target_size())));
-            frame.draw<alia::uv_vertex>(background_quad);
+            alia::draw_texture({
+                .target = frame,
+                .texture = background,
+                .texture_slot = 0,
+                .destination = alia::rect_f::pos_size(
+                    {0.0f, 0.0f}, alia::vec2f(frame.target_size()))
+            });
 
             // NOTE (API feedback): alia has no scoped world-transform helper.
             prim_fx.world = alia::transform::translate(text_position);

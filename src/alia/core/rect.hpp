@@ -231,6 +231,13 @@ using rect_i = rect<int>;
 using rect_f = rect<float>;
 using rect_d = rect<double>;
 
+/// A rectangle rotated about its center; positive radians rotate +x toward +y.
+struct rotated_rect_f {
+    vec2f center;
+    vec2f size;
+    float angle_rad = 0.0f;
+};
+
 } // namespace alia
 
 #endif /* RECT_FABC5EAE_D6A2_45E9_9565_1C2ECED7CA91 */

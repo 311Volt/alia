@@ -1,6 +1,7 @@
 #include "alia/core/timing.hpp"
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/bitmap/image_io.hpp"
+#include "alia/gfx/draw_texture.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
 #include "alia/gfx/pipeline.hpp"
@@ -8,28 +9,12 @@
 #include "alia/os/window.hpp"
 
 #include <algorithm>
-#include <array>
 #include <exception>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
 
 namespace {
-
-// NOTE (API feedback): alia currently has no sprite or texture-blit helper.
-std::array<alia::uv_vertex, 6> textured_quad(
-    alia::rect_f dst,
-    alia::rect_f uv = {{0.0f, 0.0f}, {1.0f, 1.0f}}
-) {
-    return {{
-        {{dst.left(), dst.top()}, {uv.left(), uv.top()}},
-        {{dst.right(), dst.top()}, {uv.right(), uv.top()}},
-        {{dst.left(), dst.bottom()}, {uv.left(), uv.bottom()}},
-        {{dst.right(), dst.top()}, {uv.right(), uv.top()}},
-        {{dst.right(), dst.bottom()}, {uv.right(), uv.bottom()}},
-        {{dst.left(), dst.bottom()}, {uv.left(), uv.bottom()}},
-    }};
-}
 
 // HYPOTHETICAL alia API: rect::test(rect) could expose these results directly.
 bool outside_x(alia::rect_f inner, alia::rect_f outer) {
@@ -81,8 +66,8 @@ int main(int argc, char **argv) {
             logo.generate_mipmaps();
         logo.set_sampler(alia::linear_clamp);
 
-        alia::basic_effect texture_fx{.texture_op = alia::texture_operation::replace};
-        auto texture_pipeline = alia::pipeline::create<alia::uv_vertex>(
+        alia::basic_effect texture_fx{.texture_op = alia::texture_operation::modulate};
+        auto texture_pipeline = alia::pipeline::create<alia::full_vertex>(
             device, {.effect = &texture_fx});
 
         alia::event_queue events;
@@ -121,9 +106,12 @@ int main(int argc, char **argv) {
             frame.clear(alia::color::from_rgba8(150, 180, 240));
             texture_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(texture_pipeline);
-            frame.set_texture(0, logo, alia::linear_clamp);
-            const auto quad = textured_quad(logo_rect);
-            frame.draw<alia::uv_vertex>(quad);
+            alia::draw_texture({
+                .target = frame,
+                .texture = logo,
+                .texture_slot = 0,
+                .destination = logo_rect
+            });
             frame.present();
         }
     } catch (const std::exception &error) {

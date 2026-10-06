@@ -6,7 +6,7 @@ The graphics subsystem in `src/alia/gfx/` follows a four-layer split.
 
 | Layer | Location | Role |
 |-------|----------|------|
-| L1 | `*.hpp` (public) | User-facing API: `texture`, `cube_texture`, `gfx_device`, `swapchain`, `framebuffer_config`, `pipeline`, `dynamic_pipeline`, `frame`, and the primitive renderer family |
+| L1 | `*.hpp` (public) | User-facing API: `texture`, `cube_texture`, `gfx_device`, `swapchain`, `framebuffer_config`, `pipeline`, `dynamic_pipeline`, `frame`, `draw_texture`, and the primitive renderer family |
 | L2 | `*.hpp` (detail/templates) | Type-erasure shims: `texture::lock<TPixel>` / `cube_texture::lock<TPixel>` → `lock_impl`, and `frame::draw<TVertex>` → L3 submission helpers |
 | L3 | `*.cpp` (backend-agnostic) | Device/pipeline/frame lifetime and validation, texture format dispatch, and vertex-definition registry; calls into L4 |
 | L4 | `graphics_backend_interface` | Single function-pointer table per device; one slot per backend operation |
@@ -45,6 +45,7 @@ src/alia/gfx/
   gfx_device.hpp / gfx_device.cpp  — L1/L3 for device, swapchain, and backend registry
   pipeline.hpp / pipeline.cpp      — L1/L3 immutable and dynamic pipeline objects
   frame.hpp / frame.cpp            — L1/L2/L3 frame lifetime, target/clear commands, and draw validation
+  draw_texture.hpp / .cpp          — L1/L3 immediate textured quads (pixel crops, anchors, tint, scaling, rotation)
   primitive_renderer.hpp          — header-only colored-primitive tessellation (batching + immediate)
   texture.hpp / texture.cpp        — L1/L2/L3 for texture (lock template, upload, download, clone)
   cube_texture.hpp / cube_texture.cpp — L1/L2/L3 for cube textures (face locks, upload, download, clone)
@@ -86,6 +87,10 @@ Primitive renderers own no device, effect, pipeline, or transform state. The cal
 
 Text drawing requires the caller to bind a `full_vertex` pipeline whose `basic_effect` uses `texture_operation::alpha_mask` and owns the projection. `draw_text` rebinds texture slot 0, whose binding persists for the frame, so callers relying on that slot must rebind it afterwards. `create_text_bitmap` rasterizes on the CPU into a gray8 `text_bitmap` carrying the offset of its top-left pixel from the layout origin; `create_text_texture` uploads it as an alpha-mask texture. Nothing caches: a caller whose string changes re-creates the texture. Drawing submits immediately: one indexed draw per atlas page touched for `hardware_glyph_buffer`, or one quad for a `text_texture`. Both `hardware_glyph_buffer` and `text_texture` must not outlive their device.
 
+`draw_texture` submits four tinted `full_vertex` vertices and six indices immediately through `frame::draw_indexed`. The caller supplies the pipeline, world/projection transforms, viewport, and blending. Fixed-function drawing requires a `full_vertex` pipeline with `texture_operation::modulate` and `.texture_slot = 0`; programmable drawing requires the shader to sample the explicitly selected slot. The helper binds that slot using the texture's stored sampler immediately before drawing, and the frame binding persists afterwards. Existing shader-owned sampler records still apply at draw time and may rebind the slot; callers must keep them consistent with the requested texture. `draw_texture_params` remains an aggregate, accepts integer slots directly, and requires an explicit slot at every callsite.
+
+Crops use level-zero texture pixels, retain fractional coordinates, and may extend outside the texture; UV normalization leaves clamp/repeat/mirror addressing to the sampler. A `vec2i` destination draws at the crop's native size and subtracts the named or custom pixel anchor from the destination; custom anchors may lie outside the crop. `rect_f` destinations stretch the crop, while `rotated_rect_f` destinations stretch and rotate about their center in radians using `transform::rotate`'s convention. Both rectangle destinations ignore the source anchor. Zero-width or zero-height crops/destinations return without binding or drawing. Inverted rectangles, negative rotated sizes, and non-finite geometry throw `std::invalid_argument` before binding.
+
 ## Adding a new backend operation
 
 1. Add a `graphics_backend_operation<R(Args...)>` slot to `graphics_backend_interface` in `graphics_backend_interface.hpp`. Cube creation and face locking use `create_cube_texture` and `cube_texture_lock`; the swapchain readback operations are `swapchain_properties` and `swapchain_present_region`.
@@ -95,4 +100,4 @@ Text drawing requires the caller to bind a `full_vertex` pipeline whose `basic_e
 
 ## The `slop` folder
 
-They contain AI-generated design documents. They may, or may not be in any way relevant to the current state of the repo. They may, or may not be in any way aligned with the user's intent. Only intentionally read documents from that folder if explicitly asked to / pointed at by the user.
+The folder contains AI-generated design documents. They may, or may not be in any way relevant to the current state of the repo. They may, or may not be in any way aligned with the user's intent. Only intentionally read documents from that folder if explicitly asked to / pointed at by the user.
