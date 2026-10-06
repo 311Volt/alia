@@ -71,6 +71,8 @@ namespace alia {
         ogl_device *owner = nullptr;
         void *surface = nullptr;
         vec2i size = {};
+        // FBOs are not shared between contexts, so each swapchain context
+        // keeps its own render-to-texture FBO.
         GLuint target_fbo = 0;
         framebuffer_properties props;
     };

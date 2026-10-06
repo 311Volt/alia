@@ -7,6 +7,7 @@
 
 namespace alia {
 
+    // Window-system hooks (WGL on Win32) used only by the OpenGL backend.
     struct ogl_platform_ops {
         void *(*create_context)();
         void (*destroy_context)(void *ctx);

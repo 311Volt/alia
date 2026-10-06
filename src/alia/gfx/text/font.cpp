@@ -35,6 +35,7 @@ namespace alia {
         // produce sampling artifacts.
         constexpr int glyph_atlas_border_size = 1;
         constexpr int text_texture_border = 1;
+        constexpr float tab_width_in_spaces = 4.0f;
 
         void copy_bitmap_coverage(const FT_Bitmap &bitmap, std::vector<unsigned char> &out) {
             const int width = static_cast<int>(bitmap.width);
@@ -277,7 +278,7 @@ namespace alia {
                 }
                 if (cp == '\t') {
                     const glyph_metrics space = source.get_glyph_metrics(' ');
-                    pen_x += space.advance * 4.0f;
+                    pen_x += space.advance * tab_width_in_spaces;
                     previous = 0;
                     continue;
                 }
@@ -560,6 +561,47 @@ namespace alia {
             width,
             source.metrics().line_height * static_cast<float>(line_widths.size()),
         };
+    }
+
+    std::size_t font::cutoff_point(std::string_view text, float max_width, bool use_kerning) {
+        if (std::isnan(max_width))
+            throw std::invalid_argument("font::cutoff_point: max_width must not be NaN");
+        if (max_width < 0.0f)
+            return 0;
+
+        // Same line rules as walk_text, stopping before the first overflow.
+        float pen_x = 0.0f;
+        uint32_t previous = 0;
+
+        std::size_t offset = 0;
+        while (offset < text.size()) {
+            const std::size_t start = offset;
+            const uint32_t cp = utf8_read_next_codepoint(text, offset).value_or(utf8_replacement_codepoint);
+            if (cp == '\r')
+                continue;
+            if (cp == '\n') {
+                pen_x = 0.0f;
+                previous = 0;
+                continue;
+            }
+
+            float next_x = pen_x;
+            if (cp == '\t') {
+                next_x += get_glyph_metrics(' ').advance * tab_width_in_spaces;
+                previous = 0;
+            } else {
+                if (use_kerning)
+                    next_x += kerning(previous, cp);
+                next_x += get_glyph_metrics(cp).advance;
+                previous = cp;
+            }
+
+            if (next_x > max_width)
+                return start;
+            pen_x = next_x;
+        }
+
+        return text.size();
     }
 
     void draw_text(const draw_text_params &params) {

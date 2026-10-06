@@ -20,6 +20,7 @@ namespace alia {
 
     // A frame owns all drawing state for one swapchain update. It starts on
     // the backbuffer with no implicit clear; targets and clears are commands.
+    // Texture bindings persist for the frame across pipeline switches.
     class frame {
     public:
         frame() = delete;
@@ -32,12 +33,17 @@ namespace alia {
         // Select the swapchain backbuffer (which may have a depth attachment).
         void set_target();
         // Select a render-target texture mip level (which has no depth attachment).
+        // Frame bindings of the texture are removed first; shader-owned samplers
+        // must avoid sampling it themselves.
         void set_target(texture &, int level = 0);
-        // Select one face and mip level of a render-target cube texture.
+        // Select one face and mip level of a render-target cube texture, with
+        // the same depth and binding rules as the texture overload.
         void set_target(cube_texture &, cube_face, int level = 0);
         // Clear either attachment. A depth clear is valid only on the backbuffer.
         void clear(std::optional<color> color = {}, std::optional<float> depth = {});
 
+        // Required before the first draw. Depth-enabled pipelines need a target
+        // with depth; dynamic pipelines are re-checked and rebound before every draw.
         void set_pipeline(pipeline &);
         void set_texture(int slot, texture &tex);
         void set_texture(int slot, texture &tex, const sampler_state &sampler);

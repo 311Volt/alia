@@ -57,6 +57,8 @@ namespace alia {
 
     private:
         device_handle *device_ = nullptr;
+        // Heap-allocated so the raw aliases held by device-owned objects
+        // survive moves of the device.
         std::unique_ptr<graphics_backend_interface> backend_;
         explicit gfx_device(device_handle *device, std::unique_ptr<graphics_backend_interface> backend) noexcept
             : device_(device), backend_(std::move(backend)) {}
@@ -71,6 +73,7 @@ namespace alia {
         swapchain(const swapchain &) = delete;
         swapchain &operator=(const swapchain &) = delete;
 
+        // The frame ends with frame::present or, without presenting, its destructor.
         [[nodiscard]] frame begin_frame();
         void on_resize(vec2i new_size);
         [[nodiscard]] bool valid() const noexcept { return handle_ != nullptr; }

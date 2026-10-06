@@ -337,6 +337,9 @@ namespace alia {
 
     // These mesh-only renderers never bind a pipeline or modify an effect;
     // input coordinates remain in world space for the caller's transform.
+    // The caller binds a colored_vertex pipeline and owns its basic_effect,
+    // re-deriving the projection after every frame::set_target (ortho_ui for
+    // UI, perspective_fov for 3D).
     // These CRTP-like methods use the concrete explicit-object type as their
     // sink. Calling through generic_primitive_renderer& therefore fails the
     // primitive_sink constraint. Calling an immediate renderer through a
@@ -417,6 +420,7 @@ namespace alia {
         }
     };
 
+    // Batches geometry until flush; anything not flushed is never drawn.
     class primitive_renderer : public generic_primitive_renderer {
     public:
         void append_vertices(std::span<const colored_vertex> vertices) {
@@ -452,6 +456,7 @@ namespace alia {
         std::vector<uint32_t> indices_;
     };
 
+    // Flushes after every primitive.
     class immediate_primitive_renderer : public primitive_renderer {
     public:
         void finish_primitive(frame &target) {

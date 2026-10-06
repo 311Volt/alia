@@ -30,6 +30,9 @@ namespace alia {
     template <class R, class... Args>
     struct gfx_backend_op;
 
+    // One backend operation slot. A null operation means the hardware lacks
+    // the feature (probed at device creation), never that the backend has not
+    // implemented it yet; reason_unsupported then says why.
     template <class R, class... Args>
     struct gfx_backend_op<R(Args...)> {
         R (*operation)(Args...) = nullptr;
@@ -47,7 +50,9 @@ namespace alia {
     };
 
     // Opaque bases. Concrete backend handles inherit these types and are only
-    // downcast inside their own backend implementation files.
+    // downcast inside their own backend implementation files. 2D and cube
+    // textures share texture_handle; concrete texture records carry their kind
+    // and shared texture operations dispatch on it.
     struct device_handle {};
     struct texture_handle {};
     struct vertex_buffer_handle {};
@@ -190,7 +195,7 @@ namespace alia {
         vec2i extent;
         int stride_bytes = 0;
         int level = 0;
-        int face = 0;
+        int face = 0; // Locked cube face; zero for 2D textures.
         std::byte *data = nullptr;
     };
     struct buffer_lock_info {
@@ -263,6 +268,8 @@ namespace alia {
     struct raster_state {
         cull_mode cull = cull_mode::none;
     };
+    // Fixed-function effect. Pipelines reference it without owning it and
+    // backends read the matrices at draw time, so changes apply to later draws.
     struct basic_effect {
         texture_operation texture_op = texture_operation::vertex_color;
         lighting_mode lighting = lighting_mode::unlit;
@@ -292,13 +299,17 @@ namespace alia {
         swapchain_handle *swapchain = nullptr;
         texture_handle *target_texture = nullptr;
         int target_level = 0;
-        int target_face = 0;
+        int target_face = 0; // Selected cube face; zero otherwise.
         vec2i target_size = {};
     };
 
+    // One instance per gfx_device. Device-owned objects keep a raw pointer to
+    // it, so the device must outlive them.
+    //
     // Bind and upload operations are record-only. Backends consume their
     // recorded sources at draw time. Transient data remains valid through the
-    // next same-kind bind/upload or swapchain_end_frame.
+    // next same-kind bind/upload or swapchain_end_frame; L3 enforces this, and
+    // every backend clears the recorded sources at frame end.
     struct graphics_backend_interface {
         gfx_backend id = gfx_backend::auto_;
         vec2f pixel_center_offset = {};
@@ -371,10 +382,13 @@ namespace alia {
 
     struct created_device {
         device_handle *handle = nullptr;
+        // Not "interface": that is a macro in MinGW's COM headers.
         graphics_backend_interface iface;
     };
     struct gfx_backend_factory {
         gfx_backend id;
+        // Selects an adapter and render method, creates the device, probes
+        // capabilities, and builds the full interface in one call.
         created_device (*create)(const gfx_device_config &);
     };
     void register_gfx_backend(gfx_backend_factory factory);

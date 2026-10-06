@@ -21,10 +21,14 @@ namespace alia {
         frame &target;
         alia::texture &texture;
         detail::required_texture_slot texture_slot;
-        // Level-zero pixels; crops may extend beyond the texture's bounds.
+        // Level-zero pixels, fractions kept; crops may extend beyond the
+        // texture's bounds, leaving addressing to the sampler's wrap mode.
         std::variant<detail::full_rect_t, rect_f> source_crop_rect = full_rect;
-        // Used only for vec2i destinations; vectors are pixels from the crop's top-left.
+        // Used only for vec2i destinations; vectors are pixels from the crop's
+        // top-left and may lie outside the crop.
         std::variant<draw_anchor, vec2f> source_anchor = draw_anchor::top_left;
+        // vec2i draws the crop at native size with source_anchor placed there.
+        // rect_f stretches the crop; rotated_rect_f also rotates it.
         std::variant<vec2i, rect_f, rotated_rect_f> destination;
         color tint = white;
     };
@@ -33,7 +37,8 @@ namespace alia {
     // viewport, and blending. Fixed-function drawing requires modulate and slot 0;
     // shaders must sample the explicit slot (stored shader samplers still apply).
     // Bind the texture with its stored sampler; the binding persists after drawing.
-    // Empty geometry leaves bindings untouched. Invalid geometry throws
+    // Zero-width or zero-height geometry leaves bindings untouched. Inverted
+    // rectangles, negative rotated sizes, and non-finite geometry throw
     // std::invalid_argument before binding.
     void draw_texture(const draw_texture_params &);
 } // namespace alia

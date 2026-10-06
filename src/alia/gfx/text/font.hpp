@@ -7,6 +7,7 @@
 #include "alia/gfx/bitmap/bitmap.hpp"
 #include "alia/gfx/draw_common.hpp"
 #include "alia/gfx/texture.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string_view>
@@ -47,6 +48,18 @@ namespace alia {
         [[nodiscard]] virtual glyph_metrics get_glyph_metrics(uint32_t codepoint) = 0;
         [[nodiscard]] virtual rendered_glyph render_glyph(uint32_t codepoint) = 0;
         [[nodiscard]] virtual float kerning(uint32_t left, uint32_t right) const = 0;
+
+        // Byte offset at which to cut text so that measure_text of the prefix
+        // is at most max_width wide: the start of the first codepoint whose
+        // advance would carry its line past max_width, or text.size() if all
+        // of it fits. Newlines start a fresh line, so multi-line text is cut
+        // where any line first overflows. A negative max_width returns 0; NaN
+        // throws std::invalid_argument.
+        [[nodiscard]] std::size_t cutoff_point(
+            std::string_view text,
+            float max_width,
+            bool use_kerning = true
+        );
     };
 
     namespace detail {
@@ -77,6 +90,8 @@ namespace alia {
         std::unique_ptr<detail::ttf_font_impl> impl_;
     };
 
+    // Gray8 glyph atlas pages on the GPU, filled on demand. Must not outlive
+    // its device.
     class hardware_glyph_buffer {
     public:
         hardware_glyph_buffer(gfx_device &device, font &source, vec2i page_size = {1024, 1024});
@@ -120,6 +135,8 @@ namespace alia {
     };
 
     // GPU counterpart: mask is an alpha_mask texture with a clamp sampler.
+    // Nothing caches it; re-create it when the string changes. Must not
+    // outlive its device.
     struct text_texture {
         texture mask;
         vec2i offset;
@@ -128,6 +145,8 @@ namespace alia {
 
     [[nodiscard]] ttf_font load_ttf_font(std::string_view filename, int pixel_height = 32);
 
+    // Size of the layout box: from the top-left of the first line box to
+    // {widest line, line_height * line_count}. Its top-left is the layout origin.
     [[nodiscard]] vec2f measure_text(font &source, std::string_view text, bool kerning = true);
 
     [[nodiscard]] text_bitmap create_text_bitmap(
@@ -178,6 +197,8 @@ namespace alia {
     // texture_operation::alpha_mask and owns the projection. Fixed-function
     // drawing requires slot 0; shaders must sample the explicit slot. Both bind
     // the slot and submit immediately; the binding persists after drawing.
+    // draw_text lays out the whole string first and issues one indexed draw
+    // per atlas page touched; draw_text_texture draws one quad.
     // Empty text leaves bindings untouched. A non-finite position or anchor
     // throws std::invalid_argument before binding.
     void draw_text(const draw_text_params &);

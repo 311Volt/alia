@@ -19,6 +19,8 @@ namespace alia {
 
     class frame;
 
+    // Immutable vertex layout, effect/program selection, and blend/depth/raster
+    // state. Drawing a different vertex type through it throws.
     class pipeline {
     public:
         pipeline() = delete;
@@ -58,6 +60,9 @@ namespace alia {
         friend class frame;
     };
 
+    // Same backend object as pipeline, but mutable. The frame rebinds it before
+    // every draw, so changes take effect at draw granularity; its vertex layout
+    // follows the vertex type being drawn.
     class dynamic_pipeline : public pipeline {
     public:
         dynamic_pipeline() = delete;

@@ -66,21 +66,22 @@ struct rect {
 
     /**
      * @brief Converts the rectangle to a different coordinate type.
+     * Each corner is converted with vec2::as (float to integer truncates toward zero).
      * @tparam U The target numeric type.
      * @return A rectangle with coordinates cast to U.
      */
     template <typename U>
-    [[nodiscard]] constexpr rect<U> cast() const {
-        return rect<U>(p1.template cast<U>(), p2.template cast<U>());
+    [[nodiscard]] constexpr rect<U> as() const {
+        return rect<U>(p1.template as<U>(), p2.template as<U>());
     }
 
     /// Convenience helpers for casting.
-    [[nodiscard]] constexpr rect<float> f32() const { return cast<float>(); }
-    [[nodiscard]] constexpr rect<double> f64() const { return cast<double>(); }
-    [[nodiscard]] constexpr rect<int32_t> i32() const { return cast<int32_t>(); }
-    [[nodiscard]] constexpr rect<uint32_t> u32() const { return cast<uint32_t>(); }
-    [[nodiscard]] constexpr rect<int64_t> i64() const { return cast<int64_t>(); }
-    [[nodiscard]] constexpr rect<uint64_t> u64() const { return cast<uint64_t>(); }
+    [[nodiscard]] constexpr rect<float> f32() const { return as<float>(); }
+    [[nodiscard]] constexpr rect<double> f64() const { return as<double>(); }
+    [[nodiscard]] constexpr rect<int32_t> i32() const { return as<int32_t>(); }
+    [[nodiscard]] constexpr rect<uint32_t> u32() const { return as<uint32_t>(); }
+    [[nodiscard]] constexpr rect<int64_t> i64() const { return as<int64_t>(); }
+    [[nodiscard]] constexpr rect<uint64_t> u64() const { return as<uint64_t>(); }
 
     /**
      * @brief Calculates the center of the rectangle.

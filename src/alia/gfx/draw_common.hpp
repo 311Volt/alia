@@ -13,6 +13,8 @@ namespace alia {
     };
 
     namespace detail {
+        // Texture slot member of draw-helper params. It has no default, so
+        // aggregate initialization requires an explicit slot at every callsite.
         struct required_texture_slot {
             int value;
             required_texture_slot() = delete;

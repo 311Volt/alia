@@ -365,6 +365,9 @@ namespace alia {
             delete context;
         }
 
+        // Each swapchain gets its own HGLRC sharing objects with the root
+        // dummy-window context. A window's first swapchain fixes its pixel
+        // format; later swapchains for the same window reuse it.
         void *win32_ogl_create_surface(
             void *native_handle,
             void *root_ctx,

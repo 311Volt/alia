@@ -16,6 +16,10 @@ struct vec2 {
     template <typename U>
     explicit constexpr vec2(const vec2<U>& v) : x(static_cast<T>(v.x)), y(static_cast<T>(v.y)) {}
 
+    /// Converts each component with static_cast (float to integer truncates toward zero).
+    template <typename U>
+    [[nodiscard]] constexpr vec2<U> as() const { return vec2<U>(static_cast<U>(x), static_cast<U>(y)); }
+
     template <typename U = T, typename ResultT = typename detail::square_type_trait<U>::type>
     [[nodiscard]] constexpr ResultT length_squared() const {
         return static_cast<ResultT>(x) * static_cast<ResultT>(x) + static_cast<ResultT>(y) * static_cast<ResultT>(y);
@@ -56,6 +60,12 @@ struct vec3 {
     constexpr vec3(T x, T y, T z) : x(x), y(y), z(z) {}
     template <typename U>
     explicit constexpr vec3(const vec3<U>& v) : x(static_cast<T>(v.x)), y(static_cast<T>(v.y)), z(static_cast<T>(v.z)) {}
+
+    /// Converts each component with static_cast (float to integer truncates toward zero).
+    template <typename U>
+    [[nodiscard]] constexpr vec3<U> as() const {
+        return vec3<U>(static_cast<U>(x), static_cast<U>(y), static_cast<U>(z));
+    }
 
     template <typename U = T, typename ResultT = typename detail::square_type_trait<U>::type>
     [[nodiscard]] constexpr ResultT dot(const vec3& other) const {
@@ -112,6 +122,12 @@ struct vec4 {
     constexpr vec4(T x, T y, T z, T w) : x(x), y(y), z(z), w(w) {}
     template <typename U>
     explicit constexpr vec4(const vec4<U>& v) : x(static_cast<T>(v.x)), y(static_cast<T>(v.y)), z(static_cast<T>(v.z)), w(static_cast<T>(v.w)) {}
+
+    /// Converts each component with static_cast (float to integer truncates toward zero).
+    template <typename U>
+    [[nodiscard]] constexpr vec4<U> as() const {
+        return vec4<U>(static_cast<U>(x), static_cast<U>(y), static_cast<U>(z), static_cast<U>(w));
+    }
 
     template <typename U = T, typename ResultT = typename detail::square_type_trait<U>::type>
     [[nodiscard]] constexpr ResultT length_squared() const {

@@ -13,7 +13,6 @@
 #include "alia/os/window.hpp"
 
 #include <cmath>
-#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <format>
@@ -23,24 +22,6 @@
 #include <string_view>
 
 namespace {
-
-// Avoid rect::f32()/cast(), which currently depends on a missing vec2::cast().
-alia::rect_f to_rect_f(alia::rect_i value) {
-    return {alia::vec2f(value.p1), alia::vec2f(value.p2)};
-}
-
-// HYPOTHETICAL alia API: font::cutoff_point(text, max_width).
-std::size_t cutoff_index(alia::font &font, std::string_view text, float max_width) {
-    float width = 0.0f;
-    for (std::size_t i = 0; i < text.size(); ++i) {
-        const auto codepoint = static_cast<unsigned char>(text[i]);
-        const float next_width = width + font.get_glyph_metrics(codepoint).advance;
-        if (next_width > max_width)
-            return i;
-        width = next_width;
-    }
-    return text.size();
-}
 
 template <class LockedRegion>
 void paint_green(LockedRegion &locked) {
@@ -104,7 +85,7 @@ int main(int argc, char **argv) {
                     swapchain.on_resize(resize->new_size);
                 } else if (const auto *mouse = event.get_if<alia::mouse_button_down_event>();
                            mouse && mouse->button == alia::mouse_button::left) {
-                    text_position = alia::vec2f(mouse->position);
+                    text_position = mouse->position.as<float>();
                 } else if (const auto *key = event.get_if<alia::window_key_down_event>()) {
                     if (key->key == alia::key::escape)
                         running = false;
@@ -124,7 +105,7 @@ int main(int argc, char **argv) {
                 10.0f + (0.5f + 0.5f * std::sin(static_cast<float>(alia::get_time()))) * 300.0f;
             const std::string full_text = std::format("{}. tick={}", text, tick);
             const std::string visible_text =
-                full_text.substr(0, cutoff_index(font, full_text, max_width));
+                full_text.substr(0, font.cutoff_point(full_text, max_width));
 
             const int x = static_cast<int>(tick % static_cast<std::uint64_t>(background.width() - 10));
             const int y = static_cast<int>(tick % static_cast<std::uint64_t>(background.height() - 10));
@@ -148,7 +129,7 @@ int main(int argc, char **argv) {
                 .texture = background,
                 .texture_slot = 0,
                 .destination = alia::rect_f::pos_size(
-                    {0.0f, 0.0f}, alia::vec2f(frame.target_size()))
+                    {0.0f, 0.0f}, frame.target_size().as<float>())
             });
 
             // NOTE (API feedback): alia has no scoped world-transform helper.
@@ -176,9 +157,9 @@ int main(int argc, char **argv) {
             const alia::rect_i r2 = alia::rect_i::pos_size({70, 30}, {80, 80});
             prim_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(prim_pipeline);
-            renderer.draw_rect(frame, to_rect_f(r1), alia::blue);
-            renderer.draw_rect(frame, to_rect_f(r2), alia::blue);
-            renderer.draw_rect(frame, to_rect_f(r1.union_with(r2)), alia::magenta);
+            renderer.draw_rect(frame, r1.as<float>(), alia::blue);
+            renderer.draw_rect(frame, r2.as<float>(), alia::blue);
+            renderer.draw_rect(frame, r1.union_with(r2).as<float>(), alia::magenta);
             for (int i = 0; i < 16; ++i) {
                 renderer.fill_rect(
                     frame,
