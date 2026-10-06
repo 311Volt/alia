@@ -8,33 +8,12 @@
 #include "alia/gfx/texture.hpp"
 #include "alia/os/window.hpp"
 
-#include <algorithm>
 #include <exception>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
 
 namespace {
-
-// HYPOTHETICAL alia API: rect::test(rect) could expose these results directly.
-bool outside_x(alia::rect_f inner, alia::rect_f outer) {
-    return inner.left() < outer.left() || inner.right() > outer.right();
-}
-
-bool outside_y(alia::rect_f inner, alia::rect_f outer) {
-    return inner.top() < outer.top() || inner.bottom() > outer.bottom();
-}
-
-// HYPOTHETICAL alia API: rect::clamp(rect).
-alia::rect_f clamp_inside(alia::rect_f inner, alia::rect_f outer) {
-    const float max_x = (std::max)(outer.left(), outer.right() - inner.width());
-    const float max_y = (std::max)(outer.top(), outer.bottom() - inner.height());
-    const alia::vec2f position{
-        std::clamp(inner.left(), outer.left(), max_x),
-        std::clamp(inner.top(), outer.top(), max_y),
-    };
-    return alia::rect_f::pos_size(position, inner.size());
-}
 
 alia::gfx_backend requested_backend(int argc, char **argv) {
     if (argc < 2)
@@ -96,11 +75,12 @@ int main(int argc, char **argv) {
 
             const alia::rect_f screen = alia::rect_f::pos_size(
                 {0.0f, 0.0f}, alia::vec2f(swapchain.size()));
-            if (outside_x(logo_rect, screen))
+            const auto bounds = screen.test_rect(logo_rect);
+            if (bounds.x_outside())
                 speed.x *= -1.0f;
-            if (outside_y(logo_rect, screen))
+            if (bounds.y_outside())
                 speed.y *= -1.0f;
-            logo_rect = clamp_inside(logo_rect, screen);
+            logo_rect.clamp_inside_inplace(screen);
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::color::from_rgba8(150, 180, 240));

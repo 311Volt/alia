@@ -129,6 +129,36 @@ struct rect {
     }
 
     /**
+     * @brief Result of a rectangle-rectangle bounds test.
+     */
+    struct rect_test_result {
+        bool x_low;  ///< Other rectangle extends left of p1.x
+        bool x_high; ///< Other rectangle extends right of p2.x
+        bool y_low;  ///< Other rectangle extends above p1.y
+        bool y_high; ///< Other rectangle extends below p2.y
+
+        /// Other rectangle extends past the left or right edge.
+        [[nodiscard]] constexpr bool x_outside() const { return x_low || x_high; }
+        /// Other rectangle extends past the top or bottom edge.
+        [[nodiscard]] constexpr bool y_outside() const { return y_low || y_high; }
+        /// Other rectangle extends past any edge.
+        [[nodiscard]] constexpr bool outside() const { return x_outside() || y_outside(); }
+    };
+
+    /**
+     * @brief Tests which edges of this rectangle another rectangle extends past.
+     * Touching an edge does not count as extending past it.
+     */
+    [[nodiscard]] constexpr rect_test_result test_rect(const rect& other) const {
+        return {
+            other.p1.x < p1.x,
+            other.p2.x > p2.x,
+            other.p1.y < p1.y,
+            other.p2.y > p2.y
+        };
+    }
+
+    /**
      * @brief Checks if a point is inside the rectangle.
      * Includes left/top edges, excludes right/bottom edges.
      */
@@ -187,6 +217,27 @@ struct rect {
     [[nodiscard]] constexpr rect translated(vec2<T> offset) const {
         rect r = *this;
         r.translate_inplace(offset);
+        return r;
+    }
+
+    /**
+     * @brief Moves the rectangle, keeping its size, so that it lies within bounds.
+     * On an axis where the rectangle is larger than bounds, it is aligned to bounds' p1.
+     */
+    constexpr void clamp_inside_inplace(const rect& bounds) {
+        const vec2<T> sz = size();
+        const T max_x = (std::max)(bounds.p1.x, bounds.p2.x - sz.x);
+        const T max_y = (std::max)(bounds.p1.y, bounds.p2.y - sz.y);
+        p1 = vec2<T>(std::clamp(p1.x, bounds.p1.x, max_x), std::clamp(p1.y, bounds.p1.y, max_y));
+        p2 = p1 + sz;
+    }
+
+    /**
+     * @brief Returns a copy of the rectangle moved, keeping its size, to lie within bounds.
+     */
+    [[nodiscard]] constexpr rect clamped_inside(const rect& bounds) const {
+        rect r = *this;
+        r.clamp_inside_inplace(bounds);
         return r;
     }
 
