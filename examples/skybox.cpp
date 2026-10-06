@@ -334,12 +334,16 @@ int main(int argc, char **argv) {
                 "uploaded sky", "rendered faces", "copied faces"};
             text_effect.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
-            alia::draw_text(
-                frame, {14.0f, 14.0f}, glyphs,
-                std::format(
+            alia::draw_text({
+                .target = frame,
+                .glyphs = glyphs,
+                .text = std::format(
                     "{} | animated face {} | Space: source  L: stamp +Z  arrows/mouse: look",
                     labels[static_cast<std::size_t>(active_texture)], animated_face),
-                alia::white);
+                .texture_slot = 0,
+                .position = {14.0f, 14.0f},
+                .tint = alia::white
+            });
             frame.present();
         }
     } catch (const std::exception &error) {

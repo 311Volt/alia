@@ -5,15 +5,18 @@
 #include "alia/core/rect.hpp"
 #include "alia/core/vec.hpp"
 #include "alia/gfx/bitmap/bitmap.hpp"
+#include "alia/gfx/draw_common.hpp"
 #include "alia/gfx/texture.hpp"
 #include <cstdint>
 #include <memory>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 namespace alia {
 
     class frame;
+    struct draw_text_params;
 
     struct font_metrics {
         float ascender = 0.0f;
@@ -88,13 +91,7 @@ namespace alia {
         void clear();
 
     private:
-        friend void draw_text(
-            frame &target,
-            vec2f position,
-            hardware_glyph_buffer &buffer,
-            std::string_view value,
-            color text_color
-        );
+        friend void draw_text(const draw_text_params &);
 
         std::unique_ptr<detail::hardware_glyph_buffer_impl> impl_;
     };
@@ -112,18 +109,21 @@ namespace alia {
     };
 
     // CPU-rasterized text. coverage is a gray_u8 alpha mask. offset is where
-    // its top-left pixel lands relative to the layout origin (the position
-    // later passed to draw_text). It is at most {-1, -1} because of the 1px
-    // transparent border, and smaller when glyphs overhang the layout box.
+    // its top-left pixel lands relative to the layout origin (the top-left of
+    // the layout box). It is at most {-1, -1} because of the 1px transparent
+    // border, and smaller when glyphs overhang the layout box. layout_size is
+    // the layout box itself, as measure_text reports it.
     struct text_bitmap {
         bitmap coverage;
         vec2i offset;
+        vec2f layout_size;
     };
 
     // GPU counterpart: mask is an alpha_mask texture with a clamp sampler.
     struct text_texture {
         texture mask;
         vec2i offset;
+        vec2f layout_size;
     };
 
     [[nodiscard]] ttf_font load_ttf_font(std::string_view filename, int pixel_height = 32);
@@ -149,17 +149,39 @@ namespace alia {
         const text_raster_options &options = {}
     );
 
+    struct draw_text_params {
+        frame &target;
+        hardware_glyph_buffer &glyphs;
+        std::string_view text;
+        detail::required_texture_slot texture_slot;
+        vec2f position;
+        // Point of the layout box (measure_text's size) placed at position;
+        // vectors are pixels from the box's top-left.
+        std::variant<draw_anchor, vec2f> anchor = draw_anchor::top_left;
+        // Horizontal placement of each line within the layout box.
+        text_align align = text_align::left;
+        color tint = white;
+    };
+
+    struct draw_text_texture_params {
+        frame &target;
+        text_texture &texture;
+        detail::required_texture_slot texture_slot;
+        vec2f position;
+        // Point of texture.layout_size placed at position; vectors are pixels
+        // from the box's top-left. Alignment is baked in by create_text_bitmap.
+        std::variant<draw_anchor, vec2f> anchor = draw_anchor::top_left;
+        color tint = white;
+    };
+
     // The caller binds a full_vertex pipeline whose basic_effect uses
-    // texture_operation::alpha_mask and owns the projection. These overloads
-    // rebind texture slot 0 and submit immediately.
-    void draw_text(
-        frame &target,
-        vec2f position,
-        hardware_glyph_buffer &buffer,
-        std::string_view value,
-        color text_color = white
-    );
-    void draw_text(frame &target, vec2f position, text_texture &value, color text_color = white);
+    // texture_operation::alpha_mask and owns the projection. Fixed-function
+    // drawing requires slot 0; shaders must sample the explicit slot. Both bind
+    // the slot and submit immediately; the binding persists after drawing.
+    // Empty text leaves bindings untouched. A non-finite position or anchor
+    // throws std::invalid_argument before binding.
+    void draw_text(const draw_text_params &);
+    void draw_text_texture(const draw_text_texture_params &);
 
 } // namespace alia
 

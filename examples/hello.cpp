@@ -189,25 +189,39 @@ int main(int argc, char **argv) {
 
             text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
-            if (demo_text)
-                alia::draw_text(frame, {310.0f, 58.0f}, *demo_text);
-            if (demo_numbers) {
-                alia::draw_text(
-                    frame,
-                    {310.0f, 98.0f},
-                    *demo_numbers,
-                    alia::color(0.05f, 0.08f, 0.12f, 1.0f)
-                );
+            if (demo_text) {
+                alia::draw_text_texture({
+                    .target = frame,
+                    .texture = *demo_text,
+                    .texture_slot = 0,
+                    .position = {310.0f, 58.0f}
+                });
             }
-            if (fps_text)
-                alia::draw_text(frame, {10.0f, 10.0f}, *fps_text);
+            if (demo_numbers) {
+                alia::draw_text_texture({
+                    .target = frame,
+                    .texture = *demo_numbers,
+                    .texture_slot = 0,
+                    .position = {310.0f, 98.0f},
+                    .tint = alia::color(0.05f, 0.08f, 0.12f, 1.0f)
+                });
+            }
+            if (fps_text) {
+                alia::draw_text_texture({
+                    .target = frame,
+                    .texture = *fps_text,
+                    .texture_slot = 0,
+                    .position = {10.0f, 10.0f}
+                });
+            }
             if (glyph_cache) {
-                alia::draw_text(
-                    frame,
-                    {310.0f, 138.0f},
-                    *glyph_cache,
-                    "immediate atlas path (hardware_glyph_buffer)"
-                );
+                alia::draw_text({
+                    .target = frame,
+                    .glyphs = *glyph_cache,
+                    .text = "immediate atlas path (hardware_glyph_buffer)",
+                    .texture_slot = 0,
+                    .position = {310.0f, 138.0f}
+                });
             }
 
             frame.present();

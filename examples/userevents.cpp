@@ -116,18 +116,25 @@ int main(int argc, char **argv) {
             text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
 
-            constexpr std::string_view heading = "Press A or Z to emit events";
-            const float heading_width = alia::measure_text(font, heading).x;
-            alia::draw_text(
-                frame,
-                {(static_cast<float>(frame.target_size().x) - heading_width) * 0.5f, 10.0f},
-                glyphs,
-                heading);
+            alia::draw_text({
+                .target = frame,
+                .glyphs = glyphs,
+                .text = "Press A or Z to emit events",
+                .texture_slot = 0,
+                .position = {static_cast<float>(frame.target_size().x) * 0.5f, 10.0f},
+                .anchor = alia::draw_anchor::top_center
+            });
 
             float y = 50.0f;
             const float line_step = font.metrics().line_height + 3.0f;
             for (const std::string &line : messages) {
-                alia::draw_text(frame, {50.0f, y}, glyphs, line);
+                alia::draw_text({
+                    .target = frame,
+                    .glyphs = glyphs,
+                    .text = line,
+                    .texture_slot = 0,
+                    .position = {50.0f, y}
+                });
                 y += line_step;
             }
 

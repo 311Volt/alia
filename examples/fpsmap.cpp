@@ -371,11 +371,13 @@ int main(int argc, char **argv) {
 
             text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
-            alia::draw_text(
-                frame,
-                {15.0f, 15.0f},
-                glyphs,
-                std::format("{} fps", displayed_fps));
+            alia::draw_text({
+                .target = frame,
+                .glyphs = glyphs,
+                .text = std::format("{} fps", displayed_fps),
+                .texture_slot = 0,
+                .position = {15.0f, 15.0f}
+            });
             frame.present();
             if (fps.count_frame())
                 displayed_fps = static_cast<int>(fps.interval().fps() + 0.5);

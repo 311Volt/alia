@@ -59,7 +59,13 @@ int main() {
             frame.clear(alia::blue);
             text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
-            alia::draw_text(frame, {100.0f, 100.0f}, glyphs, "press F to play the sound");
+            alia::draw_text({
+                .target = frame,
+                .glyphs = glyphs,
+                .text = "press F to play the sound",
+                .texture_slot = 0,
+                .position = {100.0f, 100.0f}
+            });
             frame.present();
         }
     } catch (const std::exception &error) {

@@ -502,10 +502,14 @@ int main(int argc, char **argv) {
 
             text_effect.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
-            alia::draw_text(
-                frame, {16.0f, 16.0f}, glyphs,
-                "normal-mapped ball | one-tap cubemap reflection",
-                alia::white);
+            alia::draw_text({
+                .target = frame,
+                .glyphs = glyphs,
+                .text = "normal-mapped ball | one-tap cubemap reflection",
+                .texture_slot = 0,
+                .position = {16.0f, 16.0f},
+                .tint = alia::white
+            });
             frame.present();
         }
     } catch (const std::exception &error) {

@@ -156,10 +156,20 @@ int main() {
 
         text_fx.projection = device.ortho_ui(frame.target_size());
         frame.set_pipeline(text_pipeline);
-        alia::draw_text(frame, {50, 50}, glyphs,
-            std::format("peaks: L {:.1f} dB | R {:.1f} dB", db(left), db(right)));
-        alia::draw_text(frame, {50, 75}, glyphs,
-            std::format("playback gain: {:.1f} dB", db(float(playback_gain.load()))));
+        alia::draw_text({
+            .target = frame,
+            .glyphs = glyphs,
+            .text = std::format("peaks: L {:.1f} dB | R {:.1f} dB", db(left), db(right)),
+            .texture_slot = 0,
+            .position = {50, 50}
+        });
+        alia::draw_text({
+            .target = frame,
+            .glyphs = glyphs,
+            .text = std::format("playback gain: {:.1f} dB", db(float(playback_gain.load()))),
+            .texture_slot = 0,
+            .position = {50, 75}
+        });
         frame.present();
     }
 }

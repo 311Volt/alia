@@ -190,8 +190,22 @@ int main(int argc, char **argv) {
             text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
             const std::string fps_text = std::format("{} fps", displayed_fps);
-            alia::draw_text(frame, {16.0f, 16.0f}, glyphs, fps_text, alia::black);
-            alia::draw_text(frame, {15.0f, 15.0f}, glyphs, fps_text, alia::white);
+            alia::draw_text({
+                .target = frame,
+                .glyphs = glyphs,
+                .text = fps_text,
+                .texture_slot = 0,
+                .position = {16.0f, 16.0f},
+                .tint = alia::black
+            });
+            alia::draw_text({
+                .target = frame,
+                .glyphs = glyphs,
+                .text = fps_text,
+                .texture_slot = 0,
+                .position = {15.0f, 15.0f},
+                .tint = alia::white
+            });
             frame.present();
             if (fps.count_frame())
                 displayed_fps = static_cast<int>(fps.interval().fps() + 0.5);

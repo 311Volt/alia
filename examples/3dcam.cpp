@@ -110,16 +110,18 @@ int main(int argc, char **argv) {
             // Each pipeline owns its transform state; no global reset is needed.
             text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
-            alia::draw_text(
-                frame,
-                {10.0f, 10.0f},
-                glyphs,
-                std::format(
+            alia::draw_text({
+                .target = frame,
+                .glyphs = glyphs,
+                .text = std::format(
                     "player pos = ({:.2f}, {:.2f}, {:.2f}), facing {:.2f} deg",
                     position.x,
                     position.y,
                     position.z,
-                    rotation_degrees));
+                    rotation_degrees),
+                .texture_slot = 0,
+                .position = {10.0f, 10.0f}
+            });
             frame.present();
         }
     } catch (const std::exception &error) {

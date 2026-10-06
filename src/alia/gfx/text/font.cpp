@@ -225,6 +225,18 @@ namespace alia {
             rendered_glyph rendered;
         };
 
+        struct laid_out_atlas_glyph {
+            int line = 0;
+            float pen_x = 0.0f;
+            // Stable: unordered_map rehashing does not move its elements.
+            const detail::cached_glyph *glyph = nullptr;
+        };
+
+        void validate_position(vec2f position, const char *message) {
+            if (!std::isfinite(position.x) || !std::isfinite(position.y))
+                throw std::invalid_argument(message);
+        }
+
         [[nodiscard]] float text_align_offset(text_align align, float block_width, float line_width) noexcept {
             switch (align) {
             case text_align::left:
@@ -375,7 +387,7 @@ namespace alia {
             }
         }
 
-        return {std::move(coverage), {left, top}};
+        return {std::move(coverage), {left, top}, {block_width, block_height}};
     }
 
     text_texture create_text_texture(
@@ -397,7 +409,7 @@ namespace alia {
             .wrap_u = texture_wrap::clamp,
             .wrap_v = texture_wrap::clamp,
         });
-        return {std::move(mask), source.offset};
+        return {std::move(mask), source.offset, source.layout_size};
     }
 
     text_texture create_text_texture(
@@ -550,17 +562,37 @@ namespace alia {
         };
     }
 
-    void draw_text(
-        frame &target,
-        vec2f position,
-        hardware_glyph_buffer &buffer,
-        std::string_view value,
-        color text_color
-    ) {
-        if (value.empty())
+    void draw_text(const draw_text_params &params) {
+        validate_position(params.position, "draw_text: position must be finite");
+        if (params.text.empty())
             return;
 
-        auto &cache = *buffer.impl_;
+        // Lay out first: alignment and anchoring need every line's width.
+        auto &cache = *params.glyphs.impl_;
+        std::vector<float> line_widths;
+        std::vector<laid_out_atlas_glyph> glyphs;
+        walk_text(
+            *cache.source,
+            params.text,
+            true,
+            line_widths,
+            [&](uint32_t cp, int line, float pen_x) {
+                const detail::cached_glyph &glyph = cache.get(cp);
+                if (glyph.page >= 0)
+                    glyphs.push_back({.line = line, .pen_x = pen_x, .glyph = &glyph});
+                return glyph.metrics.advance;
+            }
+        );
+
+        const font_metrics metrics = cache.source->metrics();
+        const float block_width = *std::max_element(line_widths.begin(), line_widths.end());
+        const vec2f block_size{
+            block_width,
+            metrics.line_height * static_cast<float>(line_widths.size()),
+        };
+        const vec2f origin = params.position -
+            detail::anchor_offset(params.anchor, block_size, "draw_text: anchor must be finite");
+
         std::vector<full_vertex> vertices;
         std::vector<uint32_t> indices;
         int batch_page = -1;
@@ -569,84 +601,81 @@ namespace alia {
             if (vertices.empty())
                 return;
 
-            target.set_texture(0, cache.pages[static_cast<std::size_t>(batch_page)].atlas);
-            target.draw_indexed<full_vertex>(vertices, indices);
+            params.target.set_texture(
+                params.texture_slot.value,
+                cache.pages[static_cast<std::size_t>(batch_page)].atlas
+            );
+            params.target.draw_indexed<full_vertex>(vertices, indices);
             vertices.clear();
             indices.clear();
         };
 
-        const font_metrics metrics = cache.source->metrics();
-        const float first_baseline = position.y + metrics.ascender;
-        std::vector<float> line_widths;
-        walk_text(
-            *cache.source,
-            value,
-            true,
-            line_widths,
-            [&](uint32_t cp, int line, float pen_x) {
-                detail::cached_glyph &glyph = cache.get(cp);
-                if (glyph.page >= 0) {
-                    const int page_index = glyph.page;
-                    if (batch_page != page_index) {
-                        flush();
-                        batch_page = page_index;
-                    }
-
-                    const rect_i atlas_rect = glyph.atlas_rect;
-                    const float x0 = position.x + pen_x +
-                        static_cast<float>(glyph.metrics.bearing.x - glyph_atlas_border_size);
-                    const float baseline =
-                        first_baseline + metrics.line_height * static_cast<float>(line);
-                    const float y0 = baseline -
-                        static_cast<float>(glyph.metrics.bearing.y + glyph_atlas_border_size);
-                    const float x1 = x0 + static_cast<float>(atlas_rect.width());
-                    const float y1 = y0 + static_cast<float>(atlas_rect.height());
-                    const float u0 = static_cast<float>(atlas_rect.left()) /
-                        static_cast<float>(cache.page_size.x);
-                    const float v0 = static_cast<float>(atlas_rect.top()) /
-                        static_cast<float>(cache.page_size.y);
-                    const float u1 = static_cast<float>(atlas_rect.right()) /
-                        static_cast<float>(cache.page_size.x);
-                    const float v1 = static_cast<float>(atlas_rect.bottom()) /
-                        static_cast<float>(cache.page_size.y);
-
-                    const uint32_t base = static_cast<uint32_t>(vertices.size());
-                    vertices.insert(
-                        vertices.end(),
-                        {
-                            {{x0, y0}, text_color, {u0, v0}},
-                            {{x1, y0}, text_color, {u1, v0}},
-                            {{x1, y1}, text_color, {u1, v1}},
-                            {{x0, y1}, text_color, {u0, v1}},
-                        }
-                    );
-                    indices.insert(
-                        indices.end(),
-                        {base, base + 1, base + 2, base, base + 2, base + 3}
-                    );
-                }
-                return glyph.metrics.advance;
+        for (const auto &placed : glyphs) {
+            const detail::cached_glyph &glyph = *placed.glyph;
+            if (batch_page != glyph.page) {
+                flush();
+                batch_page = glyph.page;
             }
-        );
+
+            const float line_width = line_widths[static_cast<std::size_t>(placed.line)];
+            const float line_x = text_align_offset(params.align, block_width, line_width);
+            const rect_i atlas_rect = glyph.atlas_rect;
+            const float x0 = origin.x + line_x + placed.pen_x +
+                static_cast<float>(glyph.metrics.bearing.x - glyph_atlas_border_size);
+            const float baseline = origin.y + metrics.ascender +
+                metrics.line_height * static_cast<float>(placed.line);
+            const float y0 = baseline -
+                static_cast<float>(glyph.metrics.bearing.y + glyph_atlas_border_size);
+            const float x1 = x0 + static_cast<float>(atlas_rect.width());
+            const float y1 = y0 + static_cast<float>(atlas_rect.height());
+            const float u0 = static_cast<float>(atlas_rect.left()) /
+                static_cast<float>(cache.page_size.x);
+            const float v0 = static_cast<float>(atlas_rect.top()) /
+                static_cast<float>(cache.page_size.y);
+            const float u1 = static_cast<float>(atlas_rect.right()) /
+                static_cast<float>(cache.page_size.x);
+            const float v1 = static_cast<float>(atlas_rect.bottom()) /
+                static_cast<float>(cache.page_size.y);
+
+            const uint32_t base = static_cast<uint32_t>(vertices.size());
+            vertices.insert(
+                vertices.end(),
+                {
+                    {{x0, y0}, params.tint, {u0, v0}},
+                    {{x1, y0}, params.tint, {u1, v0}},
+                    {{x1, y1}, params.tint, {u1, v1}},
+                    {{x0, y1}, params.tint, {u0, v1}},
+                }
+            );
+            indices.insert(
+                indices.end(),
+                {base, base + 1, base + 2, base, base + 2, base + 3}
+            );
+        }
         flush();
     }
 
-    void draw_text(frame &target, vec2f position, text_texture &value, color text_color) {
+    void draw_text_texture(const draw_text_texture_params &params) {
+        validate_position(params.position, "draw_text_texture: position must be finite");
+        const text_texture &value = params.texture;
+        const vec2f origin = params.position - detail::anchor_offset(
+            params.anchor, value.layout_size, "draw_text_texture: anchor must be finite");
+
         const vec2i texture_size = value.mask.size();
-        const float x0 = position.x + static_cast<float>(value.offset.x);
-        const float y0 = position.y + static_cast<float>(value.offset.y);
+        const float x0 = origin.x + static_cast<float>(value.offset.x);
+        const float y0 = origin.y + static_cast<float>(value.offset.y);
         const float x1 = x0 + static_cast<float>(texture_size.x);
         const float y1 = y0 + static_cast<float>(texture_size.y);
         const full_vertex vertices[]{
-            {{x0, y0}, text_color, {0.0f, 0.0f}},
-            {{x1, y0}, text_color, {1.0f, 0.0f}},
-            {{x1, y1}, text_color, {1.0f, 1.0f}},
-            {{x0, y1}, text_color, {0.0f, 1.0f}},
+            {{x0, y0}, params.tint, {0.0f, 0.0f}},
+            {{x1, y0}, params.tint, {1.0f, 0.0f}},
+            {{x1, y1}, params.tint, {1.0f, 1.0f}},
+            {{x0, y1}, params.tint, {0.0f, 1.0f}},
         };
         constexpr uint32_t indices[]{0, 1, 2, 0, 2, 3};
 
-        target.set_texture(0, value.mask);
-        target.draw_indexed<full_vertex>(vertices, indices);
+        params.target.set_texture(params.texture_slot.value, params.texture.mask);
+        params.target.draw_indexed<full_vertex>(vertices, indices);
     }
 
 } // namespace alia

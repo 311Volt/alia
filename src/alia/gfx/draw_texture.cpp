@@ -26,27 +26,6 @@ namespace alia {
             return size.x == 0.0f || size.y == 0.0f;
         }
 
-        vec2f anchor_offset(const std::variant<draw_anchor, vec2f> &anchor, vec2f size) {
-            if (const auto *offset = std::get_if<vec2f>(&anchor)) {
-                if (!is_finite(*offset))
-                    throw std::invalid_argument("draw_texture: source anchor must be finite");
-                return *offset;
-            }
-
-            switch (std::get<draw_anchor>(anchor)) {
-            case draw_anchor::top_left:      return {0.0f, 0.0f};
-            case draw_anchor::top_center:    return {size.x * 0.5f, 0.0f};
-            case draw_anchor::top_right:     return {size.x, 0.0f};
-            case draw_anchor::center_left:   return {0.0f, size.y * 0.5f};
-            case draw_anchor::center:        return size * 0.5f;
-            case draw_anchor::center_right:  return {size.x, size.y * 0.5f};
-            case draw_anchor::bottom_left:   return {0.0f, size.y};
-            case draw_anchor::bottom_center: return {size.x * 0.5f, size.y};
-            case draw_anchor::bottom_right:  return size;
-            }
-            throw std::invalid_argument("draw_texture: invalid source anchor");
-        }
-
         std::array<vec2f, 4> corners(rect_f value) {
             return {value.tl(), value.tr(), value.br(), value.bl()};
         }
@@ -63,7 +42,8 @@ namespace alia {
         std::array<vec2f, 4> positions;
         vec2f destination_size;
         if (const auto *position = std::get_if<vec2i>(&params.destination)) {
-            const vec2f offset = anchor_offset(params.source_anchor, crop_size);
+            const vec2f offset = detail::anchor_offset(
+                params.source_anchor, crop_size, "draw_texture: source anchor must be finite");
             const rect_f destination = rect_f::pos_size(vec2f(*position) - offset, crop_size);
             validate_rect(destination, "draw_texture: destination geometry must be finite");
             positions = corners(destination);

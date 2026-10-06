@@ -76,12 +76,14 @@ int main() {
         frame.draw<alia::uv_vertex>(quad);
         text_fx.projection = device.ortho_ui(frame.target_size());
         frame.set_pipeline(text_pipeline);
-        alia::draw_text(
-            frame,
-            alia::vec2f(vid.current_frame().size()),
-            glyphs,
-            std::format("position: {:.2f} secs", vid.position()),
-            alia::pure_green);
+        alia::draw_text({
+            .target = frame,
+            .glyphs = glyphs,
+            .text = std::format("position: {:.2f} secs", vid.position()),
+            .texture_slot = 0,
+            .position = alia::vec2f(vid.current_frame().size()),
+            .tint = alia::pure_green
+        });
         frame.present();
     }
 }

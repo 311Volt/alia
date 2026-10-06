@@ -101,15 +101,17 @@ int main(int argc, char **argv) {
 
             text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
-            alia::draw_text(
-                frame,
-                {100.0f, 100.0f},
-                glyphs,
-                std::format(
+            alia::draw_text({
+                .target = frame,
+                .glyphs = glyphs,
+                .text = std::format(
                     "tick={}, avg frametime: {:.9f} ms",
                     tick,
                     1000.0 * fps.total().mean_frame_time()),
-                alia::pure_yellow);
+                .texture_slot = 0,
+                .position = {100.0f, 100.0f},
+                .tint = alia::pure_yellow
+            });
             frame.present();
             if (tick == 1)
                 fps.reset(); // Exclude the first completed frame as warm-up.

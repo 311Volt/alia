@@ -161,7 +161,14 @@ int main(int argc, char **argv) {
             text_fx.world = alia::transform::translate(text_position);
             text_fx.projection = device.ortho_ui(frame.target_size());
             frame.set_pipeline(text_pipeline);
-            alia::draw_text(frame, {0.0f, 0.0f}, glyphs, visible_text, alia::white);
+            alia::draw_text({
+                .target = frame,
+                .glyphs = glyphs,
+                .text = visible_text,
+                .texture_slot = 0,
+                .position = {0.0f, 0.0f},
+                .tint = alia::white
+            });
             prim_fx.world = alia::transform::identity();
             text_fx.world = alia::transform::identity();
 

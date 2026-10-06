@@ -3,6 +3,7 @@
 
 #include "../core/color.hpp"
 #include "../core/rect.hpp"
+#include "draw_common.hpp"
 
 #include <variant>
 
@@ -12,22 +13,9 @@ namespace alia {
 
     namespace detail {
         struct full_rect_t {};
-
-        struct required_texture_slot {
-            int value;
-            required_texture_slot() = delete;
-            constexpr required_texture_slot(int value) noexcept
-                : value(value) {}
-        };
     } // namespace detail
 
     inline constexpr auto full_rect = detail::full_rect_t{};
-
-    enum class draw_anchor {
-        top_left, top_center, top_right,
-        center_left, center, center_right,
-        bottom_left, bottom_center, bottom_right
-    };
 
     struct draw_texture_params {
         frame &target;
