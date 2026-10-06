@@ -17,19 +17,12 @@
 #include <exception>
 #include <format>
 #include <iostream>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 
 namespace {
-
-template <class LockedRegion>
-void paint_green(LockedRegion &locked) {
-    auto &view = locked.view();
-    for (int y = 0; y < view.height(); ++y)
-        for (int x = 0; x < view.width(); ++x)
-            view[x, y].g = 255;
-}
 
 alia::gfx_backend requested_backend(int argc, char **argv) {
     if (argc < 2)
@@ -110,13 +103,11 @@ int main(int argc, char **argv) {
             const int x = static_cast<int>(tick % static_cast<std::uint64_t>(background.width() - 10));
             const int y = static_cast<int>(tick % static_cast<std::uint64_t>(background.height() - 10));
             const alia::rect_i write_rect = alia::rect_i::pos_size({x, y}, {2, 2});
-            // NOTE (API feedback): texture writes have no format-agnostic path.
-            if (auto locked = background.lock<alia::px_bgra8888>(write_rect))
-                paint_green(locked);
-            else if (auto locked = background.lock<alia::px_rgb888>(write_rect))
-                paint_green(locked);
-            else if (auto locked = background.lock<alia::px_rgba8888>(write_rect))
-                paint_green(locked);
+            if (auto locked = background.lock_any(write_rect))
+                locked.visit_rows<alia::px_rgba8888>([](std::span<alia::px_rgba8888> row, int) {
+                    for (auto &px : row)
+                        px.g = 255;
+                });
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::black);

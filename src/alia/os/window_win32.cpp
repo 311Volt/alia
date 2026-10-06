@@ -159,7 +159,7 @@ namespace alia {
             if (source.width() <= 0 || source.height() <= 0)
                 return nullptr;
             bitmap converted(source.size(), px_bgra8888{});
-            converting_blit(converted.view(), source);
+            converting_blit_lossy(converted.view(), source);
             HBITMAP color = CreateBitmap(
                 source.width(), source.height(), 1, 32, converted.line(0));
             const int mask_stride = ((source.width() + 15) / 16) * 2;

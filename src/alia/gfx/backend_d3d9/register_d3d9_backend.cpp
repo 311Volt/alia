@@ -49,10 +49,14 @@ namespace alia {
         iface.destroy_device      = {d3d9_destroy_device};
 
         iface.create_texture              = {d3d9_create_texture};
+        iface.texture_format_supported    = {d3d9_texture_format_supported};
         if (iface.caps.cube_textures) {
             iface.create_cube_texture = {d3d9_create_cube_texture};
+            iface.cube_texture_format_supported = {d3d9_cube_texture_format_supported};
         } else {
             iface.create_cube_texture = {
+                nullptr, "device lacks D3DPTEXTURECAPS_CUBEMAP"};
+            iface.cube_texture_format_supported = {
                 nullptr, "device lacks D3DPTEXTURECAPS_CUBEMAP"};
         }
         iface.destroy_texture             = {d3d9_destroy_texture};

@@ -114,37 +114,6 @@ namespace alia {
             return supported;
         }
 
-        pixel_format choose_d3d9_texture_format(
-            IDirect3DDevice9 *device,
-            pixel_format requested,
-            DWORD usage,
-            texture_role role,
-            D3DRESOURCETYPE resource_type
-        ) {
-            const D3DFORMAT requested_fmt = to_d3d_format(requested, role);
-            if (d3d9_supports_texture_format(device, requested_fmt, usage, resource_type))
-                return requested;
-
-            if (role == texture_role::alpha_mask)
-                return requested;
-
-            switch (requested) {
-            case pixel_format::rgb888:
-            case pixel_format::rgba8888:
-            case pixel_format::bgr888:
-            case pixel_format::bgra8888:
-            case pixel_format::rgb565:
-            case pixel_format::gray_u8:
-                if (d3d9_supports_texture_format(
-                        device, D3DFMT_A8R8G8B8, usage, resource_type))
-                    return pixel_format::bgra8888;
-                break;
-            default: break;
-            }
-
-            return requested;
-        }
-
         bool uses_autogen_mips(int mip_levels) noexcept {
             return mip_levels == 0;
         }
@@ -326,6 +295,29 @@ namespace alia {
 
     } // namespace
 
+    bool d3d9_texture_format_supported(
+        device_handle *dev_h, pixel_format fmt, int mip_levels,
+        texture_role role, texture_usage usage
+    ) {
+        return d3d9_supports_texture_format(
+            as_d3d9_device(dev_h)->device, to_d3d_format(fmt, role),
+            d3d_texture_usage_flags(uses_autogen_mips(mip_levels), usage),
+            D3DRTYPE_TEXTURE);
+    }
+
+    bool d3d9_cube_texture_format_supported(
+        device_handle *dev_h, pixel_format fmt, int mip_levels, texture_usage usage
+    ) {
+        auto *dev = as_d3d9_device(dev_h);
+        if (mip_levels != 1 &&
+            (dev->caps.TextureCaps & D3DPTEXTURECAPS_MIPCUBEMAP) == 0)
+            return false;
+        return d3d9_supports_texture_format(
+            dev->device, to_d3d_format(fmt, texture_role::color),
+            d3d_texture_usage_flags(uses_autogen_mips(mip_levels), usage),
+            D3DRTYPE_CUBETEXTURE);
+    }
+
     texture_handle *d3d9_create_texture(
         device_handle *dev_h,
         pixel_format fmt,
@@ -339,9 +331,7 @@ namespace alia {
         const DWORD d3d_usage = d3d_texture_usage_flags(autogen, usage);
         const UINT mips = autogen ? 0u : static_cast<UINT>(mip_levels);
         const D3DPOOL pool = d3d_texture_pool(usage);
-        const pixel_format actual_fmt = choose_d3d9_texture_format(
-            dev->device, fmt, d3d_usage, role, D3DRTYPE_TEXTURE);
-        const D3DFORMAT d3dfmt = to_d3d_format(actual_fmt, role);
+        const D3DFORMAT d3dfmt = to_d3d_format(fmt, role);
         if (!d3d9_supports_texture_format(
                 dev->device, d3dfmt, d3d_usage, D3DRTYPE_TEXTURE))
             return nullptr;
@@ -354,7 +344,7 @@ namespace alia {
             return nullptr;
 
         auto *t = new d3d9_texture;
-        fill_texture_record(*t, dev->device, tex, actual_fmt, size, autogen, role, usage);
+        fill_texture_record(*t, dev->device, tex, fmt, size, autogen, role, usage);
         return t;
     }
 
@@ -377,10 +367,7 @@ namespace alia {
         const DWORD d3d_usage = d3d_texture_usage_flags(autogen, usage);
         const UINT mips = autogen ? 0u : static_cast<UINT>(mip_levels);
         const D3DPOOL pool = d3d_texture_pool(usage);
-        const pixel_format actual_fmt = choose_d3d9_texture_format(
-            dev->device, fmt, d3d_usage, texture_role::color,
-            D3DRTYPE_CUBETEXTURE);
-        const D3DFORMAT d3dfmt = to_d3d_format(actual_fmt, texture_role::color);
+        const D3DFORMAT d3dfmt = to_d3d_format(fmt, texture_role::color);
         if (!d3d9_supports_texture_format(
                 dev->device, d3dfmt, d3d_usage, D3DRTYPE_CUBETEXTURE))
             return nullptr;
@@ -393,7 +380,7 @@ namespace alia {
 
         auto *texture = new d3d9_texture;
         fill_cube_texture_record(
-            *texture, dev->device, cube, actual_fmt, edge, autogen, usage);
+            *texture, dev->device, cube, fmt, edge, autogen, usage);
         return texture;
     }
 

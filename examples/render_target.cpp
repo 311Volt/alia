@@ -42,8 +42,9 @@ int main(int argc, char **argv) {
         auto swapchain = device.create_swapchain({.target = win});
         constexpr alia::vec2i target_size{256, 256};
         const alia::vec2f target_size_f{256.0f, 256.0f};
-        alia::texture offscreen(device, alia::pixel_format::bgra8888, target_size, 1, alia::texture_role::color, alia::texture_usage::render_target);
-        alia::texture copied(device, alia::pixel_format::bgra8888, target_size);
+        alia::texture offscreen(device, target_size,
+            {.format = alia::pixel_format::bgra8888, .usage = alia::texture_usage::render_target});
+        alia::texture copied(device, target_size, {.format = alia::pixel_format::bgra8888});
 
         alia::basic_effect prim_fx;
         auto prim_pipeline = alia::pipeline::create<alia::colored_vertex>(device, {.effect = &prim_fx});

@@ -76,9 +76,31 @@ namespace alia {
                         (static_cast<std::uint64_t>(value) * dst_max + src_max / 2) / src_max
                     );
                 }
+            } else if constexpr (std::is_floating_point_v<src_channel_type> && std::is_integral_v<dst_channel_type>) {
+                constexpr auto dst_max = integer_channel_max_v<TDstPixel, TDstChannel>;
+                // The first comparison also maps NaN to zero before any cast.
+                if (!(value > src_channel_type{0}))
+                    return dst_channel_type{0};
+                if (value >= src_channel_type{1})
+                    return static_cast<dst_channel_type>(dst_max);
+                return static_cast<dst_channel_type>(
+                    value * static_cast<src_channel_type>(dst_max) + src_channel_type{0.5f}
+                );
             } else {
                 static_assert(always_false_v<TSrcPixel, TDstPixel>, "unsupported pixel channel conversion");
             }
+        }
+
+        template <typename TChannel>
+            requires std::is_integral_v<TChannel>
+        [[nodiscard]] constexpr TChannel luminance(TChannel r, TChannel g, TChannel b) noexcept {
+            return static_cast<TChannel>(static_cast<std::uint16_t>(77u * r + 150u * g + 30u * b) >> 8);
+        }
+
+        template <typename TChannel>
+            requires std::is_floating_point_v<TChannel>
+        [[nodiscard]] constexpr TChannel luminance(TChannel r, TChannel g, TChannel b) noexcept {
+            return g + TChannel{0.299f} * (r - g) + TChannel{0.114f} * (b - g);
         }
 
         template <pixel PixelT>
@@ -246,17 +268,6 @@ namespace alia {
             }
         }
 
-        template <pixel TDstPixel, typename TDstChannel>
-        [[nodiscard]] constexpr channel_type_t<TDstPixel> float_to_channel(float value) noexcept {
-            using dst_channel_type = channel_type_t<TDstPixel>;
-            if constexpr (std::is_floating_point_v<dst_channel_type>) {
-                return static_cast<dst_channel_type>(value);
-            } else {
-                constexpr auto dst_max = integer_channel_max_v<TDstPixel, TDstChannel>;
-                return static_cast<dst_channel_type>(static_cast<float>(dst_max) * value + 0.5f);
-            }
-        }
-
     } // namespace detail
 
     template <pixel TDstPixel>
@@ -265,14 +276,14 @@ namespace alia {
                       "color_to_pixel only supports RGB, RGBA, and grayscale pixel types");
         TDstPixel dst{};
         if constexpr (has_color_v<TDstPixel>) {
-            detail::set_red(dst,   detail::float_to_channel<TDstPixel, detail::red_channel>  (std::clamp(c.r, 0.0f, 1.0f)));
-            detail::set_green(dst, detail::float_to_channel<TDstPixel, detail::green_channel>(std::clamp(c.g, 0.0f, 1.0f)));
-            detail::set_blue(dst,  detail::float_to_channel<TDstPixel, detail::blue_channel> (std::clamp(c.b, 0.0f, 1.0f)));
+            detail::set_red(dst,   detail::convert_channel_value<px_rgba_f32, TDstPixel, detail::red_channel>  (std::clamp(c.r, 0.0f, 1.0f)));
+            detail::set_green(dst, detail::convert_channel_value<px_rgba_f32, TDstPixel, detail::green_channel>(std::clamp(c.g, 0.0f, 1.0f)));
+            detail::set_blue(dst,  detail::convert_channel_value<px_rgba_f32, TDstPixel, detail::blue_channel> (std::clamp(c.b, 0.0f, 1.0f)));
             if constexpr (has_alpha_v<TDstPixel>)
-                detail::set_alpha(dst, detail::float_to_channel<TDstPixel, detail::alpha_channel>(std::clamp(c.a, 0.0f, 1.0f)));
+                detail::set_alpha(dst, detail::convert_channel_value<px_rgba_f32, TDstPixel, detail::alpha_channel>(std::clamp(c.a, 0.0f, 1.0f)));
         } else if constexpr (has_gray_v<TDstPixel>) {
-            const float lum = std::clamp(0.299f * c.r + 0.587f * c.g + 0.114f * c.b, 0.0f, 1.0f);
-            detail::set_gray(dst, detail::float_to_channel<TDstPixel, detail::gray_channel>(lum));
+            const float lum = std::clamp(detail::luminance(c.r, c.g, c.b), 0.0f, 1.0f);
+            detail::set_gray(dst, detail::convert_channel_value<px_gray_f32, TDstPixel, detail::gray_channel>(lum));
         }
         return dst;
     }
@@ -331,23 +342,11 @@ namespace alia {
         requires (detail::grayscale_conversion_is_allowed<TSrcPixel, TDstPixel>())
     {
         TDstPixel dst{};
-        using dst_channel_type = channel_type_t<TDstPixel>;
-
         const auto r = detail::convert_channel_value<TSrcPixel, TDstPixel, detail::red_channel, detail::gray_channel>(get_red(src));
         const auto g = detail::convert_channel_value<TSrcPixel, TDstPixel, detail::green_channel, detail::gray_channel>(get_green(src));
         const auto b = detail::convert_channel_value<TSrcPixel, TDstPixel, detail::blue_channel, detail::gray_channel>(get_blue(src));
 
-        if constexpr (std::is_integral_v<dst_channel_type>) {
-            const auto gray = static_cast<dst_channel_type>(
-                static_cast<std::uint16_t>(77u * r + 150u * g + 30u * b) >> 8
-            );
-            detail::set_gray(dst, gray);
-        } else {
-            const auto gray = static_cast<dst_channel_type>(
-                r * dst_channel_type{0.299f} + g * dst_channel_type{0.587f} + b * dst_channel_type{0.114f}
-            );
-            detail::set_gray(dst, gray);
-        }
+        detail::set_gray(dst, detail::luminance(r, g, b));
 
         return dst;
     }

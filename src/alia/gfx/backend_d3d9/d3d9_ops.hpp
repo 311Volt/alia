@@ -149,6 +149,8 @@ namespace alia {
     d3d9_device *d3d9_create_device(const gfx_device_config &); void d3d9_destroy_device(device_handle *);
     texture_handle *d3d9_create_texture(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage);
     texture_handle *d3d9_create_cube_texture(device_handle *, pixel_format, int, int, texture_usage);
+    bool d3d9_texture_format_supported(device_handle *, pixel_format, int, texture_role, texture_usage);
+    bool d3d9_cube_texture_format_supported(device_handle *, pixel_format, int, texture_usage);
     void d3d9_destroy_texture(texture_handle *); pixel_format d3d9_texture_format(const texture_handle *);
     int d3d9_texture_width(const texture_handle *); int d3d9_texture_height(const texture_handle *); int d3d9_texture_mip_levels(const texture_handle *);
     sampler_state d3d9_texture_sampler(const texture_handle *); void d3d9_texture_set_sampler(texture_handle *, const sampler_state &);

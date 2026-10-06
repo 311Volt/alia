@@ -206,10 +206,16 @@ namespace alia {
         iface.destroy_device = {ogl_destroy_device};
 
         iface.create_texture           = {ogl_create_texture};
+        iface.texture_format_supported = {ogl_texture_format_supported};
         if (has_cube_maps) {
             iface.create_cube_texture = {ogl_create_cube_texture};
+            iface.cube_texture_format_supported = {ogl_cube_texture_format_supported};
         } else {
             iface.create_cube_texture = {
+                nullptr,
+                "cube textures require OpenGL 1.3 or GL_ARB_texture_cube_map"
+            };
+            iface.cube_texture_format_supported = {
                 nullptr,
                 "cube textures require OpenGL 1.3 or GL_ARB_texture_cube_map"
             };

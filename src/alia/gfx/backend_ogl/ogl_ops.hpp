@@ -118,6 +118,8 @@ namespace alia {
     ogl_device *ogl_create_device(const gfx_device_config &); void ogl_destroy_device(device_handle *);
     texture_handle *ogl_create_texture(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage); void ogl_destroy_texture(texture_handle *);
     texture_handle *ogl_create_cube_texture(device_handle *, pixel_format, int, int, texture_usage);
+    bool ogl_texture_format_supported(device_handle *, pixel_format, int, texture_role, texture_usage);
+    bool ogl_cube_texture_format_supported(device_handle *, pixel_format, int, texture_usage);
     pixel_format ogl_texture_format(const texture_handle *); int ogl_texture_width(const texture_handle *); int ogl_texture_height(const texture_handle *); int ogl_texture_mip_levels(const texture_handle *);
     sampler_state ogl_texture_sampler(const texture_handle *); void ogl_texture_set_sampler(texture_handle *, const sampler_state &);
     bool ogl_texture_lock(texture_handle *, rect_i, int, texture_lock_mode, texture_lock_info &); void ogl_texture_unlock(texture_handle *, const texture_lock_info &, bool);

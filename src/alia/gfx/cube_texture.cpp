@@ -62,45 +62,60 @@ namespace alia {
 
     cube_texture::cube_texture(
         gfx_device &device,
-        pixel_format fmt,
         int edge,
-        int mip_levels,
-        texture_usage usage
+        const cube_texture_config &config
     ) {
         if (!device.valid())
             throw std::runtime_error("cube_texture: device is not valid");
-        detail::validate_texture_desc(fmt, {edge, edge}, mip_levels, "cube_texture");
+        const auto fmt = config.format.value_or(pixel_format::bgra8888);
+        detail::validate_texture_desc(fmt, {edge, edge}, config.mip_levels, "cube_texture");
+        if (!can_create(device, config))
+            throw std::runtime_error("cube_texture: requested pixel format is not supported by this device");
 
         const auto *backend = device.backend();
         handle_ = backend->create_cube_texture.get_or_throw()(
-            device.device(), fmt, edge, mip_levels, usage);
+            device.device(), fmt, edge, config.mip_levels, config.usage);
         if (!handle_)
             throw std::runtime_error("cube_texture: backend failed to create texture");
 
         backend_ = backend;
         device_ = device.device();
-        usage_ = usage;
+        usage_ = config.usage;
     }
 
     cube_texture::cube_texture(
         gfx_device &device,
         std::span<const any_bitmap_view, cube_face_count> faces,
-        int mip_levels,
-        texture_usage usage
+        const cube_texture_config &config
     ) {
         if (!device.valid())
             throw std::runtime_error("cube_texture: device is not valid");
-        validate_faces(faces, mip_levels);
+        validate_faces(faces, config.mip_levels);
+        if (config.format)
+            detail::validate_texture_desc(*config.format, faces[0].size(), config.mip_levels, "cube_texture");
 
         const auto *backend = device.backend();
+        const auto supported = [&](pixel_format fmt) {
+            return backend->cube_texture_format_supported.is_supported() &&
+                backend->cube_texture_format_supported.get_or_throw()(
+                    device.device(), fmt, config.mip_levels, config.usage);
+        };
+        const auto fmt = config.format
+            ? (supported(*config.format) ? config.format : std::nullopt)
+            : detail::closest_texture_format(faces[0].format(), texture_role::color, supported);
+        if (!fmt)
+            throw std::runtime_error("cube_texture: requested pixel format is not supported by this device");
+        if (!can_convert_pixel_lossy(faces[0].format(), *fmt))
+            throw std::invalid_argument("cube_texture: unsupported source pixel format conversion");
+
         handle_ = backend->create_cube_texture.get_or_throw()(
-            device.device(), faces[0].format(), faces[0].width(), mip_levels, usage);
+            device.device(), *fmt, faces[0].width(), config.mip_levels, config.usage);
         if (!handle_)
             throw std::runtime_error("cube_texture: backend failed to create texture");
 
         backend_ = backend;
         device_ = device.device();
-        usage_ = usage;
+        usage_ = config.usage;
 
         try {
             for (int i = 0; i < cube_face_count; ++i) {
@@ -122,8 +137,7 @@ namespace alia {
     cube_texture::cube_texture(
         gfx_device &device,
         std::span<const bitmap, cube_face_count> faces,
-        int mip_levels,
-        texture_usage usage
+        const cube_texture_config &config
     )
         : cube_texture(
             device,
@@ -131,9 +145,19 @@ namespace alia {
                 faces[0].view(), faces[1].view(), faces[2].view(),
                 faces[3].view(), faces[4].view(), faces[5].view()
             },
-            mip_levels,
-            usage
+            config
         ) {}
+
+    bool cube_texture::can_create(const gfx_device &device, const cube_texture_config &config) {
+        if (!device.valid() || config.mip_levels < 0 ||
+            !device.backend()->cube_texture_format_supported.is_supported())
+            return false;
+        const auto fmt = config.format.value_or(pixel_format::bgra8888);
+        if (bytes_per_pixel_for_format(fmt) == 0)
+            return false;
+        return device.backend()->cube_texture_format_supported.get_or_throw()(
+            device.device(), fmt, config.mip_levels, config.usage);
+    }
 
     pixel_format cube_texture::format() const noexcept {
         return backend_->texture_format.get_or_throw()(handle_);
@@ -159,25 +183,26 @@ namespace alia {
         cube_face face,
         const std::optional<rect_i> &region,
         int level,
-        pixel_format expected_fmt,
+        std::optional<pixel_format> expected_fmt,
         texture_lock_mode mode
     ) {
-        if (!handle_ || !valid_face(face) || level < 0 || level >= mip_levels() ||
-            format() != expected_fmt)
+        if (!handle_ || !valid_face(face) || level < 0 || level >= mip_levels())
+            return nullptr;
+        const auto actual_fmt = format();
+        if (expected_fmt && actual_fmt != *expected_fmt)
             return nullptr;
 
         const int size = std::max(1, edge() >> level);
         const rect_i requested = region.value_or(rect_i{{0, 0}, {size, size}});
 
-        texture_lock_info info{};
+        auto state = std::make_unique<detail::texture_lock_state>();
         if (!backend_->cube_texture_lock.get_or_throw()(
-                handle_, face, requested, level, mode, info))
+                handle_, face, requested, level, mode, state->info))
             return nullptr;
 
-        auto state = std::make_unique<detail::texture_lock_state>();
         state->handle = handle_;
         state->backend = backend_;
-        state->info = info;
+        state->format = actual_fmt;
         return state;
     }
 

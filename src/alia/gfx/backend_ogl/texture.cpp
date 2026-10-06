@@ -186,6 +186,18 @@ namespace alia {
 
     } // namespace
 
+    bool ogl_texture_format_supported(
+        device_handle *, pixel_format fmt, int, texture_role role, texture_usage
+    ) {
+        return to_ogl_format(fmt, role).internal_format != 0;
+    }
+
+    bool ogl_cube_texture_format_supported(
+        device_handle *, pixel_format fmt, int, texture_usage
+    ) {
+        return to_ogl_format(fmt, texture_role::color).internal_format != 0;
+    }
+
     texture_handle *ogl_create_texture(
         device_handle *,
         pixel_format fmt,

@@ -289,10 +289,9 @@ alia::bitmap make_normal_map() {
             const float ny = 0.24f * std::cos(u * 14.0f * std::numbers::pi_v<float>) *
                 std::sin(v * 22.0f * std::numbers::pi_v<float>);
             const float nz = std::sqrt(std::max(0.0f, 1.0f - nx * nx - ny * ny));
-            auto pack = [](float value) {
-                return static_cast<std::uint8_t>((value * 0.5f + 0.5f) * 255.0f + 0.5f);
-            };
-            pixels[x, y] = {pack(nx), pack(ny), pack(nz), 255};
+            pixels[x, y] = alia::from_rgba_f32<alia::px_rgba8888>({
+                nx * 0.5f + 0.5f, ny * 0.5f + 0.5f, nz * 0.5f + 0.5f, 1.0f,
+            });
         }
     }
     return result;

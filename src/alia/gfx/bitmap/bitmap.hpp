@@ -503,4 +503,6 @@ namespace alia {
 
 } // namespace alia
 
+#include "pixel_converters.hpp"
+
 #endif /* BITMAP_D13C36F5_B90B_4972_BABA_70EDC4AEE8DB */

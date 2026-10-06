@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
             ? alia::full_mip_chain
             : 1;
         alia::texture logo(
-            device, alia::load_image("./resources/dvdlogo.png"), mips);
+            device, alia::load_image("./resources/dvdlogo.png"), {.mip_levels = mips});
         if (mips != 1)
             logo.generate_mipmaps();
         logo.set_sampler(alia::linear_clamp);

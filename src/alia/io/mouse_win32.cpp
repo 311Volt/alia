@@ -38,50 +38,8 @@ private:
     HCURSOR cursor_ = nullptr;
 };
 
-std::uint8_t float_channel(float value) {
-    return static_cast<std::uint8_t>(
-        std::clamp(value, 0.0f, 1.0f) * 255.0f + 0.5f);
-}
-
 void copy_cursor_pixels(bitmap &destination, const any_bitmap_view &source) {
-    if (can_convert_pixel(source.format(), pixel_format::bgra8888)) {
-        converting_blit(destination.view(), source);
-        return;
-    }
-
-    auto output = destination.view_as<px_bgra8888>();
-    switch (source.format()) {
-    case pixel_format::rgb_f32:
-        for (int y = 0; y < source.height(); ++y) {
-            const auto *row = static_cast<const px_rgb_f32 *>(source.line(y));
-            for (int x = 0; x < source.width(); ++x)
-                output[x, y] = {
-                    float_channel(row[x].b), float_channel(row[x].g),
-                    float_channel(row[x].r), 255};
-        }
-        return;
-    case pixel_format::rgba_f32:
-        for (int y = 0; y < source.height(); ++y) {
-            const auto *row = static_cast<const px_rgba_f32 *>(source.line(y));
-            for (int x = 0; x < source.width(); ++x)
-                output[x, y] = {
-                    float_channel(row[x].b), float_channel(row[x].g),
-                    float_channel(row[x].r), float_channel(row[x].a)};
-        }
-        return;
-    case pixel_format::gray_f32:
-        for (int y = 0; y < source.height(); ++y) {
-            const auto *row = static_cast<const px_gray_f32 *>(source.line(y));
-            for (int x = 0; x < source.width(); ++x) {
-                const auto gray = float_channel(row[x].v);
-                output[x, y] = {gray, gray, gray, 255};
-            }
-        }
-        return;
-    default:
-        throw std::invalid_argument(
-            "mouse_cursor: bitmap format cannot be converted to RGBA");
-    }
+    converting_blit_lossy(destination.view(), source);
 }
 
 HCURSOR create_cursor(const any_bitmap_view &source, vec2i hotspot) {

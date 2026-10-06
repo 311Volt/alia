@@ -325,22 +325,39 @@ namespace alia {
 
         /// @brief Create an uninitialized 2D texture with the requested mip chain and role.
         /// @param device Device that will own the texture.
-        /// @param format Pixel storage format for every mip level.
+        /// @param format Exact pixel storage format for every mip level; never substituted.
         /// @param size Width and height in pixels of mip level zero.
         /// @param mip_levels Number of levels; one means no mipmaps, zero requests a full chain.
         /// @param role Whether the texture stores color or an alpha mask.
         /// @param usage Whether the texture is for sampling only or can be a render target.
-        /// @return New texture handle, or null if creation fails.
+        /// @return New texture handle, or null if the format is unsupported or creation fails.
         gfx_backend_op<texture_handle *(device_handle *device, pixel_format format, vec2i size, int mip_levels, texture_role role, texture_usage usage)> create_texture;
+
+        /// @brief Query support for an exact 2D texture format without creating a texture.
+        /// @param device Device that would own the texture.
+        /// @param format Exact pixel storage format to query.
+        /// @param mip_levels Number of levels; one means no mipmaps, zero requests a full chain.
+        /// @param role Whether the texture stores color or an alpha mask.
+        /// @param usage Whether the texture is for sampling only or can be a render target.
+        /// @return True if the requested format is supported for these settings.
+        gfx_backend_op<bool(device_handle *device, pixel_format format, int mip_levels, texture_role role, texture_usage usage)> texture_format_supported;
 
         /// @brief Create an uninitialized cube texture with six square faces.
         /// @param device Device that will own the texture.
-        /// @param format Pixel storage format for every face and mip level.
+        /// @param format Exact pixel storage format for every face and mip level; never substituted.
         /// @param edge Width and height in pixels of each base-level face.
         /// @param mip_levels Number of levels; one means no mipmaps, zero requests a full chain.
         /// @param usage Whether the texture is for sampling only or can be a render target.
-        /// @return New cube texture handle, or null if creation fails.
+        /// @return New cube texture handle, or null if the format is unsupported or creation fails.
         gfx_backend_op<texture_handle *(device_handle *device, pixel_format format, int edge, int mip_levels, texture_usage usage)> create_cube_texture;
+
+        /// @brief Query support for an exact color cube texture format without creating a texture.
+        /// @param device Device that would own the texture.
+        /// @param format Exact pixel storage format to query.
+        /// @param mip_levels Number of levels; one means no mipmaps, zero requests a full chain.
+        /// @param usage Whether the texture is for sampling only or can be a render target.
+        /// @return True if the requested format is supported for these settings.
+        gfx_backend_op<bool(device_handle *device, pixel_format format, int mip_levels, texture_usage usage)> cube_texture_format_supported;
 
         /// @brief Release a 2D or cube texture handle and its backend resource.
         /// @param texture Texture handle to release.

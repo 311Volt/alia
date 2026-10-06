@@ -94,6 +94,9 @@ add_executable(vertex_definition_registry_tests
     vertex_definition_registry_test_helper.cpp
 )
 
+add_executable(texture_format_tests texture_format_test.cpp)
+target_link_libraries(texture_format_tests PRIVATE alia GTest::gtest GTest::gtest_main)
+
 add_executable(display_mode_tests display_mode_test.cpp)
 target_link_libraries(display_mode_tests PRIVATE alia GTest::gtest GTest::gtest_main)
 
@@ -126,6 +129,7 @@ gtest_discover_tests(text_layout_tests)
 gtest_discover_tests(soo_any_tests)
 gtest_discover_tests(any_deque_tests)
 gtest_discover_tests(pixel_bitmap_tests)
+gtest_discover_tests(texture_format_tests)
 gtest_discover_tests(vertex_definition_registry_tests)
 gtest_discover_tests(display_mode_tests)
 gtest_discover_tests(framebuffer_config_tests)

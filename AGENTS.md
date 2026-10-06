@@ -15,6 +15,7 @@ API-level behaviour is documented next to the declarations in `src/alia/gfx/`. T
 
 - Each backend lives in `backend_<name>/`. `<name>_ops.hpp` holds its concrete structs, `as_<name>_*` cast helpers and op declarations; `register_<name>_backend.cpp` creates the device, probes capabilities and fills the interface.
 - Backend objects inherit the opaque `*_handle` bases and are downcast with `static_cast` only inside that backend. Concrete backend types never appear in public headers.
+- Backends never substitute pixel formats. `create_*texture` stores the format it is given; fallback lives in L3 (`detail::closest_texture_format`).
 - A null op slot means the **hardware** lacks the feature, as probed at device creation, with `reason_unsupported` saying why. Never use it for "this backend doesn't implement X yet".
 - Never name anything `interface`; it is a macro in MinGW's COM headers.
 

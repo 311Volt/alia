@@ -85,6 +85,7 @@ void main() {
 
 alia::bitmap make_face(alia::px_rgba8888 base) {
     constexpr int edge = 256;
+    const auto base_f = alia::to_rgba_f32(base);
     alia::bitmap result({edge, edge}, base);
     auto pixels = result.view_as<alia::px_rgba8888>();
     for (int y = 0; y < edge; ++y) {
@@ -95,12 +96,9 @@ alia::bitmap make_face(alia::px_rgba8888 base) {
             if (border || marker) {
                 pixels[x, y] = {255, 255, 255, 255};
             } else {
-                pixels[x, y] = {
-                    static_cast<std::uint8_t>(base.r * shade),
-                    static_cast<std::uint8_t>(base.g * shade),
-                    static_cast<std::uint8_t>(base.b * shade),
-                    255,
-                };
+                pixels[x, y] = alia::from_rgba_f32<alia::px_rgba8888>({
+                    base_f.r * shade, base_f.g * shade, base_f.b * shade, 1.0f,
+                });
             }
         }
     }
@@ -129,22 +127,13 @@ std::array<alia::bitmap, alia::cube_face_count> make_blank_faces() {
 
 void stamp_positive_z(alia::cube_texture &texture) {
     const alia::rect_i stamp = alia::rect_i::pos_size({96, 96}, {64, 64});
-    if (texture.format() == alia::pixel_format::rgba8888) {
-        if (auto region = texture.lock<alia::px_rgba8888>(
-                alia::cube_face::positive_z, stamp)) {
-            auto &pixels = *region;
-            for (int y = 0; y < pixels.height(); ++y)
-                for (int x = 0; x < pixels.width(); ++x)
-                    pixels[x, y] = {255, 245, 40, 255};
-        }
-    } else if (texture.format() == alia::pixel_format::bgra8888) {
-        if (auto region = texture.lock<alia::px_bgra8888>(
-                alia::cube_face::positive_z, stamp)) {
-            auto &pixels = *region;
-            for (int y = 0; y < pixels.height(); ++y)
-                for (int x = 0; x < pixels.width(); ++x)
-                    pixels[x, y] = {40, 245, 255, 255};
-        }
+    const auto color = alia::from_rgba8888<alia::px_bgra8888>({255, 245, 40, 255});
+    if (auto region = texture.lock_write_only<alia::px_bgra8888>(
+            alia::cube_face::positive_z, stamp)) {
+        auto &pixels = *region;
+        for (int y = 0; y < pixels.height(); ++y)
+            for (int x = 0; x < pixels.width(); ++x)
+                pixels[x, y] = color;
     }
 }
 
@@ -176,12 +165,13 @@ int main(int argc, char **argv) {
         auto face_bitmaps = make_sky_faces();
         alia::cube_texture sky(
             device,
-            std::span<const alia::bitmap, alia::cube_face_count>(face_bitmaps));
+            std::span<const alia::bitmap, alia::cube_face_count>(face_bitmaps),
+            {.format = alia::pixel_format::bgra8888});
         auto blank_faces = make_blank_faces();
         alia::cube_texture rendered(
             device,
-            std::span<const alia::bitmap, alia::cube_face_count>(blank_faces), 1,
-            alia::texture_usage::render_target);
+            std::span<const alia::bitmap, alia::cube_face_count>(blank_faces),
+            {.usage = alia::texture_usage::render_target});
         alia::cube_texture copied(
             device,
             std::span<const alia::bitmap, alia::cube_face_count>(blank_faces));

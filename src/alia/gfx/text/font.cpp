@@ -124,7 +124,7 @@ namespace alia {
 
             glyph_page &add_page() {
                 bitmap blank(page_size, px_gray_u8{0});
-                texture atlas(*device, blank, 1, texture_role::alpha_mask, texture_usage::sampling_only);
+                texture atlas(*device, blank, {.role = texture_role::alpha_mask});
 
                 atlas.set_sampler({
                     .min_filter = texture_filter::linear,
@@ -399,9 +399,7 @@ namespace alia {
         texture mask(
             device,
             source.coverage,
-            1,
-            texture_role::alpha_mask,
-            texture_usage::sampling_only
+            {.role = texture_role::alpha_mask}
         );
         mask.set_sampler({
             .min_filter = filter,
