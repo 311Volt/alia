@@ -2,6 +2,7 @@
 #define ALIA_GFX_FRAMEBUFFER_CONFIG_HPP
 
 #include "bitmap/pixel.hpp"
+#include "lighting.hpp"
 
 #include <optional>
 #include <string>
@@ -108,6 +109,12 @@ namespace alia {
         bool cube_textures = false;
         bool render_to_texture = false;
         bool separate_alpha_blend = false;
+        int max_lights = 0; // Zero means fixed-function lighting is unsupported.
+        // Which of the two required spot parameter sets this device applies.
+        spot_light_model spot_model = spot_light_model::inner_outer;
+        bool fog = false;
+        // Distance used by fixed-function fog; meaningful when fog is supported.
+        fog_distance_model fog_distance = fog_distance_model::view_depth;
         std::string renderer_name;
     };
 

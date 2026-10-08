@@ -2,7 +2,6 @@
 #include "alia/gfx/bitmap/bitmap.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/transform.hpp"
 #include "alia/os/display.hpp"
 #include "alia/os/monitor.hpp"
@@ -208,8 +207,6 @@ int main(int argc, char **argv) {
 
         alia::event_queue events;
         events.register_source(&window.get_event_source());
-        alia::basic_effect effect;
-        auto pipeline = alia::pipeline::create<alia::colored_vertex>(device, {.effect = &effect});
         const std::array triangle{
             alia::colored_vertex{{400.0f, 80.0f}, {1.0f, 0.2f, 0.15f}},
             alia::colored_vertex{{80.0f, 520.0f}, {0.15f, 0.9f, 0.3f}},
@@ -283,8 +280,6 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::color{0.08f, 0.1f, 0.16f, 1.0f});
-            effect.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(pipeline);
             frame.draw<alia::colored_vertex>(triangle);
             if (partial_present) {
                 const auto size = frame.target_size();

@@ -1,7 +1,6 @@
 #include "alia/os/window.hpp"
 #include "alia/gfx/gfx_device.hpp"
 #include "alia/gfx/frame.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/primitive_renderer.hpp"
 #include "alia/gfx/texture.hpp"
 #include "alia/events/event_queue.hpp"
@@ -46,10 +45,6 @@ int main(int argc, char **argv) {
             {.format = alia::pixel_format::bgra8888, .usage = alia::texture_usage::render_target});
         alia::texture copied(device, target_size, {.format = alia::pixel_format::bgra8888});
 
-        alia::basic_effect prim_fx;
-        auto prim_pipeline = alia::pipeline::create<alia::colored_vertex>(device, {.effect = &prim_fx});
-        alia::basic_effect tex_fx{.texture_op = alia::texture_operation::replace};
-        auto tex_pipeline = alia::pipeline::create<alia::uv_vertex>(device, {.effect = &tex_fx});
         alia::primitive_renderer renderer;
 
         alia::event_queue events;
@@ -68,8 +63,6 @@ int main(int argc, char **argv) {
             auto frame = swapchain.begin_frame();
             frame.set_target(offscreen);
             frame.clear(alia::color(0.04f, 0.06f, 0.08f, 1.0f));
-            prim_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(prim_pipeline);
             renderer.fill_rect(
                 frame,
                 alia::rect_f::pos_size({24.0f, 24.0f}, {96.0f, 96.0f}),
@@ -86,8 +79,6 @@ int main(int argc, char **argv) {
 
             frame.set_target();
             frame.clear(alia::color(0.08f, 0.09f, 0.11f, 1.0f));
-            tex_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(tex_pipeline);
             frame.set_texture(0, offscreen);
             const auto offscreen_quad =
                 textured_quad(alia::rect_f::pos_size({90.0f, 142.0f}, target_size_f));
@@ -97,8 +88,6 @@ int main(int argc, char **argv) {
                 textured_quad(alia::rect_f::pos_size({554.0f, 142.0f}, target_size_f));
             frame.draw<alia::uv_vertex>(copied_quad);
 
-            prim_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(prim_pipeline);
             renderer.draw_rect(
                 frame,
                 alia::rect_f::pos_size({90.0f, 142.0f}, target_size_f),

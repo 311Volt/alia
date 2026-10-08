@@ -1,6 +1,5 @@
 #include "alia/os/window.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/primitive_renderer.hpp"
 #include "alia/gfx/shader.hpp"
@@ -126,8 +125,6 @@ int main(int argc, char **argv) {
 
         alia::bitmap checker_bmp = make_checker_bitmap();
         alia::texture checker_tex(device, checker_bmp);
-        alia::basic_effect prim_fx;
-        auto prim_pipeline = alia::pipeline::create<alia::colored_vertex>(device, {.effect = &prim_fx});
         alia::immediate_primitive_renderer renderer;
 
         const std::array<alia::shader_source, 4> sources{{
@@ -183,7 +180,6 @@ int main(int argc, char **argv) {
         auto tint_constant =
             shader.allocate_constant<alia::color>("u_tint", alia::shader_type::pixel);
 
-        auto pipeline = alia::pipeline::create<alia::uv_vertex>(device, {.effect = &shader});
         const alia::uv_vertex quad[] = {
             {{-0.5f, -0.5f}, {0.0f, 0.0f}}, {{0.5f, -0.5f}, {1.0f, 0.0f}}, {{-0.5f, 0.5f}, {0.0f, 1.0f}},
             {{0.5f, -0.5f}, {1.0f, 0.0f}}, {{0.5f, 0.5f}, {1.0f, 1.0f}}, {{-0.5f, 0.5f}, {0.0f, 1.0f}},
@@ -223,13 +219,13 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::color(0.06f, 0.07f, 0.09f, 1.0f));
-            frame.set_pipeline(pipeline);
-            frame.set_texture(0, checker_tex); // Program samplers may alternatively bind their own texture.
-            frame.draw<alia::uv_vertex>(quad);
+            {
+                auto shaded = frame.save_state();
+                frame.set_shader(shader);
+                frame.set_texture(0, checker_tex); // Program samplers may alternatively bind their own texture.
+                frame.draw<alia::uv_vertex>(quad);
+            }
 
-            prim_fx.world = alia::transform::identity();
-            prim_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(prim_pipeline);
             renderer.draw_rect(
                 frame,
                 alia::rect_f::pos_size({260.0f, 160.0f}, {280.0f, 280.0f}),

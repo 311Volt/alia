@@ -5,7 +5,6 @@
 #include "alia/gfx/draw_texture.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/primitive_renderer.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/gfx/texture.hpp"
@@ -50,15 +49,6 @@ int main(int argc, char **argv) {
         alia::ttf_font font = alia::load_ttf_font("./resources/roboto.ttf", 24);
         alia::hardware_glyph_buffer glyphs(device, font);
 
-        alia::basic_effect prim_fx;
-        alia::basic_effect texture_fx{.texture_op = alia::texture_operation::modulate};
-        alia::basic_effect text_fx{.texture_op = alia::texture_operation::alpha_mask};
-        auto prim_pipeline = alia::pipeline::create<alia::colored_vertex>(
-            device, {.effect = &prim_fx});
-        auto texture_pipeline = alia::pipeline::create<alia::full_vertex>(
-            device, {.effect = &texture_fx});
-        auto text_pipeline = alia::pipeline::create<alia::full_vertex>(
-            device, {.effect = &text_fx});
         alia::immediate_primitive_renderer renderer;
 
         alia::event_queue events;
@@ -112,9 +102,6 @@ int main(int argc, char **argv) {
             auto frame = swapchain.begin_frame();
             frame.clear(alia::black);
 
-            texture_fx.world = alia::transform::identity();
-            texture_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(texture_pipeline);
             alia::draw_texture({
                 .target = frame,
                 .texture = background,
@@ -123,31 +110,22 @@ int main(int argc, char **argv) {
                     {0.0f, 0.0f}, frame.target_size().as<float>())
             });
 
-            // NOTE (API feedback): alia has no scoped world-transform helper.
-            prim_fx.world = alia::transform::translate(text_position);
-            prim_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(prim_pipeline);
-            renderer.draw_line(
-                frame, {0.0f, 0.0f}, {max_width, 0.0f}, alia::red, 4.0f);
-
-            text_fx.world = alia::transform::translate(text_position);
-            text_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(text_pipeline);
-            alia::draw_text({
-                .target = frame,
-                .glyphs = glyphs,
-                .text = visible_text,
-                .texture_slot = 0,
-                .position = {0.0f, 0.0f},
-                .tint = alia::white
-            });
-            prim_fx.world = alia::transform::identity();
-            text_fx.world = alia::transform::identity();
+            {
+                auto translated = frame.push_world(alia::transform::translate(text_position));
+                renderer.draw_line(
+                    frame, {0.0f, 0.0f}, {max_width, 0.0f}, alia::red, 4.0f);
+                alia::draw_text({
+                    .target = frame,
+                    .glyphs = glyphs,
+                    .text = visible_text,
+                    .texture_slot = 0,
+                    .position = {0.0f, 0.0f},
+                    .tint = alia::white
+                });
+            }
 
             const alia::rect_i r1 = alia::rect_i::pos_size({95, 160}, {70, 70});
             const alia::rect_i r2 = alia::rect_i::pos_size({70, 30}, {80, 80});
-            prim_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(prim_pipeline);
             renderer.draw_rect(frame, r1.as<float>(), alia::blue);
             renderer.draw_rect(frame, r2.as<float>(), alia::blue);
             renderer.draw_rect(frame, r1.union_with(r2).as<float>(), alia::magenta);

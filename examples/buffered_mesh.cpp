@@ -1,6 +1,5 @@
 #include "alia/os/window.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/prim_buffers.hpp"
 #include "alia/gfx/shader.hpp"
@@ -256,10 +255,6 @@ int main(int argc, char **argv) {
             shader.allocate_constant<alia::transform>("u_projection", alia::shader_type::vertex);
         auto transform_constant =
             shader.allocate_constant<alia::transform>("u_transform", alia::shader_type::vertex);
-        auto pipeline = alia::pipeline::create<alia::normal_vertex3d>(device, {
-            .effect = &shader,
-            .depth = {.test_enabled = true, .write_enabled = true},
-        });
 
         alia::event_queue events;
         events.register_source(&win.get_event_source());
@@ -309,11 +304,17 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::color(0.025f, 0.03f, 0.04f, 1.0f), 1.0f);
-            frame.set_pipeline(pipeline);
-            if (use_buffered)
-                frame.draw_indexed(gpu_vertices, gpu_indices);
-            else
-                frame.draw_indexed(vertex_span, index_span);
+            {
+                auto scene = frame.save_state();
+                frame.set_projection(projection);
+                frame.set_world(model);
+                frame.set_shader(shader);
+                frame.set_depth(alia::depth_test_write);
+                if (use_buffered)
+                    frame.draw_indexed(gpu_vertices, gpu_indices);
+                else
+                    frame.draw_indexed(vertex_span, index_span);
+            }
             frame.present();
             if (fps.count_frame()) {
                 displayed_fps = static_cast<int>(fps.interval().fps() + 0.5);

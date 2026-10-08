@@ -56,14 +56,18 @@ namespace alia {
             }
         }
 
+        bool hardware_vertex_processing = false;
         auto try_create = [&](D3DDEVTYPE type, IDirect3DDevice9 **out) {
-            const DWORD first_flags = type == D3DDEVTYPE_HAL
+            DWORD flags = type == D3DDEVTYPE_HAL
                 ? D3DCREATE_HARDWARE_VERTEXPROCESSING
                 : D3DCREATE_SOFTWARE_VERTEXPROCESSING;
-            HRESULT hr = d3d->CreateDevice(adapter, type, dummy, first_flags, &pp, out);
-            if (FAILED(hr) && type == D3DDEVTYPE_HAL)
-                hr = d3d->CreateDevice(
-                    adapter, type, dummy, D3DCREATE_SOFTWARE_VERTEXPROCESSING, &pp, out);
+            HRESULT hr = d3d->CreateDevice(adapter, type, dummy, flags, &pp, out);
+            if (FAILED(hr) && type == D3DDEVTYPE_HAL) {
+                flags = D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+                hr = d3d->CreateDevice(adapter, type, dummy, flags, &pp, out);
+            }
+            if (SUCCEEDED(hr))
+                hardware_vertex_processing = flags == D3DCREATE_HARDWARE_VERTEXPROCESSING;
             return hr;
         };
 
@@ -88,6 +92,7 @@ namespace alia {
         dev->dummy = dummy;
         dev->adapter = adapter;
         dev->device_type = device_type;
+        dev->hardware_vertex_processing = hardware_vertex_processing;
         device->GetDeviceCaps(&dev->caps);
         return dev;
     }

@@ -1,6 +1,5 @@
 #include "alia/os/window.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/primitive_renderer.hpp"
 #include "alia/gfx/bitmap/image_io.hpp"
@@ -51,7 +50,7 @@ alia::gfx_backend requested_backend(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     try {
-        alia::window win({800, 600}, {.title = "Hello ALIA — pipelines", .resizable = true});
+        alia::window win({800, 600}, {.title = "Hello ALIA", .resizable = true});
         auto device = alia::gfx_device::create(requested_backend(argc, argv));
         auto swapchain = device.create_swapchain({
             .target = win,
@@ -60,20 +59,12 @@ int main(int argc, char **argv) {
         alia::event_queue events;
         events.register_source(&win.get_event_source());
 
-        alia::basic_effect triangle_effect;
-        auto triangle_pipeline = alia::pipeline::create<alia::colored_vertex>(device, {.effect = &triangle_effect});
         const alia::colored_vertex triangle[] = {
             {{400.0f, 100.0f}, {1.0f, 0.15f, 0.15f}},
             {{100.0f, 500.0f}, {0.15f, 1.0f, 0.15f}},
             {{700.0f, 500.0f}, {0.15f, 0.15f, 1.0f}},
         };
 
-        alia::basic_effect prim_fx;
-        auto prim_pipeline = alia::pipeline::create<alia::colored_vertex>(device, {.effect = &prim_fx});
-        alia::basic_effect tex_fx{.texture_op = alia::texture_operation::replace};
-        auto tex_pipeline = alia::pipeline::create<alia::uv_vertex>(device, {.effect = &tex_fx});
-        alia::basic_effect text_fx{.texture_op = alia::texture_operation::alpha_mask};
-        auto text_pipeline = alia::pipeline::create<alia::full_vertex>(device, {.effect = &text_fx});
         alia::immediate_primitive_renderer renderer;
         alia::texture checker(device, alia::load_image("./resources/test.png"));
 
@@ -132,13 +123,8 @@ int main(int argc, char **argv) {
             auto frame = swapchain.begin_frame();
             frame.clear(alia::light_blue);
 
-            triangle_effect.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(triangle_pipeline);
             frame.draw<alia::colored_vertex>(triangle);
 
-            prim_fx.world = alia::transform::identity();
-            prim_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(prim_pipeline);
             renderer.fill_rect(
                 frame,
                 alia::rect_f::pos_size({50.0f, 50.0f}, {100.0f, 100.0f}),
@@ -172,23 +158,19 @@ int main(int argc, char **argv) {
                 alia::line_join::bevel
             );
 
-            tex_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(tex_pipeline);
             frame.set_texture(0, checker);
             const auto checker_quad =
                 textured_quad(alia::rect_f::pos_size({50.0f, 290.0f}, {256.0f, 256.0f}));
             frame.draw<alia::uv_vertex>(checker_quad);
 
-            prim_fx.world =
-                alia::transform::translate(-1.0f * transformed_center) *
-                alia::transform::rotate(elapsed) *
-                alia::transform::translate(transformed_center);
-            frame.set_pipeline(prim_pipeline);
-            renderer.draw_rect(frame, transformed_rect, alia::white, 5.0f);
-            prim_fx.world = alia::transform::identity();
+            {
+                auto rotated = frame.push_world(
+                    alia::transform::translate(-1.0f * transformed_center) *
+                    alia::transform::rotate(elapsed) *
+                    alia::transform::translate(transformed_center));
+                renderer.draw_rect(frame, transformed_rect, alia::white, 5.0f);
+            }
 
-            text_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(text_pipeline);
             if (demo_text) {
                 alia::draw_text_texture({
                     .target = frame,
@@ -233,7 +215,7 @@ int main(int argc, char **argv) {
                         *demo_font,
                         "FPS: " + std::to_string(fps)
                     );
-                const std::string title = "Hello ALIA — pipelines | FPS: " + std::to_string(fps);
+                const std::string title = "Hello ALIA | FPS: " + std::to_string(fps);
                 win.set_title(title.c_str());
             }
         }

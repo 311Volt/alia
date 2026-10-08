@@ -4,7 +4,6 @@
 #include "alia/gfx/cube_texture.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/gfx/texture.hpp"
@@ -380,11 +379,6 @@ int main(int argc, char **argv) {
             "u_sky_view_proj", alia::shader_type::vertex);
         auto sky_sampler = sky_shader.allocate_sampler("u_sky");
         sky_sampler.set_texture(environment);
-        auto sky_pipeline = alia::pipeline::create<alia::vertex3d>(
-            device,
-            {.effect = &sky_shader,
-             .blend = {.enabled = false},
-             .depth = {true, false, alia::compare_func::less_equal}});
 
         const std::array<alia::shader_source, 4> ball_sources{{
             {alia::gfx_backend::d3d9, alia::shader_type::vertex,
@@ -423,11 +417,6 @@ int main(int argc, char **argv) {
         auto environment_sampler = ball_shader.allocate_sampler("u_environment");
         normal_sampler.set_texture(normal_map);
         environment_sampler.set_texture(environment);
-        auto ball_pipeline = alia::pipeline::create<ball_vertex>(
-            device,
-            {.effect = &ball_shader,
-             .blend = {.enabled = false},
-             .depth = {true, true, alia::compare_func::less_equal}});
 
         const std::array sky_vertices{
             alia::vertex3d{{-1.0f, -1.0f, -1.0f}},
@@ -447,10 +436,6 @@ int main(int argc, char **argv) {
 
         alia::ttf_font font = alia::load_ttf_font("./resources/roboto.ttf", 17);
         alia::hardware_glyph_buffer glyphs(device, font);
-        alia::basic_effect text_effect{
-            .texture_op = alia::texture_operation::alpha_mask};
-        auto text_pipeline = alia::pipeline::create<alia::full_vertex>(
-            device, {.effect = &text_effect});
 
         alia::event_queue events;
         events.register_source(&window.get_event_source());
@@ -481,26 +466,34 @@ int main(int argc, char **argv) {
             const auto projection =
                 device.perspective_fov(55.0f, aspect, 0.05f, 30.0f);
 
-            auto sky_view = view;
-            sky_view.m[3][0] = 0.0f;
-            sky_view.m[3][1] = 0.0f;
-            sky_view.m[3][2] = 0.0f;
-            sky_view_projection.set_value(sky_view * projection);
-            frame.set_pipeline(sky_pipeline);
-            frame.draw_indexed<alia::vertex3d>(sky_vertices, sky_indices);
+            {
+                auto scene = frame.save_state();
+                frame.set_projection(projection);
+                frame.set_blend(alia::no_blend);
 
-            world_constant.set_value(
-                rotation_y(time * 0.32f) * rotation_x(-0.18f));
-            view_projection_constant.set_value(view * projection);
-            camera_constant.set_value(camera_position);
-            light_constant.set_value({-0.45f, -0.8f, -0.35f});
-            frame.set_pipeline(ball_pipeline);
-            frame.draw_indexed<ball_vertex>(
-                std::span<const ball_vertex>(ball.vertices),
-                std::span<const std::uint32_t>(ball.indices));
+                auto sky_view = view;
+                sky_view.m[3][0] = 0.0f;
+                sky_view.m[3][1] = 0.0f;
+                sky_view.m[3][2] = 0.0f;
+                frame.set_view(sky_view);
+                sky_view_projection.set_value(frame.view() * frame.projection());
+                frame.set_shader(sky_shader);
+                frame.set_depth(alia::depth_test);
+                frame.draw_indexed<alia::vertex3d>(sky_vertices, sky_indices);
 
-            text_effect.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(text_pipeline);
+                frame.set_view(view);
+                frame.set_world(rotation_y(time * 0.32f) * rotation_x(-0.18f));
+                world_constant.set_value(frame.world());
+                view_projection_constant.set_value(frame.view() * frame.projection());
+                camera_constant.set_value(camera_position);
+                light_constant.set_value({-0.45f, -0.8f, -0.35f});
+                frame.set_shader(ball_shader);
+                frame.set_depth(alia::depth_test_write);
+                frame.draw_indexed<ball_vertex>(
+                    std::span<const ball_vertex>(ball.vertices),
+                    std::span<const std::uint32_t>(ball.indices));
+            }
+
             alia::draw_text({
                 .target = frame,
                 .glyphs = glyphs,

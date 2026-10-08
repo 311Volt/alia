@@ -33,8 +33,8 @@ namespace alia {
         color tint = white;
     };
 
-    // Submit one full_vertex quad using the caller's pipeline, transforms,
-    // viewport, and blending. Fixed-function drawing requires modulate and slot 0;
+    // Submit one full_vertex quad using the current frame render state and
+    // viewport. Fixed-function drawing uses slot 0;
     // shaders must sample the explicit slot (stored shader samplers still apply).
     // Bind the texture with its stored sampler; the binding persists after drawing.
     // Zero-width or zero-height geometry leaves bindings untouched. Inverted

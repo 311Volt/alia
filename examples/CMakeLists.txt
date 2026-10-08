@@ -7,6 +7,7 @@ function(alia_add_example name)
         set(source "${ARGV1}")
     endif()
     add_executable("alia_example_${name}" "${source}")
+    add_dependencies(alia_examples "alia_example_${name}")
     target_link_libraries("alia_example_${name}" PRIVATE alia)
     add_custom_command(TARGET "alia_example_${name}" POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -21,9 +22,8 @@ if(WIN32)
 endif()
 alia_add_example(shader)
 alia_add_example(buffered_mesh)
+alia_add_example(lighting)
 alia_add_example(render_target)
-alia_add_example(mdspan mdspan_example.cpp)
-
 alia_add_example(example1)
 alia_add_example(dvdlogo)
 alia_add_example(userevents)

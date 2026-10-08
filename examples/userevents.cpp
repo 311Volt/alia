@@ -4,7 +4,6 @@
 #include "alia/events/event_source_impl.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/os/window.hpp"
 
@@ -62,9 +61,6 @@ int main(int argc, char **argv) {
 
         alia::ttf_font font = alia::load_ttf_font("./resources/roboto.ttf", 16);
         alia::hardware_glyph_buffer glyphs(device, font);
-        alia::basic_effect text_fx{.texture_op = alia::texture_operation::alpha_mask};
-        auto text_pipeline = alia::pipeline::create<alia::full_vertex>(
-            device, {.effect = &text_fx});
 
         alia::event_queue events;
         events.register_source(&win.get_event_source());
@@ -113,8 +109,6 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::color::from_rgba8(0, 0, 60));
-            text_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(text_pipeline);
 
             alia::draw_text({
                 .target = frame,

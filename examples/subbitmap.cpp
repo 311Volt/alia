@@ -4,7 +4,6 @@
 #include "alia/gfx/draw_texture.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/texture.hpp"
 #include "alia/os/window.hpp"
 
@@ -45,9 +44,6 @@ int main(int argc, char **argv) {
                 alia::rect_i::pos_size({0, 0}, {16, 16})));
         first_tile.set_sampler(alia::nearest_clamp);
 
-        alia::basic_effect texture_fx{.texture_op = alia::texture_operation::modulate};
-        auto texture_pipeline = alia::pipeline::create<alia::full_vertex>(
-            device, {.effect = &texture_fx});
         alia::event_queue events;
         events.register_source(&win.get_event_source());
 
@@ -73,8 +69,6 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::black);
-            texture_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(texture_pipeline);
             alia::draw_texture({
                 .target = frame,
                 .texture = atlas,

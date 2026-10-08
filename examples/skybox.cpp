@@ -3,7 +3,6 @@
 #include "alia/gfx/cube_texture.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/primitive_renderer.hpp"
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/text/font.hpp"
@@ -200,8 +199,6 @@ int main(int argc, char **argv) {
         auto view_projection = sky_shader.allocate_constant<alia::transform>(
             "u_view_proj", alia::shader_type::vertex);
         auto sky_sampler = sky_shader.allocate_sampler("u_sky");
-        auto sky_pipeline = alia::pipeline::create<alia::vertex3d>(
-            device, {.effect = &sky_shader, .blend = {.enabled = false}});
 
         const std::array cube_vertices{
             alia::vertex3d{{-1.0f, -1.0f, -1.0f}},
@@ -219,17 +216,10 @@ int main(int argc, char **argv) {
             3, 2, 6, 3, 6, 7, 4, 5, 1, 4, 1, 0,
         }};
 
-        alia::basic_effect primitive_effect;
-        auto primitive_pipeline = alia::pipeline::create<alia::colored_vertex>(
-            device, {.effect = &primitive_effect, .blend = {.enabled = false}});
         alia::primitive_renderer primitives;
 
         alia::ttf_font font = alia::load_ttf_font("./resources/roboto.ttf", 17);
         alia::hardware_glyph_buffer glyphs(device, font);
-        alia::basic_effect text_effect{
-            .texture_op = alia::texture_operation::alpha_mask};
-        auto text_pipeline = alia::pipeline::create<alia::full_vertex>(
-            device, {.effect = &text_effect});
 
         alia::event_queue events;
         events.register_source(&window.get_event_source());
@@ -283,47 +273,50 @@ int main(int argc, char **argv) {
             frame.set_target(rendered, face);
             const float phase = static_cast<float>(std::fmod(now, 1.0));
             frame.clear(alia::color(0.025f, 0.035f, 0.06f, 1.0f));
-            primitive_effect.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(primitive_pipeline);
-            primitives.fill_rect(
-                frame,
-                alia::rect_f::pos_size({12.0f + phase * 68.0f, 20.0f}, {38.0f, 88.0f}),
-                alia::color(0.95f, 0.26f, 0.12f, 1.0f));
-            primitives.draw_line(
-                frame, {8.0f, 112.0f}, {120.0f, 16.0f},
-                alia::color(0.2f, 0.85f, 1.0f, 1.0f), 6.0f);
-            primitives.flush(frame);
-            frame.copy_to_texture(
-                copied, face, alia::rect_i::pos_size({}, {128, 128}));
+            {
+                auto face_state = frame.save_state();
+                frame.set_blend(alia::no_blend);
+                primitives.fill_rect(
+                    frame,
+                    alia::rect_f::pos_size({12.0f + phase * 68.0f, 20.0f}, {38.0f, 88.0f}),
+                    alia::color(0.95f, 0.26f, 0.12f, 1.0f));
+                primitives.draw_line(
+                    frame, {8.0f, 112.0f}, {120.0f, 16.0f},
+                    alia::color(0.2f, 0.85f, 1.0f, 1.0f), 6.0f);
+                primitives.flush(frame);
+                frame.copy_to_texture(
+                    copied, face, alia::rect_i::pos_size({}, {128, 128}));
+            }
 
             frame.set_target();
             frame.clear(alia::color(0.015f, 0.02f, 0.035f, 1.0f));
-            const auto target_size = frame.target_size();
-            const float aspect = target_size.y > 0
-                ? static_cast<float>(target_size.x) / target_size.y : 1.0f;
-            const alia::vec3f direction{
-                std::cos(pitch) * std::sin(yaw),
-                std::sin(pitch),
-                std::cos(pitch) * std::cos(yaw),
-            };
-            const auto projection =
-                device.perspective_fov(78.0f, aspect, 0.05f, 10.0f);
-            view_projection.set_value(
-                alia::transform::look_at(
-                    {}, direction, {0.0f, 1.0f, 0.0f}) * projection);
-            if (active_texture == 0)
-                sky_sampler.set_texture(sky);
-            else if (active_texture == 1)
-                sky_sampler.set_texture(rendered);
-            else
-                sky_sampler.set_texture(copied);
-            frame.set_pipeline(sky_pipeline);
-            frame.draw_indexed<alia::vertex3d>(cube_vertices, cube_indices);
+            {
+                auto scene = frame.save_state();
+                const auto target_size = frame.target_size();
+                const float aspect = target_size.y > 0
+                    ? static_cast<float>(target_size.x) / target_size.y : 1.0f;
+                const alia::vec3f direction{
+                    std::cos(pitch) * std::sin(yaw),
+                    std::sin(pitch),
+                    std::cos(pitch) * std::cos(yaw),
+                };
+                frame.set_projection(device.perspective_fov(78.0f, aspect, 0.05f, 10.0f));
+                frame.set_view(alia::transform::look_at(
+                    {}, direction, {0.0f, 1.0f, 0.0f}));
+                view_projection.set_value(frame.view() * frame.projection());
+                if (active_texture == 0)
+                    sky_sampler.set_texture(sky);
+                else if (active_texture == 1)
+                    sky_sampler.set_texture(rendered);
+                else
+                    sky_sampler.set_texture(copied);
+                frame.set_shader(sky_shader);
+                frame.set_blend(alia::no_blend);
+                frame.draw_indexed<alia::vertex3d>(cube_vertices, cube_indices);
+            }
 
             static constexpr std::array<std::string_view, 3> labels{
                 "uploaded sky", "rendered faces", "copied faces"};
-            text_effect.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(text_pipeline);
             alia::draw_text({
                 .target = frame,
                 .glyphs = glyphs,

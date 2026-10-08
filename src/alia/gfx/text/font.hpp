@@ -193,9 +193,8 @@ namespace alia {
         color tint = white;
     };
 
-    // The caller binds a full_vertex pipeline whose basic_effect uses
-    // texture_operation::alpha_mask and owns the projection. Fixed-function
-    // drawing requires slot 0; shaders must sample the explicit slot. Both bind
+    // Draw with the current frame render state and viewport. Fixed-function
+    // drawing uses slot 0; shaders must sample the explicit slot. Both bind
     // the slot and submit immediately; the binding persists after drawing.
     // draw_text lays out the whole string first and issues one indexed draw
     // per atlas page touched; draw_text_texture draws one quad.

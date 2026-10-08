@@ -335,11 +335,8 @@ namespace alia {
 
     } // namespace detail
 
-    // These mesh-only renderers never bind a pipeline or modify an effect;
+    // These mesh-only renderers never change frame render state or the viewport;
     // input coordinates remain in world space for the caller's transform.
-    // The caller binds a colored_vertex pipeline and owns its basic_effect,
-    // re-deriving the projection after every frame::set_target (ortho_ui for
-    // UI, perspective_fov for 3D).
     // These CRTP-like methods use the concrete explicit-object type as their
     // sink. Calling through generic_primitive_renderer& therefore fails the
     // primitive_sink constraint. Calling an immediate renderer through a

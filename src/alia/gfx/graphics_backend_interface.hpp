@@ -6,6 +6,7 @@
 #include "../core/vec.hpp"
 #include "bitmap/pixel.hpp"
 #include "framebuffer_config.hpp"
+#include "lighting.hpp"
 #include "transform.hpp"
 #include "vertex.hpp"
 
@@ -59,7 +60,6 @@ namespace alia {
     struct index_buffer_handle {};
     struct swapchain_handle {};
     struct shader_program_handle {};
-    struct pipeline_handle {};
 
     enum class gfx_backend {
         auto_,
@@ -240,12 +240,8 @@ namespace alia {
     };
     enum class texture_operation {
         vertex_color,
-        replace,
         modulate,
         alpha_mask
-    };
-    enum class lighting_mode {
-        unlit
     };
 
     struct render_viewport {
@@ -259,22 +255,22 @@ namespace alia {
         blend_factor src = blend_factor::src_alpha;
         blend_factor dst = blend_factor::inv_src_alpha;
         blend_op op = blend_op::add;
+        bool operator==(const blend_state &) const = default;
     };
+    inline constexpr blend_state alpha_blend{true};
+    inline constexpr blend_state no_blend{};
+    // Add the source color weighted by its alpha to the destination.
+    inline constexpr blend_state additive_blend{true, blend_factor::src_alpha, blend_factor::one};
     struct depth_state {
         bool test_enabled = false;
         bool write_enabled = false;
         compare_func compare = compare_func::less_equal;
+        bool operator==(const depth_state &) const = default;
     };
+    inline constexpr depth_state depth_test{true, false, compare_func::less_equal};
+    inline constexpr depth_state depth_test_write{true, true, compare_func::less_equal};
     struct raster_state {
         cull_mode cull = cull_mode::none;
-    };
-    // Fixed-function effect. Pipelines reference it without owning it and
-    // backends read the matrices at draw time, so changes apply to later draws.
-    struct basic_effect {
-        texture_operation texture_op = texture_operation::vertex_color;
-        lighting_mode lighting = lighting_mode::unlit;
-        transform world = transform::identity();
-        transform projection = transform::identity();
     };
 
     struct texture_sampler_binding {
@@ -287,13 +283,28 @@ namespace alia {
         int stride = 0;
         std::span<const vertex_element> elements;
     };
-    struct pipeline_desc {
+    struct render_state {
         shader_program_handle *shader = nullptr;
-        const basic_effect *effect = nullptr;
         vertex_definition_view vertex_layout;
+        texture_operation texture_op = texture_operation::vertex_color;
         blend_state blend = {};
         depth_state depth = {};
         raster_state raster = {};
+        // Resolved by L3: only fixed-function layouts with normals are lit.
+        bool lighting = false;
+        bool vertex_color_material = false;
+        // Resolved by L3: an enabled fog mode, with no shader selected.
+        bool fog = false;
+    };
+    // Row vectors are transformed by world, then view, then projection.
+    struct transform_state {
+        transform world = transform::identity();
+        transform view = transform::identity();
+        transform projection = transform::identity();
+    };
+    struct lighting_state {
+        color ambient = black;
+        std::span<const light> lights;
     };
     struct render_target_info {
         swapchain_handle *swapchain = nullptr;
@@ -610,28 +621,45 @@ namespace alia {
         /// @return Nothing.
         gfx_backend_op<void(swapchain_handle *swapchain, vec2i new_size)> swapchain_on_resize;
 
-        /// @brief Create a pipeline from shader or fixed-function effect and render-state descriptions.
-        /// @param device Device that will own the pipeline.
-        /// @param description Shader/effect, vertex layout, blend, depth, and raster state to retain. Referenced shader/effect objects are non-owning and must outlive the pipeline.
-        /// @return New pipeline handle, or null if the backend cannot create it.
-        gfx_backend_op<pipeline_handle *(device_handle *device, const pipeline_desc &description)> create_pipeline;
+        /// @brief Retain the complete render-state group for subsequent draws.
+        /// L3 calls this only immediately before a draw, with the whole group,
+        /// and only when it changed (or on the first draw of a frame).
+        /// @param device Device whose draw state is changed.
+        /// @param state Resolved shader, vertex layout, texture operation and render states.
+        gfx_backend_op<void(device_handle *device, const render_state &state)> set_render_state;
 
-        /// @brief Release a pipeline.
-        /// @param pipeline Pipeline to release.
-        /// @return Nothing.
-        gfx_backend_op<void(pipeline_handle *pipeline)> destroy_pipeline;
+        /// @brief Retain the complete transform group for subsequent fixed-function draws.
+        /// L3 calls this only immediately before a draw, with the whole group,
+        /// and only when it changed (or on the first draw of a frame).
+        /// Shader constants remain the caller's responsibility.
+        /// @param device Device whose transforms are changed.
+        /// @param transforms World, view and projection in row-vector order.
+        gfx_backend_op<void(device_handle *device, const transform_state &transforms)> set_transforms;
 
-        /// @brief Replace the retained description of a mutable pipeline.
-        /// @param pipeline Pipeline to update.
-        /// @param description New shader/effect, vertex layout, blend, depth, and raster state. Referenced shader/effect objects are non-owning and must outlive the pipeline.
-        /// @return Nothing.
-        gfx_backend_op<void(pipeline_handle *pipeline, const pipeline_desc &description)> update_pipeline;
+        /// @brief Upload the complete global ambient and world-space light group.
+        /// L3 calls this only immediately before a draw, after transforms, and
+        /// only when the group changed (or on the first draw of a frame).
+        /// Null, with reason_unsupported, when caps.max_lights is zero.
+        /// @param device Device whose lighting is changed.
+        /// @param lighting Values to copy; the light span is valid only during this call.
+        gfx_backend_op<void(device_handle *device, const lighting_state &lighting)> set_lighting;
 
-        /// @brief Bind a pipeline as the device's current draw pipeline.
-        /// @param device Device whose pipeline state is changed.
-        /// @param pipeline Pipeline to bind.
-        /// @return Nothing.
-        gfx_backend_op<void(device_handle *device, pipeline_handle *pipeline)> bind_pipeline;
+        /// @brief Upload the complete fixed-function material group.
+        /// L3 calls this only immediately before a draw, after lighting, and
+        /// only when the group changed (or on the first draw of a frame).
+        /// Null, with reason_unsupported, when caps.max_lights is zero.
+        /// @param device Device whose material is changed.
+        /// @param surface Material to retain by value.
+        gfx_backend_op<void(device_handle *device, const material &surface)> set_material;
+
+        /// @brief Upload the complete fixed-function fog parameter group.
+        /// L3 calls this only immediately before a draw, after material, and
+        /// only when the group changed (or on the first draw of a frame).
+        /// Fog enablement comes from render_state.fog; shader draws disable fog.
+        /// Null, with reason_unsupported, when caps.fog is false.
+        /// @param device Device whose fog parameters are changed.
+        /// @param fog Parameters to apply; distances follow caps.fog_distance.
+        gfx_backend_op<void(device_handle *device, const fog_state &fog)> set_fog;
 
         /// @brief Select the swapchain backbuffer or a texture mip/face as the current render target and reset the viewport to its full extent.
         /// @param device Device whose render target is changed.
@@ -683,7 +711,7 @@ namespace alia {
         /// @return Nothing.
         gfx_backend_op<void(device_handle *device, const texture_sampler_binding &binding)> bind_resources;
 
-        /// @brief Submit a non-indexed draw using the current pipeline and recorded vertex source.
+        /// @brief Submit a non-indexed draw using the current render state and recorded vertex source.
         /// @param device Device on which to draw.
         /// @param topology Triangle list, strip, or fan interpretation of the vertices.
         /// @param vertex_count Number of vertices to consume from the selected source.
@@ -691,7 +719,7 @@ namespace alia {
         /// @return Nothing.
         gfx_backend_op<void(device_handle *device, primitive_topology topology, int vertex_count, int first_vertex)> draw;
 
-        /// @brief Submit an indexed draw using the current pipeline and recorded vertex and index sources.
+        /// @brief Submit an indexed draw using the current render state and recorded vertex and index sources.
         /// @param device Device on which to draw.
         /// @param topology Triangle list, strip, or fan interpretation of the indices.
         /// @param index_count Number of indices consumed by this draw.

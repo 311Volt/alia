@@ -6,8 +6,8 @@ API-level behaviour is documented next to the declarations in `src/alia/gfx/`. T
 
 | Layer | Location | Role |
 |-------|----------|------|
-| L1 | `*.hpp` (public) | User-facing API: device, swapchain, frame, textures, buffers, pipelines, shaders, and draw helpers |
-| L2 | `*.hpp` (detail/templates) | Type-erasure shims from typed templates (texture locks, `frame::draw<TVertex>`) to L3 |
+| L1 | `*.hpp` (public) | User-facing API: device, swapchain, frame render state, textures, buffers, shaders, and draw helpers |
+| L2 | `*.hpp` (detail/templates) | Type-erasure shims from typed templates (texture locks, `frame::draw<TVertex>` and its vertex layout) to L3 |
 | L3 | `*.cpp` (backend-agnostic) | Object lifetime and validation, format dispatch, vertex-definition registry; calls into L4 |
 | L4 | `graphics_backend_interface` | One function-pointer table per device, one `gfx_backend_op` slot per backend operation |
 
@@ -21,13 +21,13 @@ API-level behaviour is documented next to the declarations in `src/alia/gfx/`. T
 
 ## Ownership
 
-Everything created from a `gfx_device` holds raw pointers into it, so the device must outlive all of them. Non-owning references in configs (such as `pipeline_config::effect`) must likewise outlive the objects built from them.
+Everything created from a `gfx_device` holds raw pointers into it, so the device must outlive all of them. A shader selected on a frame must remain valid while selected or saved in a state scope.
 
 ## Draw helpers
 
 Draw helpers (`draw_texture`, text drawing, primitive renderers) follow these rules:
 
-- They never bind a pipeline or own effect, transform, viewport or blend state. The caller sets those up.
+- They never change frame render state or the viewport; they draw with what is current.
 - Their params are aggregates. A texture slot, where needed, is a `detail::required_texture_slot` member, so every callsite must name it. Fixed-function drawing uses slot 0.
 - They bind their texture immediately before drawing and leave the binding in place afterwards.
 - Invalid input throws `std::invalid_argument` before anything is bound. Empty input returns without binding or drawing.

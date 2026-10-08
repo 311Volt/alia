@@ -2,7 +2,6 @@
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/prim_buffers.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/os/window.hpp"
@@ -142,14 +141,8 @@ int main(int argc, char **argv) {
             std::span<const std::uint32_t>(indices.data(), indices.size()),
             alia::buffer_usage::static_mesh);
 
-        alia::basic_effect prim_fx;
-        auto prim_pipeline = alia::pipeline::create<alia::colored_vertex>(
-            device, {.effect = &prim_fx});
         alia::ttf_font font = alia::load_ttf_font("./resources/roboto.ttf", 16);
         alia::hardware_glyph_buffer glyphs(device, font);
-        alia::basic_effect text_fx{.texture_op = alia::texture_operation::alpha_mask};
-        auto text_pipeline = alia::pipeline::create<alia::full_vertex>(
-            device, {.effect = &text_fx});
 
         alia::event_queue events;
         events.register_source(&win.get_event_source());
@@ -181,14 +174,11 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::black);
-            prim_fx.world = alia::transform::scale(alia::vec2f(frame.target_size()));
-            prim_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(prim_pipeline);
-            frame.draw_indexed(vertex_buffer, index_buffer);
-            prim_fx.world = alia::transform::identity();
+            {
+                auto scaled = frame.push_world(alia::transform::scale(alia::vec2f(frame.target_size())));
+                frame.draw_indexed(vertex_buffer, index_buffer);
+            }
 
-            text_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(text_pipeline);
             const std::string fps_text = std::format("{} fps", displayed_fps);
             alia::draw_text({
                 .target = frame,

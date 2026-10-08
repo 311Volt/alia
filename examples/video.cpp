@@ -7,7 +7,6 @@
 #include "alia/audio/audio.hpp"
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/frame.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/os/window.hpp"
 #include "alia/video/video.hpp"
@@ -39,10 +38,6 @@ int main() {
 
     alia::ttf_font font = alia::load_ttf_font("./resources/roboto.ttf", 18);
     alia::hardware_glyph_buffer glyphs(device, font);
-    alia::basic_effect video_fx{.texture_op = alia::texture_operation::replace};
-    alia::basic_effect text_fx{.texture_op = alia::texture_operation::alpha_mask};
-    auto video_pipeline = alia::pipeline::create<alia::uv_vertex>(device, {.effect = &video_fx});
-    auto text_pipeline = alia::pipeline::create<alia::full_vertex>(device, {.effect = &text_fx});
 
     bool running = true;
     bool redraw = true;
@@ -68,14 +63,10 @@ int main() {
 
         auto frame = swapchain.begin_frame();
         frame.clear(alia::black);
-        video_fx.projection = device.ortho_ui(frame.target_size());
-        frame.set_pipeline(video_pipeline);
         frame.set_texture(0, vid.current_frame());
         const auto quad = textured_quad(alia::rect_f::pos_size(
             {0, 0}, alia::vec2f(vid.current_frame().size())));
         frame.draw<alia::uv_vertex>(quad);
-        text_fx.projection = device.ortho_ui(frame.target_size());
-        frame.set_pipeline(text_pipeline);
         alia::draw_text({
             .target = frame,
             .glyphs = glyphs,

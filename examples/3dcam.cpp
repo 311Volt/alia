@@ -3,7 +3,6 @@
 #include "alia/gfx/bitmap/image_io.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/gfx/texture.hpp"
 #include "alia/io/keyboard.hpp"
@@ -47,15 +46,9 @@ int main(int argc, char **argv) {
             alia::uv_vertex3d{{1.5f, 0.0f, 1.5f}, {1.0f, 0.0f}},
         };
         alia::texture background(device, alia::load_image("./resources/bg.jpg"));
-        alia::basic_effect scene_fx{.texture_op = alia::texture_operation::replace};
-        auto scene_pipeline = alia::pipeline::create<alia::uv_vertex3d>(
-            device, {.effect = &scene_fx});
 
         alia::ttf_font font = alia::load_ttf_font("./resources/roboto.ttf", 16);
         alia::hardware_glyph_buffer glyphs(device, font);
-        alia::basic_effect text_fx{.texture_op = alia::texture_operation::alpha_mask};
-        auto text_pipeline = alia::pipeline::create<alia::full_vertex>(
-            device, {.effect = &text_fx});
 
         alia::event_queue events;
         events.register_source(&win.get_event_source());
@@ -96,20 +89,18 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::color::from_rgba8(100, 190, 240));
-            const float aspect = frame.target_size().y > 0
-                ? static_cast<float>(frame.target_size().x) / frame.target_size().y
-                : 1.0f;
-            scene_fx.projection =
-                device.perspective_fov(78.0f, aspect, 0.01f, 100.0f);
-            scene_fx.world = alia::transform::look_at(
-                position, position + forward, {0.0f, 1.0f, 0.0f});
-            frame.set_pipeline(scene_pipeline);
-            frame.set_texture(0, background, alia::linear_clamp);
-            frame.draw<alia::uv_vertex3d>(triangle);
+            {
+                auto scene = frame.save_state();
+                const float aspect = frame.target_size().y > 0
+                    ? static_cast<float>(frame.target_size().x) / frame.target_size().y
+                    : 1.0f;
+                frame.set_projection(device.perspective_fov(78.0f, aspect, 0.01f, 100.0f));
+                frame.set_view(alia::transform::look_at(
+                    position, position + forward, {0.0f, 1.0f, 0.0f}));
+                frame.set_texture(0, background, alia::linear_clamp);
+                frame.draw<alia::uv_vertex3d>(triangle);
+            }
 
-            // Each pipeline owns its transform state; no global reset is needed.
-            text_fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(text_pipeline);
             alia::draw_text({
                 .target = frame,
                 .glyphs = glyphs,

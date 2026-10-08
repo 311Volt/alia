@@ -42,6 +42,16 @@ namespace alia {
                 D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE, D3DFMT_A8R8G8B8));
         iface.caps.separate_alpha_blend =
             (raw->caps.PrimitiveMiscCaps & D3DPMISCCAPS_SEPARATEALPHABLEND) != 0;
+        iface.caps.spot_model = spot_light_model::inner_outer;
+        const DWORD required_light_caps = D3DVTXPCAPS_DIRECTIONALLIGHTS | D3DVTXPCAPS_POSITIONALLIGHTS;
+        const bool supports_light_types = (caps.VertexProcessingCaps & required_light_caps) == required_light_caps;
+        iface.caps.max_lights = max_lights;
+        if (raw->hardware_vertex_processing)
+            iface.caps.max_lights = supports_light_types
+                ? static_cast<int>((std::min)(static_cast<DWORD>(max_lights), caps.MaxActiveLights)) : 0;
+        iface.caps.fog = (caps.RasterCaps & D3DPRASTERCAPS_FOGVERTEX) != 0;
+        iface.caps.fog_distance = (caps.RasterCaps & D3DPRASTERCAPS_FOGRANGE) != 0
+            ? fog_distance_model::radial : fog_distance_model::view_depth;
         D3DADAPTER_IDENTIFIER9 identifier = {};
         if (SUCCEEDED(raw->d3d->GetAdapterIdentifier(raw->adapter, 0, &identifier)))
             iface.caps.renderer_name = identifier.Description;
@@ -118,10 +128,22 @@ namespace alia {
         iface.swapchain_present_region = {d3d9_swapchain_present_region};
         iface.swapchain_on_resize   = {d3d9_swapchain_on_resize};
 
-        iface.create_pipeline             = {d3d9_create_pipeline};
-        iface.destroy_pipeline            = {d3d9_destroy_pipeline};
-        iface.update_pipeline             = {d3d9_update_pipeline};
-        iface.bind_pipeline               = {d3d9_bind_pipeline};
+        iface.set_render_state            = {d3d9_set_render_state};
+        iface.set_transforms              = {d3d9_set_transforms};
+        if (iface.caps.max_lights > 0) {
+            iface.set_lighting = {d3d9_set_lighting};
+            iface.set_material = {d3d9_set_material};
+        } else {
+            const char *reason = !supports_light_types
+                ? "hardware vertex processing lacks directional or positional lighting"
+                : "device reports zero active fixed-function lights";
+            iface.set_lighting = {nullptr, reason};
+            iface.set_material = {nullptr, reason};
+        }
+        iface.set_fog = iface.caps.fog
+            ? gfx_backend_op<void(device_handle *, const fog_state &)>{d3d9_set_fog}
+            : gfx_backend_op<void(device_handle *, const fog_state &)>{
+                nullptr, "device lacks D3DPRASTERCAPS_FOGVERTEX"};
         iface.set_render_target           = {d3d9_set_render_target};
         iface.clear                       = {d3d9_clear};
         iface.set_viewport                = {d3d9_set_viewport};

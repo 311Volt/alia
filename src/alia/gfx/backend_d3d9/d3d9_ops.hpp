@@ -35,7 +35,6 @@ namespace alia {
         d3d9_compiled_vertex_definition(const d3d9_compiled_vertex_definition &) = delete;
         d3d9_compiled_vertex_definition &operator=(const d3d9_compiled_vertex_definition &) = delete;
     };
-    struct d3d9_pipeline;
     struct d3d9_vertex_buffer;
     struct d3d9_index_buffer;
     struct d3d9_device : device_handle {
@@ -45,8 +44,12 @@ namespace alia {
         D3DCAPS9 caps = {};
         UINT adapter = D3DADAPTER_DEFAULT;
         D3DDEVTYPE device_type = D3DDEVTYPE_HAL;
+        bool hardware_vertex_processing = false;
         std::vector<std::optional<d3d9_compiled_vertex_definition>> vertex_definitions;
-        d3d9_pipeline *current_pipeline = nullptr;
+        render_state state = {};
+        transform_state transforms = {};
+        material surface_material = {};
+        int enabled_light_count = 0;
         d3d9_vertex_buffer *current_vb = nullptr;
         d3d9_index_buffer *current_ib = nullptr;
         const void *transient_vertices = nullptr;
@@ -108,14 +111,6 @@ namespace alia {
         std::vector<d3d9_stored_shader_constant> stored_constants;
         std::unordered_map<int, texture_handle *> sampler_textures;
     };
-    struct d3d9_pipeline : pipeline_handle {
-        d3d9_shader_program *shader = nullptr;
-        const basic_effect *effect = nullptr;
-        vertex_definition_view layout = {};
-        blend_state blend = {};
-        depth_state depth = {};
-        raster_state raster = {};
-    };
 
     inline d3d9_device *as_d3d9_device(device_handle *h) { return static_cast<d3d9_device *>(h); }
     inline d3d9_texture *as_d3d9_texture(texture_handle *h) { return static_cast<d3d9_texture *>(h); }
@@ -140,7 +135,6 @@ namespace alia {
     inline d3d9_swapchain *as_d3d9_swapchain(swapchain_handle *h) { return static_cast<d3d9_swapchain *>(h); }
     inline const d3d9_swapchain *as_d3d9_swapchain(const swapchain_handle *h) { return static_cast<const d3d9_swapchain *>(h); }
     inline d3d9_shader_program *as_d3d9_shader_program(shader_program_handle *h) { return static_cast<d3d9_shader_program *>(h); }
-    inline d3d9_pipeline *as_d3d9_pipeline(pipeline_handle *h) { return static_cast<d3d9_pipeline *>(h); }
     inline DWORD to_d3d_color(color c) {
         auto clamp = [](float v) { return static_cast<BYTE>(std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f); };
         return D3DCOLOR_RGBA(clamp(c.r), clamp(c.g), clamp(c.b), clamp(c.a));
@@ -171,7 +165,11 @@ namespace alia {
     swapchain_handle *d3d9_create_swapchain(device_handle *, void *, vec2i, const swapchain_desc &); void d3d9_destroy_swapchain(swapchain_handle *);
     framebuffer_properties d3d9_swapchain_properties(const swapchain_handle *);
     void d3d9_swapchain_begin_frame(swapchain_handle *); void d3d9_swapchain_end_frame(swapchain_handle *); void d3d9_swapchain_present(swapchain_handle *); bool d3d9_swapchain_present_region(swapchain_handle *, rect_i); void d3d9_swapchain_on_resize(swapchain_handle *, vec2i);
-    pipeline_handle *d3d9_create_pipeline(device_handle *, const pipeline_desc &); void d3d9_destroy_pipeline(pipeline_handle *); void d3d9_update_pipeline(pipeline_handle *, const pipeline_desc &); void d3d9_bind_pipeline(device_handle *, pipeline_handle *);
+    void d3d9_set_render_state(device_handle *, const render_state &);
+    void d3d9_set_transforms(device_handle *, const transform_state &);
+    void d3d9_set_lighting(device_handle *, const lighting_state &);
+    void d3d9_set_material(device_handle *, const material &);
+    void d3d9_set_fog(device_handle *, const fog_state &);
     bool d3d9_set_render_target(device_handle *, const render_target_info &); bool d3d9_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void d3d9_reset_frame_state(d3d9_device &); void d3d9_set_viewport(device_handle *, const render_viewport &);
     void d3d9_bind_vertex_buffer(device_handle *, vertex_buffer_handle *); void d3d9_bind_index_buffer(device_handle *, index_buffer_handle *);
     void d3d9_upload_transient_vertex_data(device_handle *, const void *, int); void d3d9_upload_transient_index_data(device_handle *, std::span<const uint32_t>);

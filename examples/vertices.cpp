@@ -5,7 +5,6 @@
 #include "alia/gfx/bitmap/image_io.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/texture.hpp"
 #include "alia/os/window.hpp"
 
@@ -75,12 +74,6 @@ int main(int argc, char **argv) {
         auto swapchain = device.create_swapchain({.target = win});
 
         alia::texture background(device, alia::load_image("./resources/bg.jpg"));
-        alia::basic_effect fx{
-            .texture_op = alia::texture_operation::modulate,
-            .world = alia::transform::scale({100.0f, 100.0f}),
-        };
-        auto draw_pipeline = alia::pipeline::create<my_vertex>(
-            device, {.effect = &fx});
 
         const std::array vertices{
             my_vertex{.pos = {1.0f, 1.0f}, .uv = {0.0f, 0.0f}},
@@ -107,8 +100,7 @@ int main(int argc, char **argv) {
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::black);
-            fx.projection = device.ortho_ui(frame.target_size());
-            frame.set_pipeline(draw_pipeline);
+            frame.set_world(alia::transform::scale({100.0f, 100.0f}));
             frame.set_texture(0, background, alia::linear_clamp);
             frame.draw<my_vertex>(vertices);
             frame.present();

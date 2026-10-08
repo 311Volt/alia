@@ -107,10 +107,6 @@ namespace alia {
                 device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1); device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
                 device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1); device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
                 break;
-            case texture_operation::replace:
-                device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1); device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-                device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1); device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
-                break;
             case texture_operation::modulate:
                 device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE); device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE); device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
                 device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE); device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE); device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
@@ -124,66 +120,54 @@ namespace alia {
             device->SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
         }
         void prepare_draw(d3d9_device &device) {
-            auto *pipeline = device.current_pipeline;
-            if (pipeline->shader) {
-                d3d9_apply_program_state(device.device, pipeline->shader);
+            if (device.state.shader) {
+                d3d9_apply_program_state(device.device, as_d3d9_shader_program(device.state.shader));
                 return;
             }
-            IDirect3DBaseTexture9 *bound_texture = nullptr;
-            const bool cube_bound =
-                SUCCEEDED(device.device->GetTexture(0, &bound_texture)) &&
-                bound_texture && bound_texture->GetType() == D3DRTYPE_CUBETEXTURE;
-            if (bound_texture)
-                bound_texture->Release();
-            apply_texture_op(
-                device.device,
-                cube_bound ? texture_operation::vertex_color
-                           : pipeline->effect->texture_op);
-            device.device->SetTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX *>(&pipeline->effect->world.m[0][0]));
-            D3DMATRIX identity{};
-            identity._11 = identity._22 = identity._33 = identity._44 = 1.0f;
-            device.device->SetTransform(D3DTS_VIEW, &identity);
-            device.device->SetTransform(D3DTS_PROJECTION, reinterpret_cast<const D3DMATRIX *>(&pipeline->effect->projection.m[0][0]));
+            apply_texture_op(device.device, device.state.texture_op);
+            device.device->SetTransform(D3DTS_WORLD, reinterpret_cast<const D3DMATRIX *>(&device.transforms.world.m[0][0]));
+            device.device->SetTransform(D3DTS_VIEW, reinterpret_cast<const D3DMATRIX *>(&device.transforms.view.m[0][0]));
+            device.device->SetTransform(D3DTS_PROJECTION, reinterpret_cast<const D3DMATRIX *>(&device.transforms.projection.m[0][0]));
         }
     }
 
-    pipeline_handle *d3d9_create_pipeline(device_handle *, const pipeline_desc &desc) {
-        auto *pipeline = new d3d9_pipeline;
-        d3d9_update_pipeline(pipeline, desc);
-        return pipeline;
-    }
-    void d3d9_destroy_pipeline(pipeline_handle *h) { delete as_d3d9_pipeline(h); }
-    void d3d9_update_pipeline(pipeline_handle *h, const pipeline_desc &desc) {
-        auto *pipeline = as_d3d9_pipeline(h);
-        pipeline->shader = desc.shader ? as_d3d9_shader_program(desc.shader) : nullptr;
-        pipeline->effect = desc.effect;
-        pipeline->layout = desc.vertex_layout;
-        pipeline->blend = desc.blend;
-        pipeline->depth = desc.depth;
-        pipeline->raster = desc.raster;
-    }
-    void d3d9_bind_pipeline(device_handle *h, pipeline_handle *pipeline_h) {
+    void d3d9_set_render_state(device_handle *h, const render_state &state) {
         auto &device = *as_d3d9_device(h);
-        auto *pipeline = as_d3d9_pipeline(pipeline_h);
-        if (pipeline->layout.stride > 0)
-            device.device->SetVertexDeclaration(get_or_compile(device, pipeline->layout));
-        if (pipeline->shader) {
-            device.device->SetVertexShader(pipeline->shader->vertex_shader);
-            device.device->SetPixelShader(pipeline->shader->pixel_shader);
+        if (state.vertex_layout.stride > 0)
+            device.device->SetVertexDeclaration(get_or_compile(device, state.vertex_layout));
+        if (state.shader) {
+            const auto *shader = as_d3d9_shader_program(state.shader);
+            device.device->SetVertexShader(shader->vertex_shader);
+            device.device->SetPixelShader(shader->pixel_shader);
         } else {
             device.device->SetVertexShader(nullptr); device.device->SetPixelShader(nullptr);
-            apply_texture_op(device.device, pipeline->effect->texture_op);
         }
-        device.device->SetRenderState(D3DRS_ZENABLE, pipeline->depth.test_enabled ? D3DZB_TRUE : D3DZB_FALSE);
-        device.device->SetRenderState(D3DRS_ZWRITEENABLE, pipeline->depth.write_enabled ? TRUE : FALSE);
-        device.device->SetRenderState(D3DRS_ZFUNC, to_d3d(pipeline->depth.compare));
-        device.device->SetRenderState(D3DRS_ALPHABLENDENABLE, pipeline->blend.enabled ? TRUE : FALSE);
+        device.device->SetRenderState(D3DRS_ZENABLE, state.depth.test_enabled ? D3DZB_TRUE : D3DZB_FALSE);
+        device.device->SetRenderState(D3DRS_ZWRITEENABLE, state.depth.write_enabled ? TRUE : FALSE);
+        device.device->SetRenderState(D3DRS_ZFUNC, to_d3d(state.depth.compare));
+        device.device->SetRenderState(D3DRS_ALPHABLENDENABLE, state.blend.enabled ? TRUE : FALSE);
         device.device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
-        device.device->SetRenderState(D3DRS_SRCBLEND, to_d3d(pipeline->blend.src));
-        device.device->SetRenderState(D3DRS_DESTBLEND, to_d3d(pipeline->blend.dst));
-        device.device->SetRenderState(D3DRS_CULLMODE, to_d3d(pipeline->raster.cull));
-        device.device->SetRenderState(D3DRS_LIGHTING, FALSE);
-        device.current_pipeline = pipeline;
+        device.device->SetRenderState(D3DRS_SRCBLEND, to_d3d(state.blend.src));
+        device.device->SetRenderState(D3DRS_DESTBLEND, to_d3d(state.blend.dst));
+        device.device->SetRenderState(D3DRS_CULLMODE, to_d3d(state.raster.cull));
+        device.device->SetRenderState(D3DRS_LIGHTING, state.lighting ? TRUE : FALSE);
+        // D3D9 can still blend fixed-function fog after a ps_2_0 shader.
+        device.device->SetRenderState(D3DRS_FOGENABLE, state.fog && !state.shader ? TRUE : FALSE);
+        device.device->SetRenderState(D3DRS_NORMALIZENORMALS, TRUE);
+        device.device->SetRenderState(D3DRS_LOCALVIEWER, TRUE);
+        device.device->SetRenderState(D3DRS_COLORVERTEX, state.vertex_color_material ? TRUE : FALSE);
+        const DWORD color_source = state.vertex_color_material ? D3DMCS_COLOR1 : D3DMCS_MATERIAL;
+        device.device->SetRenderState(D3DRS_DIFFUSEMATERIALSOURCE, color_source);
+        device.device->SetRenderState(D3DRS_AMBIENTMATERIALSOURCE, color_source);
+        device.device->SetRenderState(D3DRS_SPECULARMATERIALSOURCE, D3DMCS_MATERIAL);
+        device.device->SetRenderState(D3DRS_EMISSIVEMATERIALSOURCE, D3DMCS_MATERIAL);
+        const auto &specular = device.surface_material.specular;
+        const bool has_specular = specular.r != 0.0f || specular.g != 0.0f || specular.b != 0.0f;
+        device.device->SetRenderState(D3DRS_SPECULARENABLE, state.lighting && has_specular ? TRUE : FALSE);
+        device.state = state;
+    }
+    void d3d9_set_transforms(device_handle *h, const transform_state &transforms) {
+        as_d3d9_device(h)->transforms = transforms;
     }
     bool d3d9_set_render_target(device_handle *h, const render_target_info &info) {
         auto &device = *as_d3d9_device(h);
@@ -221,7 +205,17 @@ namespace alia {
     }
     void d3d9_reset_frame_state(d3d9_device &device) {
         device.device->SetStreamSource(0, nullptr, 0, 0); device.device->SetIndices(nullptr);
-        device.current_pipeline = nullptr; device.current_vb = nullptr; device.current_ib = nullptr;
+        device.state = {}; device.transforms = {};
+        device.surface_material = {};
+        for (int index = 0; index != device.enabled_light_count; ++index)
+            device.device->LightEnable(static_cast<DWORD>(index), FALSE);
+        device.enabled_light_count = 0;
+        device.device->SetRenderState(D3DRS_LIGHTING, FALSE);
+        device.device->SetRenderState(D3DRS_SPECULARENABLE, FALSE);
+        device.device->SetRenderState(D3DRS_FOGENABLE, FALSE);
+        device.device->SetRenderState(D3DRS_FOGTABLEMODE, D3DFOG_NONE);
+        device.device->SetRenderState(D3DRS_FOGVERTEXMODE, D3DFOG_NONE);
+        device.current_vb = nullptr; device.current_ib = nullptr;
         device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; device.transient_indices = nullptr; device.transient_index_count = 0;
     }
     void d3d9_set_viewport(device_handle *h, const render_viewport &viewport) {
@@ -252,7 +246,7 @@ namespace alia {
     }
     void d3d9_draw(device_handle *h, primitive_topology topology, int vertex_count, int first_vertex) {
         auto &device = *as_d3d9_device(h); prepare_draw(device); const int count = primitive_count(topology, vertex_count); if (!count) return;
-        const int stride = device.current_pipeline->layout.stride;
+        const int stride = device.state.vertex_layout.stride;
         if (device.current_vb) {
             device.device->SetStreamSource(0, device.current_vb->buffer, 0, static_cast<UINT>(stride));
             device.device->DrawPrimitive(to_d3d(topology), static_cast<UINT>(first_vertex), static_cast<UINT>(count));
@@ -263,7 +257,7 @@ namespace alia {
     }
     void d3d9_draw_indexed(device_handle *h, primitive_topology topology, int index_count, int first_index, int base_vertex) {
         auto &device = *as_d3d9_device(h); prepare_draw(device); const int count = primitive_count(topology, index_count); if (!count) return;
-        const int stride = device.current_pipeline->layout.stride;
+        const int stride = device.state.vertex_layout.stride;
         if (device.current_vb) {
             device.device->SetStreamSource(0, device.current_vb->buffer, 0, static_cast<UINT>(stride));
             device.device->SetIndices(device.current_ib->buffer);

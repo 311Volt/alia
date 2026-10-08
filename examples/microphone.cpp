@@ -8,7 +8,6 @@
 #include "alia/audio/ring_buffer.hpp"
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/frame.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/primitive_renderer.hpp"
 #include "alia/gfx/text/font.hpp"
 #include "alia/os/window.hpp"
@@ -114,12 +113,6 @@ int main() {
 
     alia::ttf_font font = alia::load_ttf_font("./resources/roboto.ttf", 16);
     alia::hardware_glyph_buffer glyphs(device, font);
-    alia::basic_effect prim_fx;
-    alia::basic_effect text_fx{.texture_op = alia::texture_operation::alpha_mask};
-    auto prim_pipeline = alia::pipeline::create<alia::colored_vertex>(
-        device, {.effect = &prim_fx});
-    auto text_pipeline = alia::pipeline::create<alia::full_vertex>(
-        device, {.effect = &text_fx});
     alia::immediate_primitive_renderer renderer;
     alia::event_queue events;
     events.register_source(&win.get_event_source());
@@ -147,15 +140,11 @@ int main() {
         const float right = meter.right_peak.load();
         auto frame = swapchain.begin_frame();
         frame.clear(alia::black);
-        prim_fx.projection = device.ortho_ui(frame.target_size());
-        frame.set_pipeline(prim_pipeline);
         renderer.fill_rect(frame, meter_left, alia::color::from_rgb_u32(0x141414));
         renderer.fill_rect(frame, meter_right, alia::color::from_rgb_u32(0x141414));
         renderer.fill_rect(frame, meter_left.scaled({left, 1}, meter_left.p1), alia::green);
         renderer.fill_rect(frame, meter_right.scaled({right, 1}, meter_right.p1), alia::green);
 
-        text_fx.projection = device.ortho_ui(frame.target_size());
-        frame.set_pipeline(text_pipeline);
         alia::draw_text({
             .target = frame,
             .glyphs = glyphs,

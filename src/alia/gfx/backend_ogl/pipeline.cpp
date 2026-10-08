@@ -88,7 +88,6 @@ namespace alia {
         void apply_texture_op(texture_operation operation) {
             switch (operation) {
             case texture_operation::vertex_color: glDisable(GL_TEXTURE_2D); break;
-            case texture_operation::replace: glEnable(GL_TEXTURE_2D); glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE); glColor4f(1, 1, 1, 1); break;
             case texture_operation::modulate: glEnable(GL_TEXTURE_2D); glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE); glColor4f(1, 1, 1, 1); break;
             case texture_operation::alpha_mask:
                 glEnable(GL_TEXTURE_2D); glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
@@ -101,44 +100,69 @@ namespace alia {
             device.applied_layout = nullptr; device.applied_base = nullptr; device.applied_shader_active = false;
         }
         void apply_layout(ogl_device &device, const void *base) {
-            const auto &layout = get_or_compile(device, device.current_pipeline->layout);
-            const bool shader = device.current_pipeline->shader != nullptr;
+            const auto &layout = get_or_compile(device, device.state.vertex_layout);
+            const bool shader = device.state.shader != nullptr;
             if (&layout == device.applied_layout && shader == device.applied_shader_active && base == device.applied_base) return;
             clear_applied_layout(device);
             if (ogl_s_glBindBuffer) ogl_s_glBindBuffer(GL_ARRAY_BUFFER, device.current_vb ? device.current_vb->buffer_id : 0);
-            layout.setup(base, device.current_pipeline->layout.stride, shader);
+            layout.setup(base, device.state.vertex_layout.stride, shader);
             device.applied_layout = &layout; device.applied_shader_active = shader; device.applied_base = base;
         }
         void prepare_draw(ogl_device &device) {
-            if (device.current_pipeline->shader) {
-                ogl_apply_program_state(device.current_pipeline->shader);
+            if (device.lights_need_upload)
+                ogl_upload_lights(device);
+            if (device.state.shader) {
+                ogl_apply_program_state(as_ogl_shader_program(device.state.shader));
                 return;
             }
-            glMatrixMode(GL_PROJECTION); glLoadMatrixf(&device.current_pipeline->effect->projection.m[0][0]);
-            glMatrixMode(GL_MODELVIEW); glLoadMatrixf(&device.current_pipeline->effect->world.m[0][0]);
+            apply_texture_op(device.state.texture_op);
+            // A layout without color must not inherit the last color-array value.
+            glColor4f(1, 1, 1, 1);
+            glMatrixMode(GL_PROJECTION); glLoadMatrixf(&device.transforms.projection.m[0][0]);
+            const transform modelview = device.transforms.world * device.transforms.view;
+            glMatrixMode(GL_MODELVIEW); glLoadMatrixf(&modelview.m[0][0]);
         }
         bool fbo_available() { return ogl_s_glGenFramebuffers && ogl_s_glBindFramebuffer && ogl_s_glFramebufferTexture2D && ogl_s_glCheckFramebufferStatus; }
     }
 
-    pipeline_handle *ogl_create_pipeline(device_handle *, const pipeline_desc &desc) { auto *pipeline = new ogl_pipeline; ogl_update_pipeline(pipeline, desc); return pipeline; }
-    void ogl_destroy_pipeline(pipeline_handle *h) { delete as_ogl_pipeline(h); }
-    void ogl_update_pipeline(pipeline_handle *h, const pipeline_desc &desc) {
-        auto *pipeline = as_ogl_pipeline(h); pipeline->shader = desc.shader ? as_ogl_shader_program(desc.shader) : nullptr; pipeline->effect = desc.effect; pipeline->layout = desc.vertex_layout; pipeline->blend = desc.blend; pipeline->depth = desc.depth; pipeline->raster = desc.raster;
-    }
-    void ogl_bind_pipeline(device_handle *h, pipeline_handle *pipeline_h) {
-        auto &device = *as_ogl_device(h); auto *pipeline = as_ogl_pipeline(pipeline_h);
-        if (ogl_s_glUseProgram) ogl_s_glUseProgram(pipeline->shader ? pipeline->shader->program : 0);
-        if (pipeline->depth.test_enabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
-        glDepthMask(pipeline->depth.write_enabled ? GL_TRUE : GL_FALSE); glDepthFunc(to_gl(pipeline->depth.compare));
-        if (pipeline->blend.enabled) glEnable(GL_BLEND); else glDisable(GL_BLEND);
-        glBlendFunc(to_gl(pipeline->blend.src), to_gl(pipeline->blend.dst));
-        if (pipeline->raster.cull == cull_mode::none) glDisable(GL_CULL_FACE);
-        else { glEnable(GL_CULL_FACE); glCullFace(GL_BACK); glFrontFace(pipeline->raster.cull == cull_mode::clockwise ? GL_CCW : GL_CW); }
-        if (!pipeline->shader) {
+    void ogl_set_render_state(device_handle *h, const render_state &state) {
+        auto &device = *as_ogl_device(h);
+        if (ogl_s_glUseProgram)
+            ogl_s_glUseProgram(state.shader ? as_ogl_shader_program(state.shader)->program : 0);
+        if (state.depth.test_enabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+        glDepthMask(state.depth.write_enabled ? GL_TRUE : GL_FALSE); glDepthFunc(to_gl(state.depth.compare));
+        if (state.blend.enabled) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+        glBlendFunc(to_gl(state.blend.src), to_gl(state.blend.dst));
+        if (state.raster.cull == cull_mode::none) glDisable(GL_CULL_FACE);
+        else { glEnable(GL_CULL_FACE); glCullFace(GL_BACK); glFrontFace(state.raster.cull == cull_mode::clockwise ? GL_CCW : GL_CW); }
+        if (state.lighting) {
+            glEnable(GL_LIGHTING);
+            glEnable(GL_NORMALIZE);
+        } else {
             glDisable(GL_LIGHTING);
-            apply_texture_op(pipeline->effect->texture_op);
+            glDisable(GL_NORMALIZE);
         }
-        device.current_pipeline = pipeline;
+        if (state.vertex_color_material) {
+            glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+            glEnable(GL_COLOR_MATERIAL);
+        } else {
+            glDisable(GL_COLOR_MATERIAL);
+            // Color material overwrites GL's ambient/diffuse material values.
+            if (device.state.vertex_color_material)
+                ogl_apply_material(device);
+        }
+        if (state.fog && !state.shader) glEnable(GL_FOG); else glDisable(GL_FOG);
+        device.state = state;
+    }
+    void ogl_set_transforms(device_handle *h, const transform_state &transforms) {
+        auto &device = *as_ogl_device(h);
+        if (device.light_count != 0) {
+            for (int row = 0; row != 4; ++row)
+                for (int column = 0; column != 4; ++column)
+                    if (device.transforms.view.m[row][column] != transforms.view.m[row][column])
+                        device.lights_need_upload = true;
+        }
+        device.transforms = transforms;
     }
     bool ogl_set_render_target(device_handle *h, const render_target_info &info) {
         auto &device = *as_ogl_device(h);
@@ -172,7 +196,19 @@ namespace alia {
         clear_applied_layout(device);
         if (ogl_s_glBindBuffer) { ogl_s_glBindBuffer(GL_ARRAY_BUFFER, 0); ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); }
         if (fbo_available()) ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        device.current_pipeline = nullptr; device.current_vb = nullptr; device.current_ib = nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; device.transient_indices = nullptr; device.transient_index_count = 0;
+        device.state = {}; device.transforms = {};
+        glDisable(GL_LIGHTING);
+        glDisable(GL_NORMALIZE);
+        glDisable(GL_COLOR_MATERIAL);
+        glDisable(GL_FOG);
+        for (int index = 0; index != device.light_count; ++index)
+            glDisable(GL_LIGHT0 + index);
+        device.lights = {};
+        device.light_count = 0;
+        device.ambient = black;
+        device.surface_material = {};
+        device.lights_need_upload = false;
+        device.current_vb = nullptr; device.current_ib = nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; device.transient_indices = nullptr; device.transient_index_count = 0;
     }
     void ogl_set_viewport(device_handle *, const render_viewport &viewport) { glViewport(viewport.origin.x, viewport.origin.y, viewport.size.x, viewport.size.y); glDepthRange(viewport.min_depth, viewport.max_depth); }
     void ogl_bind_vertex_buffer(device_handle *h, vertex_buffer_handle *buffer) { auto &device = *as_ogl_device(h); device.current_vb = buffer ? as_ogl_vertex_buffer(buffer) : nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; }
@@ -191,7 +227,7 @@ namespace alia {
     }
     void ogl_draw_indexed(device_handle *h, primitive_topology topology, int index_count, int first_index, int base_vertex) {
         auto &device = *as_ogl_device(h); if (index_count < 3) return;
-        const int stride = device.current_pipeline->layout.stride;
+        const int stride = device.state.vertex_layout.stride;
         const void *base = device.current_vb ? reinterpret_cast<const void *>(static_cast<std::uintptr_t>(base_vertex * stride)) : static_cast<const std::byte *>(device.transient_vertices) + base_vertex * stride;
         apply_layout(device, base); prepare_draw(device);
         if (ogl_s_glBindBuffer) ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, device.current_ib ? device.current_ib->buffer_id : 0);

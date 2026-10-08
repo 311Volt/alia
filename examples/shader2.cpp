@@ -2,7 +2,6 @@
 #include "alia/gfx/bitmap/image_io.hpp"
 #include "alia/gfx/frame.hpp"
 #include "alia/gfx/gfx_device.hpp"
-#include "alia/gfx/pipeline.hpp"
 #include "alia/gfx/shader.hpp"
 #include "alia/gfx/texture.hpp"
 #include "alia/io/mouse.hpp"
@@ -178,8 +177,6 @@ int main(int argc, char **argv) {
             "mouse_pos", alia::shader_type::pixel);
         auto dither_constant = shader.allocate_constant<alia::vec2f>(
             "dither_offset", alia::shader_type::pixel);
-        auto shader_pipeline = alia::pipeline::create<position_vertex>(
-            device, {.effect = &shader});
 
         alia::event_queue events;
         events.register_source(&win.get_event_source());
@@ -209,7 +206,7 @@ int main(int argc, char **argv) {
                 static_cast<float>(std::rand() % 64) / 64.0f,
                 static_cast<float>(std::rand() % 64) / 64.0f,
             });
-            frame.set_pipeline(shader_pipeline);
+            frame.set_shader(shader);
             frame.set_texture(0, noise, alia::nearest_wrap);
             const auto quad = fullscreen_quad(frame.target_size());
             frame.draw<position_vertex>(quad);

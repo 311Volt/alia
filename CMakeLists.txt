@@ -137,6 +137,7 @@ install(EXPORT alia-targets
 )
 
 if(ALIA_BUILD_EXAMPLES)
+  add_custom_target(alia_examples)
   add_subdirectory("examples")
 endif()
 

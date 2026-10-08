@@ -153,6 +153,8 @@ namespace alia {
         const bool gl20_or_later = (gl_major > 2 || (gl_major == 2 && gl_minor >= 0));
         const bool gl15_or_later = (gl_major > 1 || (gl_major == 1 && gl_minor >= 5));
         const bool gl13_or_later = (gl_major > 1 || (gl_major == 1 && gl_minor >= 3));
+        raw->separate_specular_color = gl_major > 1 || (gl_major == 1 && gl_minor >= 2);
+        raw->radial_fog = has_gl_extension("GL_NV_fog_distance");
         const bool has_cube_maps =
             gl13_or_later || has_gl_extension("GL_ARB_texture_cube_map");
 
@@ -192,6 +194,13 @@ namespace alia {
         iface.caps.separate_alpha_blend =
             gl_major > 1 || (gl_major == 1 && gl_minor >= 4) ||
             has_gl_extension("GL_EXT_blend_func_separate");
+        GLint native_max_lights = 0;
+        glGetIntegerv(GL_MAX_LIGHTS, &native_max_lights);
+        iface.caps.max_lights = (std::clamp)(static_cast<int>(native_max_lights), 0, max_lights);
+        iface.caps.spot_model = spot_light_model::cutoff_exponent;
+        iface.caps.fog = true;
+        iface.caps.fog_distance = raw->radial_fog
+            ? fog_distance_model::radial : fog_distance_model::view_depth;
         if (const auto *renderer = reinterpret_cast<const char *>(glGetString(GL_RENDERER)))
             iface.caps.renderer_name = renderer;
         std::string renderer_lower = iface.caps.renderer_name;
@@ -297,10 +306,16 @@ namespace alia {
             nullptr, "WGL has no partial buffer swap"};
         iface.swapchain_on_resize    = {ogl_swapchain_on_resize};
 
-        iface.create_pipeline              = {ogl_create_pipeline};
-        iface.destroy_pipeline             = {ogl_destroy_pipeline};
-        iface.update_pipeline              = {ogl_update_pipeline};
-        iface.bind_pipeline                = {ogl_bind_pipeline};
+        iface.set_render_state             = {ogl_set_render_state};
+        iface.set_transforms               = {ogl_set_transforms};
+        if (iface.caps.max_lights > 0) {
+            iface.set_lighting = {ogl_set_lighting};
+            iface.set_material = {ogl_set_material};
+        } else {
+            iface.set_lighting = {nullptr, "device reports zero GL_MAX_LIGHTS"};
+            iface.set_material = {nullptr, "device reports zero GL_MAX_LIGHTS"};
+        }
+        iface.set_fog = {ogl_set_fog};
         iface.set_render_target            = {ogl_set_render_target};
         iface.clear                        = {ogl_clear};
         iface.set_viewport                 = {ogl_set_viewport};
