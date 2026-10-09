@@ -36,7 +36,6 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "../graphics_backend_interface.hpp"
@@ -106,7 +105,6 @@ namespace alia {
     struct ogl_stored_shader_sampler { GLint location = -1; int unit = 0; texture_handle *texture = nullptr; };
     struct ogl_shader_program : shader_program_handle {
         GLuint program = 0;
-        std::unordered_map<std::string, int> sampler_units;
         std::vector<ogl_stored_shader_constant> stored_constants;
         std::vector<ogl_stored_shader_sampler> stored_samplers;
     };
@@ -149,8 +147,8 @@ namespace alia {
     int ogl_index_buffer_count(const index_buffer_handle *); buffer_usage ogl_index_buffer_usage(const index_buffer_handle *);
     bool ogl_index_buffer_lock(index_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void ogl_index_buffer_unlock(index_buffer_handle *, const buffer_lock_info &, bool);
     shader_program_handle *ogl_create_shader_program(device_handle *, const shader_program_desc &); void ogl_destroy_shader_program(shader_program_handle *);
-    shader_constant_slot ogl_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type); void ogl_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
-    shader_sampler_slot ogl_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type); void ogl_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
+    shader_constant_slot ogl_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type, std::optional<shader_register>); void ogl_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
+    shader_sampler_slot ogl_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type, int); void ogl_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
     void ogl_apply_program_state(ogl_shader_program *);
     swapchain_handle *ogl_create_swapchain(device_handle *, void *, vec2i, const swapchain_desc &); void ogl_destroy_swapchain(swapchain_handle *);
     framebuffer_properties ogl_swapchain_properties(const swapchain_handle *);
@@ -171,6 +169,7 @@ namespace alia {
     extern PFNGLCREATESHADERPROC ogl_s_glCreateShader; extern PFNGLSHADERSOURCEPROC ogl_s_glShaderSource; extern PFNGLCOMPILESHADERPROC ogl_s_glCompileShader; extern PFNGLGETSHADERIVPROC ogl_s_glGetShaderiv; extern PFNGLGETSHADERINFOLOGPROC ogl_s_glGetShaderInfoLog; extern PFNGLDELETESHADERPROC ogl_s_glDeleteShader;
     extern PFNGLCREATEPROGRAMPROC ogl_s_glCreateProgram; extern PFNGLATTACHSHADERPROC ogl_s_glAttachShader; extern PFNGLBINDATTRIBLOCATIONPROC ogl_s_glBindAttribLocation; extern PFNGLLINKPROGRAMPROC ogl_s_glLinkProgram; extern PFNGLGETPROGRAMIVPROC ogl_s_glGetProgramiv; extern PFNGLGETPROGRAMINFOLOGPROC ogl_s_glGetProgramInfoLog; extern PFNGLDELETEPROGRAMPROC ogl_s_glDeleteProgram; extern PFNGLUSEPROGRAMPROC ogl_s_glUseProgram;
     extern PFNGLGETUNIFORMLOCATIONPROC ogl_s_glGetUniformLocation; extern PFNGLUNIFORM1FPROC ogl_s_glUniform1f; extern PFNGLUNIFORM2FPROC ogl_s_glUniform2f; extern PFNGLUNIFORM3FPROC ogl_s_glUniform3f; extern PFNGLUNIFORM4FPROC ogl_s_glUniform4f; extern PFNGLUNIFORM1IPROC ogl_s_glUniform1i; extern PFNGLUNIFORM2IPROC ogl_s_glUniform2i; extern PFNGLUNIFORM3IPROC ogl_s_glUniform3i; extern PFNGLUNIFORM4IPROC ogl_s_glUniform4i; extern PFNGLUNIFORMMATRIX4FVPROC ogl_s_glUniformMatrix4fv;
+    extern PFNGLGETACTIVEUNIFORMPROC ogl_s_glGetActiveUniform;
     extern PFNGLACTIVETEXTUREPROC ogl_s_glActiveTexture; extern PFNGLENABLEVERTEXATTRIBARRAYPROC ogl_s_glEnableVertexAttribArray; extern PFNGLDISABLEVERTEXATTRIBARRAYPROC ogl_s_glDisableVertexAttribArray; extern PFNGLVERTEXATTRIBPOINTERPROC ogl_s_glVertexAttribPointer;
     extern PFNGLGENBUFFERSPROC ogl_s_glGenBuffers; extern PFNGLDELETEBUFFERSPROC ogl_s_glDeleteBuffers; extern PFNGLBINDBUFFERPROC ogl_s_glBindBuffer; extern PFNGLBUFFERDATAPROC ogl_s_glBufferData; extern PFNGLMAPBUFFERPROC ogl_s_glMapBuffer; extern PFNGLUNMAPBUFFERPROC ogl_s_glUnmapBuffer;
     extern PFNGLGENFRAMEBUFFERSPROC ogl_s_glGenFramebuffers; extern PFNGLDELETEFRAMEBUFFERSPROC ogl_s_glDeleteFramebuffers; extern PFNGLBINDFRAMEBUFFERPROC ogl_s_glBindFramebuffer; extern PFNGLFRAMEBUFFERTEXTURE2DPROC ogl_s_glFramebufferTexture2D; extern PFNGLCHECKFRAMEBUFFERSTATUSPROC ogl_s_glCheckFramebufferStatus;

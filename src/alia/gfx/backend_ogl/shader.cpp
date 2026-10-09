@@ -23,6 +23,7 @@ namespace alia {
     PFNGLDELETEPROGRAMPROC ogl_s_glDeleteProgram = nullptr;
     PFNGLUSEPROGRAMPROC ogl_s_glUseProgram = nullptr;
     PFNGLGETUNIFORMLOCATIONPROC ogl_s_glGetUniformLocation = nullptr;
+    PFNGLGETACTIVEUNIFORMPROC ogl_s_glGetActiveUniform = nullptr;
     PFNGLUNIFORM1FPROC ogl_s_glUniform1f = nullptr;
     PFNGLUNIFORM2FPROC ogl_s_glUniform2f = nullptr;
     PFNGLUNIFORM3FPROC ogl_s_glUniform3f = nullptr;
@@ -44,14 +45,13 @@ namespace alia {
         constexpr GLuint attr_tex_coord = 2;
         constexpr GLuint attr_normal = 3;
 
-        const shader_source *
-        select_source(const shader_program_desc &desc, shader_type type) {
+        const shader_program_source *select_source(const shader_program_desc &desc) {
             for (const auto &src : desc.sources) {
-                if (src.backend == gfx_backend::opengl && src.type == type)
+                if (src.backend == gfx_backend::opengl)
                     return &src;
             }
             for (const auto &src : desc.sources) {
-                if (src.backend == gfx_backend::auto_ && src.type == type)
+                if (src.backend == gfx_backend::auto_)
                     return &src;
             }
             return nullptr;
@@ -77,9 +77,10 @@ namespace alia {
             return log;
         }
 
-        GLuint compile_shader(const shader_source &source) {
-            const GLenum type = source.type == shader_type::vertex ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER;
-            const GLuint shader = ogl_s_glCreateShader(type);
+        GLuint compile_shader(
+            const shader_stage_source &source, shader_type type, std::string_view program_name) {
+            const GLenum gl_type = type == shader_type::vertex ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER;
+            const GLuint shader = ogl_s_glCreateShader(gl_type);
             if (!shader)
                 throw shader_error("OpenGL shader compile failed: glCreateShader returned 0");
 
@@ -92,8 +93,7 @@ namespace alia {
             GLint compiled = GL_FALSE;
             ogl_s_glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
             if (!compiled) {
-                const std::string name =
-                    source.debug_name.empty() ? "alia shader" : std::string(source.debug_name);
+                const std::string name = detail::shader_stage_debug_name(program_name, type);
                 std::string message = "OpenGL shader compile failed for " + name;
                 const std::string log = shader_log(shader);
                 if (!log.empty())
@@ -102,6 +102,23 @@ namespace alia {
                 throw shader_error(message);
             }
             return shader;
+        }
+
+        shader_constant_value_type uniform_constant_type(GLenum type, std::string_view name) {
+            switch (type) {
+            case GL_FLOAT: return shader_constant_value_type::float_1;
+            case GL_FLOAT_VEC2: return shader_constant_value_type::float_2;
+            case GL_FLOAT_VEC3: return shader_constant_value_type::float_3;
+            case GL_FLOAT_VEC4: return shader_constant_value_type::float_4;
+            case GL_INT: return shader_constant_value_type::int_1;
+            case GL_INT_VEC2: return shader_constant_value_type::int_2;
+            case GL_INT_VEC3: return shader_constant_value_type::int_3;
+            case GL_INT_VEC4: return shader_constant_value_type::int_4;
+            case GL_FLOAT_MAT4: return shader_constant_value_type::matrix_4x4;
+            default:
+                throw shader_error("OpenGL shader constant '" + std::string(name) +
+                                   "' has an unsupported declared type");
+            }
         }
 
         void apply_constant(const ogl_stored_shader_constant &c) {
@@ -155,16 +172,17 @@ namespace alia {
     } // namespace
 
     shader_program_handle *ogl_create_shader_program(device_handle *, const shader_program_desc &desc) {
-        const shader_source *vertex_source = select_source(desc, shader_type::vertex);
-        const shader_source *pixel_source = select_source(desc, shader_type::pixel);
-        if (!vertex_source || !pixel_source)
-            throw shader_error("OpenGL shader program requires matching vertex and pixel sources");
+        const shader_program_source *source = select_source(desc);
+        if (!source)
+            throw shader_error("OpenGL shader program has no source for the opengl backend");
+        if (!source->vertex.bytecode.empty() || !source->pixel.bytecode.empty())
+            throw shader_error("OpenGL 2.x shader programs do not support backend bytecode; provide source text");
 
         GLuint vertex_shader = 0;
         GLuint pixel_shader = 0;
         try {
-            vertex_shader = compile_shader(*vertex_source);
-            pixel_shader = compile_shader(*pixel_source);
+            vertex_shader = compile_shader(source->vertex, shader_type::vertex, desc.debug_name);
+            pixel_shader = compile_shader(source->pixel, shader_type::pixel, desc.debug_name);
         } catch (...) {
             if (vertex_shader)
                 ogl_s_glDeleteShader(vertex_shader);
@@ -203,10 +221,6 @@ namespace alia {
 
         auto *program = new ogl_shader_program;
         program->program = program_id;
-        for (const auto &binding : desc.sampler_bindings) {
-            if (!binding.name.empty() && binding.slot >= 0)
-                program->sampler_units.emplace(std::string(binding.name), binding.slot);
-        }
         return program;
     }
 
@@ -218,13 +232,42 @@ namespace alia {
     }
 
     shader_constant_slot
-    ogl_shader_lookup_constant(shader_program_handle *h, std::string_view name, shader_type stage) {
+    ogl_shader_lookup_constant(
+        shader_program_handle *h,
+        std::string_view name,
+        shader_type stage,
+        std::optional<shader_register>
+    ) {
         auto *program = as_ogl_shader_program(h);
         const std::string uniform_name(name);
         const GLint location = ogl_s_glGetUniformLocation(program->program, uniform_name.c_str());
         if (location < 0)
             return {};
-        return {true, stage, location, 1};
+        if (name.find('[') != std::string_view::npos || name.find('.') != std::string_view::npos)
+            throw shader_error("OpenGL shader constant '" + uniform_name +
+                               "': arrays and structs are not supported");
+
+        GLint count = 0;
+        GLint max_name_length = 0;
+        ogl_s_glGetProgramiv(program->program, GL_ACTIVE_UNIFORMS, &count);
+        ogl_s_glGetProgramiv(program->program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_name_length);
+        std::string active_name(static_cast<std::size_t>(std::max(max_name_length, 1)), '\0');
+        for (GLint i = 0; i < count; ++i) {
+            GLsizei length = 0;
+            GLint size = 0;
+            GLenum type = 0;
+            ogl_s_glGetActiveUniform(
+                program->program, static_cast<GLuint>(i),
+                static_cast<GLsizei>(active_name.size()), &length, &size, &type, active_name.data());
+            const std::string_view reflected_name(active_name.data(), static_cast<std::size_t>(length));
+            if (reflected_name != name && reflected_name != uniform_name + "[0]")
+                continue;
+            if (size > 1 || reflected_name.find('[') != std::string_view::npos)
+                throw shader_error("OpenGL shader constant '" + uniform_name +
+                                   "': arrays are not supported");
+            return {true, stage, location, uniform_constant_type(type, name)};
+        }
+        throw shader_error("OpenGL shader constant '" + uniform_name + "': uniform reflection failed");
     }
 
     void ogl_shader_set_constant(
@@ -252,16 +295,20 @@ namespace alia {
     }
 
     shader_sampler_slot
-    ogl_shader_lookup_sampler(shader_program_handle *h, std::string_view name, shader_type stage) {
+    ogl_shader_lookup_sampler(shader_program_handle *h, std::string_view name, shader_type stage, int unit) {
         auto *program = as_ogl_shader_program(h);
         const std::string uniform_name(name);
         const GLint location = ogl_s_glGetUniformLocation(program->program, uniform_name.c_str());
         if (location < 0)
             return {};
 
-        int unit = 0;
-        if (auto it = program->sampler_units.find(uniform_name); it != program->sampler_units.end())
-            unit = it->second;
+        auto it = std::find_if(
+            program->stored_samplers.begin(), program->stored_samplers.end(),
+            [&](const ogl_stored_shader_sampler &sampler) { return sampler.location == location; });
+        if (it == program->stored_samplers.end())
+            program->stored_samplers.push_back({location, unit, nullptr});
+        else
+            *it = {location, unit, nullptr};
         return {true, stage, location, unit};
     }
 
@@ -285,7 +332,8 @@ namespace alia {
         for (const auto &constant : program->stored_constants)
             apply_constant(constant);
         for (const auto &sampler : program->stored_samplers) {
-            bind_texture_unit(sampler.unit, sampler.texture);
+            if (sampler.texture)
+                bind_texture_unit(sampler.unit, sampler.texture);
             ogl_s_glUniform1i(sampler.location, sampler.unit);
         }
         ogl_s_glActiveTexture(GL_TEXTURE0);

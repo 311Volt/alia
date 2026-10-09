@@ -90,6 +90,7 @@ namespace alia {
         ok = load_gl_proc(ogl_s_glDeleteProgram, "glDeleteProgram") && ok;
         ok = load_gl_proc(ogl_s_glUseProgram, "glUseProgram") && ok;
         ok = load_gl_proc(ogl_s_glGetUniformLocation, "glGetUniformLocation") && ok;
+        ok = load_gl_proc(ogl_s_glGetActiveUniform, "glGetActiveUniform") && ok;
         ok = load_gl_proc(ogl_s_glUniform1f, "glUniform1f") && ok;
         ok = load_gl_proc(ogl_s_glUniform2f, "glUniform2f") && ok;
         ok = load_gl_proc(ogl_s_glUniform3f, "glUniform3f") && ok;

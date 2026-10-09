@@ -9,9 +9,12 @@
 #include <array>
 #include <concepts>
 #include <cstddef>
+#include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 namespace alia {
 
@@ -84,6 +87,47 @@ namespace alia {
 
     namespace detail {
 
+        template <shader_constant_value T>
+        inline constexpr shader_constant_value_type shader_constant_type_v = [] {
+            using raw_t = std::remove_cvref_t<T>;
+            if constexpr (std::is_integral_v<raw_t>) {
+                return shader_constant_value_type::int_1;
+            } else if constexpr (std::is_floating_point_v<raw_t>) {
+                return shader_constant_value_type::float_1;
+            } else if constexpr (std::same_as<raw_t, color>) {
+                return shader_constant_value_type::float_4;
+            } else if constexpr (vector_shader_constant_value<raw_t>) {
+                constexpr int n = shader_vec_traits<raw_t>::size;
+                using scalar_t = typename shader_vec_traits<raw_t>::value_type;
+                if constexpr (std::is_integral_v<scalar_t>) {
+                    return n == 2 ? shader_constant_value_type::int_2 :
+                           n == 3 ? shader_constant_value_type::int_3 :
+                                    shader_constant_value_type::int_4;
+                } else {
+                    return n == 2 ? shader_constant_value_type::float_2 :
+                           n == 3 ? shader_constant_value_type::float_3 :
+                                    shader_constant_value_type::float_4;
+                }
+            } else {
+                return shader_constant_value_type::matrix_4x4;
+            }
+        }();
+
+        constexpr std::string_view to_string(shader_constant_value_type type) noexcept {
+            switch (type) {
+            case shader_constant_value_type::float_1: return "float_1";
+            case shader_constant_value_type::float_2: return "float_2";
+            case shader_constant_value_type::float_3: return "float_3";
+            case shader_constant_value_type::float_4: return "float_4";
+            case shader_constant_value_type::int_1: return "int_1";
+            case shader_constant_value_type::int_2: return "int_2";
+            case shader_constant_value_type::int_3: return "int_3";
+            case shader_constant_value_type::int_4: return "int_4";
+            case shader_constant_value_type::matrix_4x4: return "matrix_4x4";
+            }
+            return "unknown";
+        }
+
         struct shader_constant_payload_storage {
             std::array<float, 16> floats = {};
             std::array<int, 4> ints = {};
@@ -105,20 +149,18 @@ namespace alia {
             using raw_t = std::remove_cvref_t<T>;
 
             shader_constant_payload_storage storage;
+            storage.type = shader_constant_type_v<T>;
             if constexpr (std::is_integral_v<raw_t>) {
                 storage.ints[0] = static_cast<int>(value);
-                storage.type = shader_constant_value_type::int_1;
                 storage.int_count = 1;
             } else if constexpr (std::is_floating_point_v<raw_t>) {
                 storage.floats[0] = static_cast<float>(value);
-                storage.type = shader_constant_value_type::float_1;
                 storage.float_count = 1;
             } else if constexpr (std::same_as<raw_t, color>) {
                 storage.floats[0] = value.r;
                 storage.floats[1] = value.g;
                 storage.floats[2] = value.b;
                 storage.floats[3] = value.a;
-                storage.type = shader_constant_value_type::float_4;
                 storage.float_count = 4;
             } else if constexpr (vector_shader_constant_value<raw_t>) {
                 constexpr int n = shader_vec_traits<raw_t>::size;
@@ -132,10 +174,6 @@ namespace alia {
                         storage.ints[2] = static_cast<int>(value.z);
                     if constexpr (n >= 4)
                         storage.ints[3] = static_cast<int>(value.w);
-                    storage.type =
-                        n == 2 ? shader_constant_value_type::int_2 :
-                        n == 3 ? shader_constant_value_type::int_3 :
-                                 shader_constant_value_type::int_4;
                     storage.int_count = n;
                 } else {
                     if constexpr (n >= 1)
@@ -146,20 +184,14 @@ namespace alia {
                         storage.floats[2] = static_cast<float>(value.z);
                     if constexpr (n >= 4)
                         storage.floats[3] = static_cast<float>(value.w);
-                    storage.type =
-                        n == 2 ? shader_constant_value_type::float_2 :
-                        n == 3 ? shader_constant_value_type::float_3 :
-                                 shader_constant_value_type::float_4;
                     storage.float_count = n;
                 }
             } else if constexpr (std::same_as<raw_t, transform>) {
                 const auto *src = &value.m[0][0];
                 std::copy(src, src + 16, storage.floats.begin());
-                storage.type = shader_constant_value_type::matrix_4x4;
                 storage.float_count = 16;
             } else {
                 std::copy(value.begin(), value.end(), storage.floats.begin());
-                storage.type = shader_constant_value_type::matrix_4x4;
                 storage.float_count = 16;
             }
             return storage;
@@ -228,7 +260,15 @@ namespace alia {
     class shader_program {
     public:
         shader_program() = default;
+        /// Every stage must provide exactly one of source text and backend bytecode,
+        /// and no two sources may name the same backend.
+        /// The device must outlive the program and all its allocated constants and samplers.
         shader_program(gfx_device &device, const shader_program_desc &desc);
+        shader_program(
+            gfx_device &device,
+            std::string_view debug_name,
+            const std::vector<shader_program_source> &sources
+        );
         ~shader_program();
         shader_program(shader_program &&other) noexcept;
         shader_program &operator=(shader_program &&other) noexcept;
@@ -242,20 +282,53 @@ namespace alia {
             return valid();
         }
 
+        /// Allocate a constant whose declared shader type must match TValue.
+        /// D3D9 reflects the register by default; stripped bytecode requires reg.
+        /// An explicit register is checked against reflection. OpenGL addresses
+        /// uniforms by name and ignores the register after argument validation.
         template <shader_constant_value TValue>
         [[nodiscard]] shader_constant<TValue>
-        allocate_constant(std::string_view identifier, shader_type stage = shader_type::vertex) {
+        allocate_constant(
+            std::string_view identifier,
+            shader_type stage = shader_type::vertex,
+            std::optional<shader_register> reg = {}
+        ) {
             if (!handle_)
                 throw shader_error("shader_program::allocate_constant: program is not valid");
+            constexpr auto type = detail::shader_constant_type_v<TValue>;
+            if (reg) {
+                if (reg->index < 0)
+                    throw shader_error("shader_program::allocate_constant: negative register for '" +
+                                       std::string(identifier) + "'");
+                constexpr bool integer =
+                    type == shader_constant_value_type::int_1 ||
+                    type == shader_constant_value_type::int_2 ||
+                    type == shader_constant_value_type::int_3 ||
+                    type == shader_constant_value_type::int_4;
+                if (reg->kind != shader_register::kind::float4 &&
+                    (reg->kind != shader_register::kind::int4 || !integer))
+                    throw shader_error("shader_program::allocate_constant: register kind does not fit '" +
+                                       std::string(identifier) + "' (" +
+                                       std::string(detail::to_string(type)) + ")");
+            }
             shader_constant_slot slot =
-                backend_->shader_lookup_constant.get_or_throw()(handle_, identifier, stage);
+                backend_->shader_lookup_constant.get_or_throw()(handle_, identifier, stage, reg);
             if (!slot.valid)
-                throw shader_error("shader_program::allocate_constant: shader constant not found");
+                throw shader_error("shader_program::allocate_constant: shader constant '" +
+                                   std::string(identifier) + "' not found");
+            if (slot.type && *slot.type != type)
+                throw shader_error("shader_program::allocate_constant: type mismatch for '" +
+                                   std::string(identifier) + "': shader declares " +
+                                   std::string(detail::to_string(*slot.type)) +
+                                   ", requested " + std::string(detail::to_string(type)));
             return shader_constant<TValue>(backend_, handle_, slot);
         }
 
-        [[nodiscard]] shader_sampler
-        allocate_sampler(std::string_view identifier, shader_type stage = shader_type::pixel);
+        /// Assign a texture unit, checked against D3D9's reflected s# register.
+        /// The return value may be discarded when textures are bound through
+        /// frame::set_texture; allocation alone records the OpenGL uniform unit.
+        shader_sampler allocate_sampler(
+            std::string_view identifier, int unit, shader_type stage = shader_type::pixel);
 
         [[nodiscard]] shader_program_handle *impl() noexcept {
             return handle_;

@@ -98,8 +98,25 @@ namespace alia {
         UINT present_interval = D3DPRESENT_INTERVAL_IMMEDIATE;
         framebuffer_properties props;
     };
+    enum class d3d9_shader_register_set : std::uint16_t {
+        bool_ = 0, int4 = 1, float4 = 2, sampler = 3
+    };
+    struct d3d9_reflected_constant {
+        std::string name;
+        d3d9_shader_register_set register_set = d3d9_shader_register_set::float4;
+        int register_index = 0;
+        int register_count = 0;
+        std::optional<shader_constant_value_type> type;
+    };
+    struct d3d9_shader_reflection {
+        bool reflected = false;
+        std::vector<d3d9_reflected_constant> constants;
+    };
     struct d3d9_stored_shader_constant {
         shader_constant_slot slot = {};
+        d3d9_shader_register_set register_set = d3d9_shader_register_set::float4;
+        int register_index = 0;
+        int register_count = 0;
         shader_constant_value_type type = shader_constant_value_type::float_1;
         std::vector<float> floats;
         std::vector<int> ints;
@@ -108,8 +125,8 @@ namespace alia {
         IDirect3DDevice9 *device = nullptr;
         IDirect3DVertexShader9 *vertex_shader = nullptr;
         IDirect3DPixelShader9 *pixel_shader = nullptr;
-        std::unordered_map<std::string, shader_constant_slot> constants;
-        std::unordered_map<std::string, shader_sampler_slot> samplers;
+        d3d9_shader_reflection vertex_reflection;
+        d3d9_shader_reflection pixel_reflection;
         std::vector<d3d9_stored_shader_constant> stored_constants;
         std::unordered_map<int, texture_handle *> sampler_textures;
     };
@@ -165,8 +182,8 @@ namespace alia {
     int d3d9_index_buffer_count(const index_buffer_handle *); buffer_usage d3d9_index_buffer_usage(const index_buffer_handle *);
     bool d3d9_index_buffer_lock(index_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void d3d9_index_buffer_unlock(index_buffer_handle *, const buffer_lock_info &, bool);
     shader_program_handle *d3d9_create_shader_program(device_handle *, const shader_program_desc &); void d3d9_destroy_shader_program(shader_program_handle *);
-    shader_constant_slot d3d9_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type); void d3d9_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
-    shader_sampler_slot d3d9_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type); void d3d9_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
+    shader_constant_slot d3d9_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type, std::optional<shader_register>); void d3d9_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
+    shader_sampler_slot d3d9_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type, int); void d3d9_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
     void d3d9_apply_program_state(IDirect3DDevice9 *, d3d9_shader_program *);
     swapchain_handle *d3d9_create_swapchain(device_handle *, void *, vec2i, const swapchain_desc &); void d3d9_destroy_swapchain(swapchain_handle *);
     framebuffer_properties d3d9_swapchain_properties(const swapchain_handle *);

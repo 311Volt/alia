@@ -354,57 +354,19 @@ int main(int argc, char **argv) {
         normal_map.set_sampler(alia::linear_wrap);
         const sphere_mesh ball = make_sphere(48, 72);
 
-        const std::array<alia::shader_source, 4> sky_sources{{
-            {alia::gfx_backend::d3d9, alia::shader_type::vertex,
-             d3d9_sky_vertex_shader, "main", {}, "cube_reflection_sky_vs_hlsl"},
-            {alia::gfx_backend::d3d9, alia::shader_type::pixel,
-             d3d9_sky_pixel_shader, "main", {}, "cube_reflection_sky_ps_hlsl"},
-            {alia::gfx_backend::opengl, alia::shader_type::vertex,
-             ogl_sky_vertex_shader, "main", {}, "cube_reflection_sky_vs_glsl"},
-            {alia::gfx_backend::opengl, alia::shader_type::pixel,
-             ogl_sky_pixel_shader, "main", {}, "cube_reflection_sky_ps_glsl"},
-        }};
-        const std::array<alia::shader_constant_binding, 1> sky_constants{{
-            {"u_sky_view_proj", alia::shader_type::vertex, 0, 4},
-        }};
-        const std::array<alia::shader_sampler_binding, 1> sky_samplers{{
-            {"u_sky", alia::shader_type::pixel, 0},
-        }};
-        alia::shader_program sky_shader(
-            device,
-            {.sources = sky_sources,
-             .constant_bindings = sky_constants,
-             .sampler_bindings = sky_samplers});
+        alia::shader_program sky_shader(device, "cube_reflection_sky", {
+            {.backend = alia::gfx_backend::d3d9, .vertex = {d3d9_sky_vertex_shader}, .pixel = {d3d9_sky_pixel_shader}},
+            {.backend = alia::gfx_backend::opengl, .vertex = {ogl_sky_vertex_shader}, .pixel = {ogl_sky_pixel_shader}},
+        });
         auto sky_view_projection = sky_shader.allocate_constant<alia::transform>(
             "u_sky_view_proj", alia::shader_type::vertex);
-        auto sky_sampler = sky_shader.allocate_sampler("u_sky");
+        auto sky_sampler = sky_shader.allocate_sampler("u_sky", 0);
         sky_sampler.set_texture(environment);
 
-        const std::array<alia::shader_source, 4> ball_sources{{
-            {alia::gfx_backend::d3d9, alia::shader_type::vertex,
-             d3d9_ball_vertex_shader, "main", {}, "cube_reflection_ball_vs_hlsl"},
-            {alia::gfx_backend::d3d9, alia::shader_type::pixel,
-             d3d9_ball_pixel_shader, "main", {}, "cube_reflection_ball_ps_hlsl"},
-            {alia::gfx_backend::opengl, alia::shader_type::vertex,
-             ogl_ball_vertex_shader, "main", {}, "cube_reflection_ball_vs_glsl"},
-            {alia::gfx_backend::opengl, alia::shader_type::pixel,
-             ogl_ball_pixel_shader, "main", {}, "cube_reflection_ball_ps_glsl"},
-        }};
-        const std::array<alia::shader_constant_binding, 4> ball_constants{{
-            {"u_world", alia::shader_type::vertex, 0, 4},
-            {"u_view_proj", alia::shader_type::vertex, 4, 4},
-            {"u_camera_position", alia::shader_type::pixel, 0, 1},
-            {"u_light_direction", alia::shader_type::pixel, 1, 1},
-        }};
-        const std::array<alia::shader_sampler_binding, 2> ball_samplers{{
-            {"u_normal_map", alia::shader_type::pixel, 0},
-            {"u_environment", alia::shader_type::pixel, 1},
-        }};
-        alia::shader_program ball_shader(
-            device,
-            {.sources = ball_sources,
-             .constant_bindings = ball_constants,
-             .sampler_bindings = ball_samplers});
+        alia::shader_program ball_shader(device, "cube_reflection_ball", {
+            {.backend = alia::gfx_backend::d3d9, .vertex = {d3d9_ball_vertex_shader}, .pixel = {d3d9_ball_pixel_shader}},
+            {.backend = alia::gfx_backend::opengl, .vertex = {ogl_ball_vertex_shader}, .pixel = {ogl_ball_pixel_shader}},
+        });
         auto world_constant = ball_shader.allocate_constant<alia::transform>(
             "u_world", alia::shader_type::vertex);
         auto view_projection_constant = ball_shader.allocate_constant<alia::transform>(
@@ -413,8 +375,8 @@ int main(int argc, char **argv) {
             "u_camera_position", alia::shader_type::pixel);
         auto light_constant = ball_shader.allocate_constant<alia::vec3f>(
             "u_light_direction", alia::shader_type::pixel);
-        auto normal_sampler = ball_shader.allocate_sampler("u_normal_map");
-        auto environment_sampler = ball_shader.allocate_sampler("u_environment");
+        auto normal_sampler = ball_shader.allocate_sampler("u_normal_map", 0);
+        auto environment_sampler = ball_shader.allocate_sampler("u_environment", 1);
         normal_sampler.set_texture(normal_map);
         environment_sampler.set_texture(environment);
 

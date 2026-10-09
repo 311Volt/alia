@@ -175,30 +175,13 @@ int main(int argc, char **argv) {
             device,
             std::span<const alia::bitmap, alia::cube_face_count>(blank_faces));
 
-        const std::array<alia::shader_source, 4> sources{{
-            {alia::gfx_backend::d3d9, alia::shader_type::vertex,
-             d3d9_vertex_shader, "main", {}, "skybox_vs_hlsl"},
-            {alia::gfx_backend::d3d9, alia::shader_type::pixel,
-             d3d9_pixel_shader, "main", {}, "skybox_ps_hlsl"},
-            {alia::gfx_backend::opengl, alia::shader_type::vertex,
-             ogl_vertex_shader, "main", {}, "skybox_vs_glsl"},
-            {alia::gfx_backend::opengl, alia::shader_type::pixel,
-             ogl_pixel_shader, "main", {}, "skybox_ps_glsl"},
-        }};
-        const std::array<alia::shader_constant_binding, 1> constants{{
-            {"u_view_proj", alia::shader_type::vertex, 0, 4},
-        }};
-        const std::array<alia::shader_sampler_binding, 1> samplers{{
-            {"u_sky", alia::shader_type::pixel, 0},
-        }};
-        alia::shader_program sky_shader(
-            device,
-            {.sources = sources,
-             .constant_bindings = constants,
-             .sampler_bindings = samplers});
+        alia::shader_program sky_shader(device, "skybox", {
+            {.backend = alia::gfx_backend::d3d9, .vertex = {d3d9_vertex_shader}, .pixel = {d3d9_pixel_shader}},
+            {.backend = alia::gfx_backend::opengl, .vertex = {ogl_vertex_shader}, .pixel = {ogl_pixel_shader}},
+        });
         auto view_projection = sky_shader.allocate_constant<alia::transform>(
             "u_view_proj", alia::shader_type::vertex);
-        auto sky_sampler = sky_shader.allocate_sampler("u_sky");
+        auto sky_sampler = sky_shader.allocate_sampler("u_sky", 0);
 
         const std::array cube_vertices{
             alia::vertex3d{{-1.0f, -1.0f, -1.0f}},

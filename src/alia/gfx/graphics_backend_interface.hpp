@@ -123,29 +123,45 @@ namespace alia {
         pixel
     };
 
-    struct shader_source {
-        gfx_backend backend = gfx_backend::auto_;
-        shader_type type = shader_type::vertex;
+    struct shader_stage_source {
+        // Exactly one of source and bytecode must be non-empty. Bytecode is
+        // backend-specific; OpenGL 2.x accepts only source text.
         std::string_view source;
+        std::span<const std::byte> bytecode = {};
         std::string_view entry_point = "main";
         std::string_view profile;
-        std::string_view debug_name;
     };
-    struct shader_constant_binding {
-        std::string_view name;
-        shader_type stage = shader_type::vertex;
-        int index = -1;
-        int count = 1;
-    };
-    struct shader_sampler_binding {
-        std::string_view name;
-        shader_type stage = shader_type::pixel;
-        int slot = -1;
+    /// Both stages for one backend; auto_ is the fallback for backends without their own entry.
+    struct shader_program_source {
+        gfx_backend backend = gfx_backend::auto_;
+        shader_stage_source vertex;
+        shader_stage_source pixel;
     };
     struct shader_program_desc {
-        std::span<const shader_source> sources;
-        std::span<const shader_constant_binding> constant_bindings = {};
-        std::span<const shader_sampler_binding> sampler_bindings = {};
+        std::span<const shader_program_source> sources;
+        /// Optional; stage names in compile errors are derived from it.
+        std::string_view debug_name;
+    };
+
+    namespace detail {
+        /// "<program>.vs" or "<program>.ps", with "alia_shader" for an unnamed program.
+        inline std::string shader_stage_debug_name(std::string_view program, shader_type type) {
+            std::string name = program.empty() ? "alia_shader" : std::string(program);
+            name += type == shader_type::vertex ? ".vs" : ".ps";
+            return name;
+        }
+    } // namespace detail
+    struct shader_register {
+        enum class kind { float4, int4 };
+        kind kind;
+        int index;
+
+        static constexpr shader_register c(int index) noexcept {
+            return {kind::float4, index};
+        }
+        static constexpr shader_register i(int index) noexcept {
+            return {kind::int4, index};
+        }
     };
     enum class shader_constant_value_type {
         float_1,
@@ -166,8 +182,10 @@ namespace alia {
     struct shader_constant_slot {
         bool valid = false;
         shader_type stage = shader_type::vertex;
+        // Opaque backend location, not necessarily a hardware register index.
         int location = -1;
-        int count = 1;
+        // Declared shader type, or nullopt when reflection is unavailable.
+        std::optional<shader_constant_value_type> type;
     };
     struct shader_sampler_slot {
         bool valid = false;
@@ -542,9 +560,9 @@ namespace alia {
         /// @return Nothing.
         gfx_backend_op<void(index_buffer_handle *buffer, const buffer_lock_info &info, bool wrote)> index_buffer_unlock;
 
-        /// @brief Compile and link the vertex and pixel shader sources in a program description.
+        /// @brief Create a program from vertex and pixel source text or backend bytecode.
         /// @param device Device that will own the program.
-        /// @param description Shader sources and optional constant and sampler bindings.
+        /// @param description Shader sources; each supplies exactly one of text and bytecode.
         /// @return New shader-program handle. Compilation, linking, or invalid source errors are reported by throwing `shader_error`.
         gfx_backend_op<shader_program_handle *(device_handle *device, const shader_program_desc &description)> create_shader_program;
 
@@ -555,10 +573,12 @@ namespace alia {
 
         /// @brief Find a named shader constant and describe how to address it in later updates.
         /// @param program Program containing the constant.
-        /// @param name Constant name as used by the shader source or its declared binding.
-        /// @param stage Shader stage that owns the constant.
-        /// @return A valid slot when found, or a slot with `valid == false` when absent.
-        gfx_backend_op<shader_constant_slot(shader_program_handle *program, std::string_view name, shader_type stage)> shader_lookup_constant;
+        /// @param name Constant name as used by the shader.
+        /// @param stage Shader stage that owns the constant; OpenGL uniforms are program-wide.
+        /// @param explicit_register Optional register for bytecode without reflection; checked against reflection when available. OpenGL ignores it.
+        /// @return A slot with the reflected type when known, or an invalid slot when reflection exists but the name is absent or optimized out.
+        /// @throws shader_error For unsupported declared types (including bool, mat3, arrays and structs), a register mismatch, or missing reflection without an explicit register.
+        gfx_backend_op<shader_constant_slot(shader_program_handle *program, std::string_view name, shader_type stage, std::optional<shader_register> explicit_register)> shader_lookup_constant;
 
         /// @brief Record a shader constant value for application when the program is used.
         /// @param program Program whose constant state is updated.
@@ -569,10 +589,11 @@ namespace alia {
 
         /// @brief Find a named shader sampler and describe its location and texture unit.
         /// @param program Program containing the sampler.
-        /// @param name Sampler name as used by the shader source or its declared binding.
+        /// @param name Sampler name as used by the shader.
         /// @param stage Shader stage that owns the sampler.
-        /// @return A valid slot when found, or a slot with `valid == false` when absent.
-        gfx_backend_op<shader_sampler_slot(shader_program_handle *program, std::string_view name, shader_type stage)> shader_lookup_sampler;
+        /// @param unit Texture unit to assign; D3D9 returns the reflected s# register when known and otherwise trusts this unit.
+        /// @return A valid slot when found, or an invalid slot when reflection exists but the name is absent. OpenGL records the unit even if no texture is assigned.
+        gfx_backend_op<shader_sampler_slot(shader_program_handle *program, std::string_view name, shader_type stage, int unit)> shader_lookup_sampler;
 
         /// @brief Record the texture assigned to a shader sampler for application when the program is used.
         /// @param program Program whose sampler state is updated.

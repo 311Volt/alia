@@ -128,55 +128,17 @@ int main(int argc, char **argv) {
         alia::texture noise(device, alia::load_image("./resources/bluenoise.png"));
         noise.set_sampler(alia::nearest_wrap);
 
-        const std::array<alia::shader_source, 4> sources{{
-            {
-                .backend = alia::gfx_backend::d3d9,
-                .type = alia::shader_type::vertex,
-                .source = d3d9_vertex_shader,
-                .debug_name = "cursor_glow_vs_hlsl",
-            },
-            {
-                .backend = alia::gfx_backend::d3d9,
-                .type = alia::shader_type::pixel,
-                .source = d3d9_pixel_shader,
-                .debug_name = "cursor_glow_ps_hlsl",
-            },
-            {
-                .backend = alia::gfx_backend::opengl,
-                .type = alia::shader_type::vertex,
-                .source = ogl_vertex_shader,
-                .debug_name = "cursor_glow_vs_glsl",
-            },
-            {
-                .backend = alia::gfx_backend::opengl,
-                .type = alia::shader_type::pixel,
-                .source = ogl_pixel_shader,
-                .debug_name = "cursor_glow_ps_glsl",
-            },
-        }};
-        // Float constants are deliberate: D3D9 integer constants use i#
-        // registers, which HLSL c# declarations do not read.
-        const std::array<alia::shader_constant_binding, 3> constants{{
-            {"u_projection", alia::shader_type::vertex, 0, 4},
-            {"mouse_pos", alia::shader_type::pixel, 0, 1},
-            {"dither_offset", alia::shader_type::pixel, 1, 1},
-        }};
-        const std::array<alia::shader_sampler_binding, 1> samplers{{
-            {"blue_noise", alia::shader_type::pixel, 0},
-        }};
-        alia::shader_program shader(
-            device,
-            {
-                .sources = sources,
-                .constant_bindings = constants,
-                .sampler_bindings = samplers,
-            });
+        alia::shader_program shader(device, "cursor_glow", {
+            {.backend = alia::gfx_backend::d3d9, .vertex = {d3d9_vertex_shader}, .pixel = {d3d9_pixel_shader}},
+            {.backend = alia::gfx_backend::opengl, .vertex = {ogl_vertex_shader}, .pixel = {ogl_pixel_shader}},
+        });
         auto projection_constant = shader.allocate_constant<alia::transform>(
             "u_projection", alia::shader_type::vertex);
         auto mouse_constant = shader.allocate_constant<alia::vec2f>(
             "mouse_pos", alia::shader_type::pixel);
         auto dither_constant = shader.allocate_constant<alia::vec2f>(
             "dither_offset", alia::shader_type::pixel);
+        shader.allocate_sampler("blue_noise", 0);
 
         alia::event_queue events;
         events.register_source(&win.get_event_source());

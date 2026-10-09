@@ -212,45 +212,10 @@ int main(int argc, char **argv) {
         alia::vertex_buffer<alia::normal_vertex3d> gpu_vertices(device, vertex_span, alia::buffer_usage::static_mesh);
         alia::index_buffer gpu_indices(device, index_span, alia::buffer_usage::static_mesh);
 
-        const std::array<alia::shader_source, 4> sources{{
-            {
-                .backend = alia::gfx_backend::d3d9,
-                .type = alia::shader_type::vertex,
-                .source = d3d9_vertex_shader,
-                .debug_name = "buffered_mesh_vs_hlsl",
-            },
-            {
-                .backend = alia::gfx_backend::d3d9,
-                .type = alia::shader_type::pixel,
-                .source = d3d9_pixel_shader,
-                .debug_name = "buffered_mesh_ps_hlsl",
-            },
-            {
-                .backend = alia::gfx_backend::opengl,
-                .type = alia::shader_type::vertex,
-                .source = ogl_vertex_shader,
-                .debug_name = "buffered_mesh_vs_glsl",
-            },
-            {
-                .backend = alia::gfx_backend::opengl,
-                .type = alia::shader_type::pixel,
-                .source = ogl_pixel_shader,
-                .debug_name = "buffered_mesh_ps_glsl",
-            },
-        }};
-
-        const std::array<alia::shader_constant_binding, 2> constants{{
-            {"u_projection", alia::shader_type::vertex, 0, 4},
-            {"u_transform", alia::shader_type::vertex, 4, 4},
-        }};
-
-        alia::shader_program shader(
-            device,
-            {
-                .sources = sources,
-                .constant_bindings = constants,
-            }
-        );
+        alia::shader_program shader(device, "buffered_mesh", {
+            {.backend = alia::gfx_backend::d3d9, .vertex = {d3d9_vertex_shader}, .pixel = {d3d9_pixel_shader}},
+            {.backend = alia::gfx_backend::opengl, .vertex = {ogl_vertex_shader}, .pixel = {ogl_pixel_shader}},
+        });
         auto projection_constant =
             shader.allocate_constant<alia::transform>("u_projection", alia::shader_type::vertex);
         auto transform_constant =
