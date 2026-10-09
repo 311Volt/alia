@@ -8,6 +8,10 @@
 
 namespace alia {
     namespace {
+        constexpr int index_size(index_format format) {
+            return format == index_format::u16 ? sizeof(uint16_t) : sizeof(uint32_t);
+        }
+
         const ogl_compiled_vertex_definition &get_or_compile(ogl_device &device, const vertex_definition_view &definition) {
             if (device.vertex_definitions.size() <= definition.index)
                 device.vertex_definitions.resize(definition.index + 1);
@@ -214,7 +218,7 @@ namespace alia {
     void ogl_bind_vertex_buffer(device_handle *h, vertex_buffer_handle *buffer) { auto &device = *as_ogl_device(h); device.current_vb = buffer ? as_ogl_vertex_buffer(buffer) : nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; }
     void ogl_bind_index_buffer(device_handle *h, index_buffer_handle *buffer) { auto &device = *as_ogl_device(h); device.current_ib = buffer ? as_ogl_index_buffer(buffer) : nullptr; device.transient_indices = nullptr; device.transient_index_count = 0; }
     void ogl_upload_transient_vertex_data(device_handle *h, const void *data, int bytes) { auto &device = *as_ogl_device(h); device.current_vb = nullptr; device.transient_vertices = data; device.transient_vertex_bytes = bytes; }
-    void ogl_upload_transient_index_data(device_handle *h, std::span<const uint32_t> indices) { auto &device = *as_ogl_device(h); device.current_ib = nullptr; device.transient_indices = indices.data(); device.transient_index_count = static_cast<int>(indices.size()); }
+    void ogl_upload_transient_index_data(device_handle *h, const void *indices, int index_count, index_format format) { auto &device = *as_ogl_device(h); device.current_ib = nullptr; device.transient_indices = indices; device.transient_index_count = index_count; device.transient_index_format = format; }
     void ogl_bind_resources(device_handle *, const texture_sampler_binding &binding) {
         bind_texture_unit(binding.slot, binding.texture);
         if (binding.texture) apply_sampler(*as_ogl_texture(binding.texture), binding.sampler);
@@ -231,8 +235,10 @@ namespace alia {
         const void *base = device.current_vb ? reinterpret_cast<const void *>(static_cast<std::uintptr_t>(base_vertex * stride)) : static_cast<const std::byte *>(device.transient_vertices) + base_vertex * stride;
         apply_layout(device, base); prepare_draw(device);
         if (ogl_s_glBindBuffer) ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, device.current_ib ? device.current_ib->buffer_id : 0);
-        const void *indices = device.current_ib ? reinterpret_cast<const void *>(static_cast<std::uintptr_t>(first_index * sizeof(uint32_t))) : device.transient_indices + first_index;
-        glDrawElements(to_gl(topology), index_count, GL_UNSIGNED_INT, indices);
+        const index_format format = device.current_ib ? device.current_ib->format : device.transient_index_format;
+        const auto offset_bytes = static_cast<std::uintptr_t>(first_index) * index_size(format);
+        const void *indices = device.current_ib ? reinterpret_cast<const void *>(offset_bytes) : static_cast<const std::byte *>(device.transient_indices) + offset_bytes;
+        glDrawElements(to_gl(topology), index_count, to_gl(format), indices);
     }
 } // namespace alia
 

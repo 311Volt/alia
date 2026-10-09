@@ -54,8 +54,9 @@ namespace alia {
         d3d9_index_buffer *current_ib = nullptr;
         const void *transient_vertices = nullptr;
         int transient_vertex_bytes = 0;
-        const uint32_t *transient_indices = nullptr;
+        const void *transient_indices = nullptr;
         int transient_index_count = 0;
+        index_format transient_index_format = index_format::u16;
     };
     struct d3d9_texture : texture_handle {
         IDirect3DDevice9 *device = nullptr;
@@ -79,6 +80,7 @@ namespace alia {
         IDirect3DDevice9 *device = nullptr;
         IDirect3DIndexBuffer9 *buffer = nullptr;
         int count = 0;
+        index_format format = index_format::u16;
         buffer_usage usage = buffer_usage::static_mesh;
     };
     struct d3d9_swapchain : swapchain_handle {
@@ -140,6 +142,10 @@ namespace alia {
         return D3DCOLOR_RGBA(clamp(c.r), clamp(c.g), clamp(c.b), clamp(c.a));
     }
 
+    inline D3DFORMAT to_d3d(index_format format) {
+        return format == index_format::u16 ? D3DFMT_INDEX16 : D3DFMT_INDEX32;
+    }
+
     d3d9_device *d3d9_create_device(const gfx_device_config &); void d3d9_destroy_device(device_handle *);
     texture_handle *d3d9_create_texture(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage);
     texture_handle *d3d9_create_cube_texture(device_handle *, pixel_format, int, int, texture_usage);
@@ -155,7 +161,7 @@ namespace alia {
     vertex_buffer_handle *d3d9_create_vertex_buffer(device_handle *, int, int, buffer_usage, const void *); void d3d9_destroy_vertex_buffer(vertex_buffer_handle *);
     int d3d9_vertex_buffer_count(const vertex_buffer_handle *); int d3d9_vertex_buffer_stride(const vertex_buffer_handle *); buffer_usage d3d9_vertex_buffer_usage(const vertex_buffer_handle *);
     bool d3d9_vertex_buffer_lock(vertex_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void d3d9_vertex_buffer_unlock(vertex_buffer_handle *, const buffer_lock_info &, bool);
-    index_buffer_handle *d3d9_create_index_buffer(device_handle *, int, buffer_usage, const uint32_t *); void d3d9_destroy_index_buffer(index_buffer_handle *);
+    index_buffer_handle *d3d9_create_index_buffer(device_handle *, index_format, int, buffer_usage, const void *); void d3d9_destroy_index_buffer(index_buffer_handle *);
     int d3d9_index_buffer_count(const index_buffer_handle *); buffer_usage d3d9_index_buffer_usage(const index_buffer_handle *);
     bool d3d9_index_buffer_lock(index_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void d3d9_index_buffer_unlock(index_buffer_handle *, const buffer_lock_info &, bool);
     shader_program_handle *d3d9_create_shader_program(device_handle *, const shader_program_desc &); void d3d9_destroy_shader_program(shader_program_handle *);
@@ -172,7 +178,7 @@ namespace alia {
     void d3d9_set_fog(device_handle *, const fog_state &);
     bool d3d9_set_render_target(device_handle *, const render_target_info &); bool d3d9_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void d3d9_reset_frame_state(d3d9_device &); void d3d9_set_viewport(device_handle *, const render_viewport &);
     void d3d9_bind_vertex_buffer(device_handle *, vertex_buffer_handle *); void d3d9_bind_index_buffer(device_handle *, index_buffer_handle *);
-    void d3d9_upload_transient_vertex_data(device_handle *, const void *, int); void d3d9_upload_transient_index_data(device_handle *, std::span<const uint32_t>);
+    void d3d9_upload_transient_vertex_data(device_handle *, const void *, int); void d3d9_upload_transient_index_data(device_handle *, const void *, int, index_format);
     void d3d9_bind_resources(device_handle *, const texture_sampler_binding &); void d3d9_draw(device_handle *, primitive_topology, int, int); void d3d9_draw_indexed(device_handle *, primitive_topology, int, int, int);
 } // namespace alia
 #endif

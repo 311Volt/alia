@@ -2,6 +2,7 @@
 #define PRIMITIVE_RENDERER_A43DDFAC_1C6F_42FC_92D8_ACFBCC464245
 
 #include "frame.hpp"
+#include "index_buffer_builder.hpp"
 
 #include <algorithm>
 #include <array>
@@ -418,6 +419,7 @@ namespace alia {
     };
 
     // Batches geometry until flush; anything not flushed is never drawn.
+    // Uses 16-bit indices until an index exceeds 0xFFFF; wider batches require caps().index32.
     class primitive_renderer : public generic_primitive_renderer {
     public:
         void append_vertices(std::span<const colored_vertex> vertices) {
@@ -425,7 +427,7 @@ namespace alia {
         }
 
         void append_indices(std::span<const uint32_t> indices) {
-            indices_.insert(indices_.end(), indices.begin(), indices.end());
+            indices_.add(indices);
         }
 
         [[nodiscard]] uint32_t vertex_count() const noexcept {
@@ -444,13 +446,15 @@ namespace alia {
         void flush(frame &target) {
             if (empty())
                 return;
-            target.draw_indexed<colored_vertex>(vertices_, indices_);
+            indices_.visit([&](auto indices) {
+                target.draw_indexed<colored_vertex>(vertices_, indices);
+            });
             clear();
         }
 
     private:
         std::vector<colored_vertex> vertices_;
-        std::vector<uint32_t> indices_;
+        index_buffer_builder indices_;
     };
 
     // Flushes after every primitive.

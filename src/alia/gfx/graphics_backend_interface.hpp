@@ -105,6 +105,10 @@ namespace alia {
         repeat,
         mirror
     };
+    enum class index_format {
+        u16,
+        u32
+    };
     enum class buffer_usage {
         static_mesh,
         dynamic_mesh
@@ -498,20 +502,21 @@ namespace alia {
         /// @return Nothing.
         gfx_backend_op<void(vertex_buffer_handle *buffer, const buffer_lock_info &info, bool wrote)> vertex_buffer_unlock;
 
-        /// @brief Allocate an index buffer and optionally initialize all its 32-bit indices.
+        /// @brief Allocate an index buffer and optionally initialize all its indices.
         /// @param device Device that will own the buffer.
+        /// @param format Index width; u32 is only requested when caps.index32 is true.
         /// @param index_count Number of indices to allocate; must be positive.
         /// @param usage Static or dynamic buffer usage hint.
         /// @param initial_data Optional pointer to `index_count` indices; may be null.
         /// @return New index-buffer handle, or null if allocation fails.
-        gfx_backend_op<index_buffer_handle *(device_handle *device, int index_count, buffer_usage usage, const uint32_t *initial_data)> create_index_buffer;
+        gfx_backend_op<index_buffer_handle *(device_handle *device, index_format format, int index_count, buffer_usage usage, const void *initial_data)> create_index_buffer;
 
         /// @brief Release an index buffer and its backend resource.
         /// @param buffer Index buffer to release.
         /// @return Nothing.
         gfx_backend_op<void(index_buffer_handle *buffer)> destroy_index_buffer;
 
-        /// @brief Return the number of 32-bit indices allocated in an index buffer.
+        /// @brief Return the number of indices allocated in an index buffer.
         /// @param buffer Index buffer to query.
         /// @return Index count.
         gfx_backend_op<int(const index_buffer_handle *buffer)> index_buffer_count;
@@ -699,11 +704,13 @@ namespace alia {
         /// @return Nothing.
         gfx_backend_op<void(device_handle *device, const void *data, int byte_count)> upload_transient_vertex_data;
 
-        /// @brief Record caller-owned 32-bit indices as the source for subsequent indexed draws in this frame; the backend does not copy the indices.
+        /// @brief Record caller-owned indices as the source for subsequent indexed draws in this frame; the backend does not copy the indices.
         /// @param device Device receiving the transient source.
         /// @param indices Index values; the referenced storage must remain valid through the next index bind/upload or frame end.
+        /// @param index_count Number of indices in the source.
+        /// @param format Index width; u32 is only requested when caps.index32 is true.
         /// @return Nothing.
-        gfx_backend_op<void(device_handle *device, std::span<const uint32_t> indices)> upload_transient_index_data;
+        gfx_backend_op<void(device_handle *device, const void *indices, int index_count, index_format format)> upload_transient_index_data;
 
         /// @brief Record a texture and sampler state for a slot; a null texture clears that slot, and the recorded binding is consumed at draw time.
         /// @param device Device whose resource binding is changed.

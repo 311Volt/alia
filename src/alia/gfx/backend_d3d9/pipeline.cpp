@@ -7,6 +7,10 @@
 
 namespace alia {
     namespace {
+        constexpr int index_size(index_format format) {
+            return format == index_format::u16 ? sizeof(uint16_t) : sizeof(uint32_t);
+        }
+
         IDirect3DVertexDeclaration9 *get_or_compile(d3d9_device &device, const vertex_definition_view &definition) {
             if (device.vertex_definitions.size() <= definition.index)
                 device.vertex_definitions.resize(definition.index + 1);
@@ -231,8 +235,8 @@ namespace alia {
     void d3d9_upload_transient_vertex_data(device_handle *h, const void *data, int bytes) {
         auto &device = *as_d3d9_device(h); device.current_vb = nullptr; device.transient_vertices = data; device.transient_vertex_bytes = bytes;
     }
-    void d3d9_upload_transient_index_data(device_handle *h, std::span<const uint32_t> indices) {
-        auto &device = *as_d3d9_device(h); device.current_ib = nullptr; device.transient_indices = indices.data(); device.transient_index_count = static_cast<int>(indices.size());
+    void d3d9_upload_transient_index_data(device_handle *h, const void *indices, int index_count, index_format format) {
+        auto &device = *as_d3d9_device(h); device.current_ib = nullptr; device.transient_indices = indices; device.transient_index_count = index_count; device.transient_index_format = format;
     }
     void d3d9_bind_resources(device_handle *h, const texture_sampler_binding &binding) {
         auto *device = as_d3d9_device(h)->device; auto *texture = binding.texture ? as_d3d9_texture(binding.texture) : nullptr;
@@ -263,7 +267,8 @@ namespace alia {
             device.device->SetIndices(device.current_ib->buffer);
             device.device->DrawIndexedPrimitive(to_d3d(topology), base_vertex, 0, static_cast<UINT>(device.current_vb->count - base_vertex), static_cast<UINT>(first_index), static_cast<UINT>(count));
         } else {
-            device.device->DrawIndexedPrimitiveUP(to_d3d(topology), 0, static_cast<UINT>(device.transient_vertex_bytes / stride - base_vertex), static_cast<UINT>(count), device.transient_indices + first_index, D3DFMT_INDEX32, static_cast<const std::byte *>(device.transient_vertices) + base_vertex * stride, static_cast<UINT>(stride));
+            const auto *indices = static_cast<const std::byte *>(device.transient_indices) + first_index * index_size(device.transient_index_format);
+            device.device->DrawIndexedPrimitiveUP(to_d3d(topology), 0, static_cast<UINT>(device.transient_vertex_bytes / stride - base_vertex), static_cast<UINT>(count), indices, to_d3d(device.transient_index_format), static_cast<const std::byte *>(device.transient_vertices) + base_vertex * stride, static_cast<UINT>(stride));
         }
     }
 } // namespace alia

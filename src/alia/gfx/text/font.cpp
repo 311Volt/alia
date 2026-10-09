@@ -634,7 +634,7 @@ namespace alia {
             detail::anchor_offset(params.anchor, block_size, "draw_text: anchor must be finite");
 
         std::vector<full_vertex> vertices;
-        std::vector<uint32_t> indices;
+        std::vector<uint16_t> indices;
         int batch_page = -1;
 
         const auto flush = [&] {
@@ -656,6 +656,8 @@ namespace alia {
                 flush();
                 batch_page = glyph.page;
             }
+            if (vertices.size() + 4 > 65536)
+                flush();
 
             const float line_width = line_widths[static_cast<std::size_t>(placed.line)];
             const float line_x = text_align_offset(params.align, block_width, line_width);
@@ -677,7 +679,7 @@ namespace alia {
             const float v1 = static_cast<float>(atlas_rect.bottom()) /
                 static_cast<float>(cache.page_size.y);
 
-            const uint32_t base = static_cast<uint32_t>(vertices.size());
+            const uint16_t base = static_cast<uint16_t>(vertices.size());
             vertices.insert(
                 vertices.end(),
                 {
@@ -689,7 +691,8 @@ namespace alia {
             );
             indices.insert(
                 indices.end(),
-                {base, base + 1, base + 2, base, base + 2, base + 3}
+                {base, static_cast<uint16_t>(base + 1), static_cast<uint16_t>(base + 2),
+                 base, static_cast<uint16_t>(base + 2), static_cast<uint16_t>(base + 3)}
             );
         }
         flush();
@@ -712,7 +715,7 @@ namespace alia {
             {{x1, y1}, params.tint, {1.0f, 1.0f}},
             {{x0, y1}, params.tint, {0.0f, 1.0f}},
         };
-        constexpr uint32_t indices[]{0, 1, 2, 0, 2, 3};
+        constexpr uint16_t indices[]{0, 1, 2, 0, 2, 3};
 
         params.target.set_texture(params.texture_slot.value, params.texture.mask);
         params.target.draw_indexed<full_vertex>(vertices, indices);

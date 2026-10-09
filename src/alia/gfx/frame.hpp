@@ -17,7 +17,7 @@ namespace alia {
     namespace detail {
         void frame_draw_transient(frame &, const void *, int, const vertex_definition_view &, primitive_topology);
         void frame_draw_buffered(frame &, vertex_buffer_handle *, int, int, const vertex_definition_view &, primitive_topology);
-        void frame_draw_indexed_transient(frame &, const void *, int, std::span<const uint32_t>, const vertex_definition_view &, primitive_topology);
+        void frame_draw_indexed_transient(frame &, const void *, int, const void *, int, index_format, const vertex_definition_view &, primitive_topology);
         void frame_draw_indexed_buffered(frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, const vertex_definition_view &, primitive_topology);
     }
 
@@ -146,13 +146,24 @@ namespace alia {
             const int count = vertex_count < 0 ? vertices.count() - first_vertex : vertex_count;
             detail::frame_draw_buffered(*this, vertices.impl(), count, first_vertex, detail::vertex_definition_of<TVertex>(), topology);
         }
+        // 32-bit indices throw unsupported_operation_exception when caps().index32 is false.
+        template <vertex_type TVertex, index_type TIndex>
+        void draw_indexed(std::span<const TVertex> vertices, std::span<const TIndex> indices,
+                          primitive_topology topology = primitive_topology::triangle_list) {
+            detail::frame_draw_indexed_transient(*this, vertices.data(), static_cast<int>(vertices.size()), indices.data(), static_cast<int>(indices.size()), index_format_of<TIndex>, detail::vertex_definition_of<TVertex>(), topology);
+        }
+        template <vertex_type TVertex>
+        void draw_indexed(std::span<const TVertex> vertices, std::span<const uint16_t> indices,
+                          primitive_topology topology = primitive_topology::triangle_list) {
+            detail::frame_draw_indexed_transient(*this, vertices.data(), static_cast<int>(vertices.size()), indices.data(), static_cast<int>(indices.size()), index_format::u16, detail::vertex_definition_of<TVertex>(), topology);
+        }
         template <vertex_type TVertex>
         void draw_indexed(std::span<const TVertex> vertices, std::span<const uint32_t> indices,
                           primitive_topology topology = primitive_topology::triangle_list) {
-            detail::frame_draw_indexed_transient(*this, vertices.data(), static_cast<int>(vertices.size()), indices, detail::vertex_definition_of<TVertex>(), topology);
+            detail::frame_draw_indexed_transient(*this, vertices.data(), static_cast<int>(vertices.size()), indices.data(), static_cast<int>(indices.size()), index_format::u32, detail::vertex_definition_of<TVertex>(), topology);
         }
-        template <vertex_type TVertex>
-        void draw_indexed(vertex_buffer<TVertex> &vertices, index_buffer &indices,
+        template <vertex_type TVertex, index_type TIndex>
+        void draw_indexed(vertex_buffer<TVertex> &vertices, index_buffer<TIndex> &indices,
                           int first_index = 0, int index_count = -1, int base_vertex = 0,
                           primitive_topology topology = primitive_topology::triangle_list) {
             detail::frame_draw_indexed_buffered(*this, vertices.impl(), vertices.count(), indices.impl(), indices.count(), first_index, index_count, base_vertex, detail::vertex_definition_of<TVertex>(), topology);
@@ -174,7 +185,7 @@ namespace alia {
         friend class swapchain;
         friend void detail::frame_draw_transient(frame &, const void *, int, const vertex_definition_view &, primitive_topology);
         friend void detail::frame_draw_buffered(frame &, vertex_buffer_handle *, int, int, const vertex_definition_view &, primitive_topology);
-        friend void detail::frame_draw_indexed_transient(frame &, const void *, int, std::span<const uint32_t>, const vertex_definition_view &, primitive_topology);
+        friend void detail::frame_draw_indexed_transient(frame &, const void *, int, const void *, int, index_format, const vertex_definition_view &, primitive_topology);
         friend void detail::frame_draw_indexed_buffered(frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, const vertex_definition_view &, primitive_topology);
         explicit frame(swapchain &);
         void finish_without_present() noexcept;

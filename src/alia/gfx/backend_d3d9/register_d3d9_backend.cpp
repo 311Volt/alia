@@ -42,6 +42,7 @@ namespace alia {
                 D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE, D3DFMT_A8R8G8B8));
         iface.caps.separate_alpha_blend =
             (raw->caps.PrimitiveMiscCaps & D3DPMISCCAPS_SEPARATEALPHABLEND) != 0;
+        iface.caps.index32 = caps.MaxVertexIndex > 0xFFFF;
         iface.caps.spot_model = spot_light_model::inner_outer;
         const DWORD required_light_caps = D3DVTXPCAPS_DIRECTIONALLIGHTS | D3DVTXPCAPS_POSITIONALLIGHTS;
         const bool supports_light_types = (caps.VertexProcessingCaps & required_light_caps) == required_light_caps;

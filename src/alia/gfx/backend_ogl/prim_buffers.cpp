@@ -17,6 +17,10 @@ namespace alia {
 
     namespace {
 
+        constexpr int index_size(index_format format) {
+            return format == index_format::u16 ? sizeof(uint16_t) : sizeof(uint32_t);
+        }
+
         GLenum to_gl_usage(buffer_usage usage) {
             return usage == buffer_usage::dynamic_mesh ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW;
         }
@@ -115,9 +119,10 @@ namespace alia {
 
     index_buffer_handle *ogl_create_index_buffer(
         device_handle *,
+        index_format format,
         int index_count,
         buffer_usage usage,
-        const uint32_t *initial_data
+        const void *initial_data
     ) {
         if (index_count <= 0 || !ogl_s_glGenBuffers)
             return nullptr;
@@ -127,7 +132,7 @@ namespace alia {
         if (!id)
             return nullptr;
 
-        const int size_bytes = index_count * static_cast<int>(sizeof(uint32_t));
+        const int size_bytes = index_count * index_size(format);
         ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
         ogl_s_glBufferData(GL_ELEMENT_ARRAY_BUFFER, size_bytes, initial_data, to_gl_usage(usage));
         ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -135,6 +140,7 @@ namespace alia {
         auto *out = new ogl_index_buffer;
         out->buffer_id = id;
         out->count = index_count;
+        out->format = format;
         out->usage = usage;
         return out;
     }
@@ -165,8 +171,8 @@ namespace alia {
         if (first_index < 0 || index_count <= 0 || first_index + index_count > buffer->count)
             return false;
 
-        const int offset_bytes = first_index * static_cast<int>(sizeof(uint32_t));
-        const int size_bytes = index_count * static_cast<int>(sizeof(uint32_t));
+        const int offset_bytes = first_index * index_size(buffer->format);
+        const int size_bytes = index_count * index_size(buffer->format);
 
         ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer->buffer_id);
         auto *mapped = static_cast<std::byte *>(ogl_s_glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, to_gl_access(mode)));

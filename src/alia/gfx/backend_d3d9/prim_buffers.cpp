@@ -8,6 +8,10 @@ namespace alia {
 
     namespace {
 
+        constexpr int index_size(index_format format) {
+            return format == index_format::u16 ? sizeof(uint16_t) : sizeof(uint32_t);
+        }
+
         DWORD buffer_usage_flags(buffer_usage usage) {
             return usage == buffer_usage::dynamic_mesh ? D3DUSAGE_DYNAMIC : 0u;
         }
@@ -132,21 +136,22 @@ namespace alia {
 
     index_buffer_handle *d3d9_create_index_buffer(
         device_handle *dev_h,
+        index_format format,
         int index_count,
         buffer_usage usage,
-        const uint32_t *initial_data
+        const void *initial_data
     ) {
         if (index_count <= 0)
             return nullptr;
 
         auto *dev = as_d3d9_device(dev_h);
-        const int size_bytes = index_count * static_cast<int>(sizeof(uint32_t));
+        const int size_bytes = index_count * index_size(format);
 
         IDirect3DIndexBuffer9 *buffer = nullptr;
         if (FAILED(dev->device->CreateIndexBuffer(
                 static_cast<UINT>(size_bytes),
                 buffer_usage_flags(usage),
-                D3DFMT_INDEX32,
+                to_d3d(format),
                 buffer_pool(usage),
                 &buffer,
                 nullptr
@@ -172,6 +177,7 @@ namespace alia {
         out->device = dev->device;
         out->buffer = buffer;
         out->count = index_count;
+        out->format = format;
         out->usage = usage;
         return out;
     }
@@ -202,9 +208,9 @@ namespace alia {
         if (first_index < 0 || index_count <= 0 || first_index + index_count > buffer->count)
             return false;
 
-        const int offset_bytes = first_index * static_cast<int>(sizeof(uint32_t));
-        const int size_bytes = index_count * static_cast<int>(sizeof(uint32_t));
-        const int total_bytes = buffer->count * static_cast<int>(sizeof(uint32_t));
+        const int offset_bytes = first_index * index_size(buffer->format);
+        const int size_bytes = index_count * index_size(buffer->format);
+        const int total_bytes = buffer->count * index_size(buffer->format);
 
         void *data = nullptr;
         if (FAILED(buffer->buffer->Lock(

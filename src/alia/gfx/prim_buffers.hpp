@@ -4,13 +4,22 @@
 #include "gfx_device.hpp"
 #include "vertex.hpp"
 
+#include <concepts>
 #include <cstdint>
 #include <memory>
+#include <ranges>
 #include <span>
 #include <type_traits>
 #include <utility>
 
 namespace alia {
+
+    template <class T>
+    concept index_type = std::same_as<T, uint16_t> || std::same_as<T, uint32_t>;
+
+    template <index_type T>
+    inline constexpr index_format index_format_of =
+        std::same_as<T, uint16_t> ? index_format::u16 : index_format::u32;
 
     namespace detail {
 
@@ -104,10 +113,10 @@ namespace alia {
                 : std::span<element_type>{}) {}
     };
 
-    template <buffer_lock_mode Mode = buffer_lock_mode::read_write>
+    template <index_type TIndex, buffer_lock_mode Mode = buffer_lock_mode::read_write>
     class locked_index_buffer_view {
     public:
-        using element_type = std::conditional_t<Mode == buffer_lock_mode::read_only, const uint32_t, uint32_t>;
+        using element_type = std::conditional_t<Mode == buffer_lock_mode::read_only, const TIndex, TIndex>;
 
         locked_index_buffer_view() = default;
 
@@ -164,6 +173,7 @@ namespace alia {
         }
 
     private:
+        template <index_type>
         friend class index_buffer;
 
         std::unique_ptr<detail::index_buffer_lock_state> impl_;
@@ -174,7 +184,7 @@ namespace alia {
             , view_(impl_
                 ? std::span<element_type>(
                     reinterpret_cast<element_type *>(impl_->info.data),
-                    static_cast<std::size_t>(impl_->info.size_bytes / static_cast<int>(sizeof(uint32_t)))
+                    static_cast<std::size_t>(impl_->info.size_bytes / static_cast<int>(sizeof(TIndex)))
                 )
                 : std::span<element_type>{}) {}
     };
@@ -320,6 +330,8 @@ namespace alia {
         buffer_usage usage_ = buffer_usage::static_mesh;
     };
 
+    // 32-bit indices throw unsupported_operation_exception when caps().index32 is false.
+    template <index_type TIndex = uint32_t>
     class index_buffer {
     public:
         index_buffer() = default;
@@ -328,7 +340,7 @@ namespace alia {
             create(device, index_count, usage, nullptr);
         }
 
-        index_buffer(gfx_device &device, std::span<const uint32_t> indices, buffer_usage usage = buffer_usage::static_mesh) {
+        index_buffer(gfx_device &device, std::span<const TIndex> indices, buffer_usage usage = buffer_usage::static_mesh) {
             create(device, static_cast<int>(indices.size()), usage, indices.data());
         }
 
@@ -372,23 +384,27 @@ namespace alia {
             return usage_;
         }
 
-        [[nodiscard]] locked_index_buffer_view<buffer_lock_mode::read_write>
+        [[nodiscard]] static constexpr int stride() noexcept {
+            return static_cast<int>(sizeof(TIndex));
+        }
+
+        [[nodiscard]] locked_index_buffer_view<TIndex, buffer_lock_mode::read_write>
         lock(int first_index = 0, int index_count = -1) {
-            return locked_index_buffer_view<buffer_lock_mode::read_write>(
+            return locked_index_buffer_view<TIndex, buffer_lock_mode::read_write>(
                 lock_impl(first_index, index_count, buffer_lock_mode::read_write)
             );
         }
 
-        [[nodiscard]] locked_index_buffer_view<buffer_lock_mode::read_only>
+        [[nodiscard]] locked_index_buffer_view<TIndex, buffer_lock_mode::read_only>
         lock_read_only(int first_index = 0, int index_count = -1) {
-            return locked_index_buffer_view<buffer_lock_mode::read_only>(
+            return locked_index_buffer_view<TIndex, buffer_lock_mode::read_only>(
                 lock_impl(first_index, index_count, buffer_lock_mode::read_only)
             );
         }
 
-        [[nodiscard]] locked_index_buffer_view<buffer_lock_mode::write_only>
+        [[nodiscard]] locked_index_buffer_view<TIndex, buffer_lock_mode::write_only>
         lock_write_only(int first_index = 0, int index_count = -1) {
-            return locked_index_buffer_view<buffer_lock_mode::write_only>(
+            return locked_index_buffer_view<TIndex, buffer_lock_mode::write_only>(
                 lock_impl(first_index, index_count, buffer_lock_mode::write_only)
             );
         }
@@ -402,12 +418,18 @@ namespace alia {
         }
 
     private:
-        void create(gfx_device &device, int index_count, buffer_usage usage, const uint32_t *initial_data) {
+        void create(gfx_device &device, int index_count, buffer_usage usage, const void *initial_data) {
             if (index_count <= 0)
                 return;
 
+            if constexpr (std::same_as<TIndex, uint32_t>) {
+                if (!device.caps().index32)
+                    throw unsupported_operation_exception("32-bit indices are not supported by this device");
+            }
+
             const auto *backend = device.backend();
-            handle_ = backend->create_index_buffer.get_or_throw()(device.device(), index_count, usage, initial_data);
+            handle_ = backend->create_index_buffer.get_or_throw()(
+                device.device(), index_format_of<TIndex>, index_count, usage, initial_data);
             if (handle_) {
                 backend_ = backend;
                 count_ = index_count;
@@ -449,6 +471,15 @@ namespace alia {
         int count_ = 0;
         buffer_usage usage_ = buffer_usage::static_mesh;
     };
+
+    template <index_type T>
+    index_buffer(gfx_device &, std::span<const T>, buffer_usage = buffer_usage::static_mesh) -> index_buffer<T>;
+
+    template <std::ranges::contiguous_range R>
+        requires std::ranges::sized_range<R> && index_type<std::ranges::range_value_t<R>>
+    index_buffer(gfx_device &, const R &, buffer_usage = buffer_usage::static_mesh) -> index_buffer<std::ranges::range_value_t<R>>;
+
+    index_buffer(gfx_device &, int, buffer_usage = buffer_usage::dynamic_mesh) -> index_buffer<uint32_t>;
 
 } // namespace alia
 

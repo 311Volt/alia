@@ -66,8 +66,9 @@ namespace alia {
         ogl_index_buffer *current_ib = nullptr;
         const void *transient_vertices = nullptr;
         int transient_vertex_bytes = 0;
-        const uint32_t *transient_indices = nullptr;
+        const void *transient_indices = nullptr;
         int transient_index_count = 0;
+        index_format transient_index_format = index_format::u16;
         const ogl_compiled_vertex_definition *applied_layout = nullptr;
         bool applied_shader_active = false;
         const void *applied_base = nullptr;
@@ -86,7 +87,7 @@ namespace alia {
         std::size_t stage_buf_bytes = 0;
     };
     struct ogl_vertex_buffer : vertex_buffer_handle { GLuint buffer_id = 0; int stride = 0, count = 0; buffer_usage usage = buffer_usage::static_mesh; };
-    struct ogl_index_buffer : index_buffer_handle { GLuint buffer_id = 0; int count = 0; buffer_usage usage = buffer_usage::static_mesh; };
+    struct ogl_index_buffer : index_buffer_handle { GLuint buffer_id = 0; int count = 0; index_format format = index_format::u16; buffer_usage usage = buffer_usage::static_mesh; };
     struct ogl_swapchain : swapchain_handle {
         ogl_device *owner = nullptr;
         void *surface = nullptr;
@@ -126,6 +127,10 @@ namespace alia {
     inline const ogl_swapchain *as_ogl_swapchain(const swapchain_handle *h) { return static_cast<const ogl_swapchain *>(h); }
     inline ogl_shader_program *as_ogl_shader_program(shader_program_handle *h) { return static_cast<ogl_shader_program *>(h); }
 
+    inline GLenum to_gl(index_format format) {
+        return format == index_format::u16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+    }
+
     ogl_device *ogl_create_device(const gfx_device_config &); void ogl_destroy_device(device_handle *);
     texture_handle *ogl_create_texture(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage); void ogl_destroy_texture(texture_handle *);
     texture_handle *ogl_create_cube_texture(device_handle *, pixel_format, int, int, texture_usage);
@@ -140,7 +145,7 @@ namespace alia {
     vertex_buffer_handle *ogl_create_vertex_buffer(device_handle *, int, int, buffer_usage, const void *); void ogl_destroy_vertex_buffer(vertex_buffer_handle *);
     int ogl_vertex_buffer_count(const vertex_buffer_handle *); int ogl_vertex_buffer_stride(const vertex_buffer_handle *); buffer_usage ogl_vertex_buffer_usage(const vertex_buffer_handle *);
     bool ogl_vertex_buffer_lock(vertex_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void ogl_vertex_buffer_unlock(vertex_buffer_handle *, const buffer_lock_info &, bool);
-    index_buffer_handle *ogl_create_index_buffer(device_handle *, int, buffer_usage, const uint32_t *); void ogl_destroy_index_buffer(index_buffer_handle *);
+    index_buffer_handle *ogl_create_index_buffer(device_handle *, index_format, int, buffer_usage, const void *); void ogl_destroy_index_buffer(index_buffer_handle *);
     int ogl_index_buffer_count(const index_buffer_handle *); buffer_usage ogl_index_buffer_usage(const index_buffer_handle *);
     bool ogl_index_buffer_lock(index_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void ogl_index_buffer_unlock(index_buffer_handle *, const buffer_lock_info &, bool);
     shader_program_handle *ogl_create_shader_program(device_handle *, const shader_program_desc &); void ogl_destroy_shader_program(shader_program_handle *);
@@ -159,7 +164,7 @@ namespace alia {
     void ogl_apply_material(ogl_device &);
     bool ogl_set_render_target(device_handle *, const render_target_info &); bool ogl_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void ogl_reset_frame_state(ogl_device &); void ogl_set_viewport(device_handle *, const render_viewport &);
     void ogl_bind_vertex_buffer(device_handle *, vertex_buffer_handle *); void ogl_bind_index_buffer(device_handle *, index_buffer_handle *);
-    void ogl_upload_transient_vertex_data(device_handle *, const void *, int); void ogl_upload_transient_index_data(device_handle *, std::span<const uint32_t>);
+    void ogl_upload_transient_vertex_data(device_handle *, const void *, int); void ogl_upload_transient_index_data(device_handle *, const void *, int, index_format);
     void ogl_bind_resources(device_handle *, const texture_sampler_binding &); void ogl_draw(device_handle *, primitive_topology, int, int); void ogl_draw_indexed(device_handle *, primitive_topology, int, int, int);
 
     extern PFNGLGENERATEMIPMAPPROC ogl_s_glGenerateMipmap;

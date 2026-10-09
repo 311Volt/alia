@@ -191,6 +191,7 @@ namespace alia {
             has_gl_extension("GL_ARB_texture_non_power_of_two");
         iface.caps.cube_textures = has_cube_maps;
         iface.caps.render_to_texture = has_framebuffers;
+        iface.caps.index32 = true; // Desktop OpenGL 1.1 supports GL_UNSIGNED_INT.
         iface.caps.separate_alpha_blend =
             gl_major > 1 || (gl_major == 1 && gl_minor >= 4) ||
             has_gl_extension("GL_EXT_blend_func_separate");

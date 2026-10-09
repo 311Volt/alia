@@ -88,7 +88,7 @@ namespace alia {
             {positions[2], params.tint, uv.br()},
             {positions[3], params.tint, uv.bl()},
         };
-        constexpr uint32_t indices[]{0, 1, 2, 0, 2, 3};
+        constexpr uint16_t indices[]{0, 1, 2, 0, 2, 3};
 
         params.target.set_texture(params.texture_slot.value, params.texture);
         params.target.draw_indexed<full_vertex>(vertices, indices);

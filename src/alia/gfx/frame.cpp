@@ -626,15 +626,19 @@ namespace alia {
             frame.backend()->bind_vertex_buffer.get_or_throw()(frame.device(), vertices);
             frame.backend()->draw.get_or_throw()(frame.device(), topology, vertex_count, first_vertex);
         }
-        void frame_draw_indexed_transient(frame &frame, const void *vertices, int vertex_count, std::span<const uint32_t> indices, const vertex_definition_view &definition, primitive_topology topology) {
-            if (vertex_count <= 0 || indices.empty())
+        void frame_draw_indexed_transient(frame &frame, const void *vertices, int vertex_count, const void *indices, int index_count, index_format format, const vertex_definition_view &definition, primitive_topology topology) {
+            if (vertex_count <= 0 || index_count <= 0)
                 return;
             if (!vertices)
                 throw std::invalid_argument("frame::draw_indexed: vertex data is null");
+            if (!indices)
+                throw std::invalid_argument("frame::draw_indexed: index data is null");
+            if (format == index_format::u32 && !frame.backend()->caps.index32)
+                throw unsupported_operation_exception("32-bit indices are not supported by this device");
             frame.prepare_draw(definition);
             frame.backend()->upload_transient_vertex_data.get_or_throw()(frame.device(), vertices, vertex_count * definition.stride);
-            frame.backend()->upload_transient_index_data.get_or_throw()(frame.device(), indices);
-            frame.backend()->draw_indexed.get_or_throw()(frame.device(), topology, static_cast<int>(indices.size()), 0, 0);
+            frame.backend()->upload_transient_index_data.get_or_throw()(frame.device(), indices, index_count, format);
+            frame.backend()->draw_indexed.get_or_throw()(frame.device(), topology, index_count, 0, 0);
         }
         void frame_draw_indexed_buffered(frame &frame, vertex_buffer_handle *vertices, int vertex_count, index_buffer_handle *indices, int index_total, int first_index, int index_count, int base_vertex, const vertex_definition_view &definition, primitive_topology topology) {
             if (index_count < 0)
