@@ -23,6 +23,9 @@ namespace alia {
 
     namespace detail {
 
+        template <class T>
+        class basic_vertex_storage;
+
         struct vertex_buffer_lock_state {
             vertex_buffer_handle *handle = nullptr;
             const graphics_backend_interface *backend = nullptr;
@@ -37,7 +40,7 @@ namespace alia {
 
     } // namespace detail
 
-    template <vertex_type TVertex, buffer_lock_mode Mode = buffer_lock_mode::read_write>
+    template <class TVertex, buffer_lock_mode Mode = buffer_lock_mode::read_write>
     class locked_vertex_buffer_view {
     public:
         using element_type = std::conditional_t<Mode == buffer_lock_mode::read_only, const TVertex, TVertex>;
@@ -97,8 +100,8 @@ namespace alia {
         }
 
     private:
-        template <vertex_type>
-        friend class vertex_buffer;
+        template <class>
+        friend class detail::basic_vertex_storage;
 
         std::unique_ptr<detail::vertex_buffer_lock_state> impl_;
         std::span<element_type> view_;
@@ -189,30 +192,30 @@ namespace alia {
                 : std::span<element_type>{}) {}
     };
 
-    template <vertex_type TVertex>
-    class vertex_buffer {
+    template <class TVertex>
+    class detail::basic_vertex_storage {
     public:
-        vertex_buffer() = default;
+        basic_vertex_storage() = default;
 
-        vertex_buffer(gfx_device &device, int vertex_count, buffer_usage usage = buffer_usage::dynamic_mesh) {
+        basic_vertex_storage(gfx_device &device, int vertex_count, buffer_usage usage = buffer_usage::dynamic_mesh) {
             create(device, vertex_count, usage, nullptr);
         }
 
-        vertex_buffer(gfx_device &device, std::span<const TVertex> vertices, buffer_usage usage = buffer_usage::static_mesh) {
+        basic_vertex_storage(gfx_device &device, std::span<const TVertex> vertices, buffer_usage usage = buffer_usage::static_mesh) {
             create(device, static_cast<int>(vertices.size()), usage, vertices.data());
         }
 
-        ~vertex_buffer() {
+        ~basic_vertex_storage() {
             reset();
         }
 
-        vertex_buffer(vertex_buffer &&other) noexcept
+        basic_vertex_storage(basic_vertex_storage &&other) noexcept
             : handle_(std::exchange(other.handle_, nullptr))
             , backend_(std::exchange(other.backend_, nullptr))
             , count_(std::exchange(other.count_, 0))
             , usage_(std::exchange(other.usage_, buffer_usage::static_mesh)) {}
 
-        vertex_buffer &operator=(vertex_buffer &&other) noexcept {
+        basic_vertex_storage &operator=(basic_vertex_storage &&other) noexcept {
             if (this != &other) {
                 reset();
                 handle_ = std::exchange(other.handle_, nullptr);
@@ -223,8 +226,8 @@ namespace alia {
             return *this;
         }
 
-        vertex_buffer(const vertex_buffer &) = delete;
-        vertex_buffer &operator=(const vertex_buffer &) = delete;
+        basic_vertex_storage(const basic_vertex_storage &) = delete;
+        basic_vertex_storage &operator=(const basic_vertex_storage &) = delete;
 
         [[nodiscard]] bool valid() const noexcept {
             return handle_ != nullptr;
@@ -329,6 +332,25 @@ namespace alia {
         int count_ = 0;
         buffer_usage usage_ = buffer_usage::static_mesh;
     };
+
+    template <vertex_type TVertex>
+    class vertex_buffer : public detail::basic_vertex_storage<TVertex> {
+    public:
+        using detail::basic_vertex_storage<TVertex>::basic_vertex_storage;
+    };
+
+    template <vertex_type T>
+    vertex_buffer(gfx_device &, std::span<const T>, buffer_usage = buffer_usage::static_mesh) -> vertex_buffer<T>;
+
+    // Uses vertex-buffer storage, with one record consumed per instance.
+    template <instance_type TInstance>
+    class instance_buffer : public detail::basic_vertex_storage<TInstance> {
+    public:
+        using detail::basic_vertex_storage<TInstance>::basic_vertex_storage;
+    };
+
+    template <instance_type T>
+    instance_buffer(gfx_device &, std::span<const T>, buffer_usage = buffer_usage::static_mesh) -> instance_buffer<T>;
 
     // 32-bit indices throw unsupported_operation_exception when caps().index32 is false.
     template <index_type TIndex = uint32_t>

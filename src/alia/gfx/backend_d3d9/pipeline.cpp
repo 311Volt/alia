@@ -3,6 +3,7 @@
 #include "d3d9_ops.hpp"
 
 #include <cstring>
+#include <limits>
 #include <vector>
 
 namespace alia {
@@ -38,6 +39,84 @@ namespace alia {
             if (FAILED(device.device->CreateVertexDeclaration(elements.data(), &declaration))) return nullptr;
             slot.emplace(declaration);
             return declaration;
+        }
+        IDirect3DVertexDeclaration9 *get_or_compile(
+            d3d9_device &device, const vertex_definition_view &definition,
+            const instance_definition_view &instance_definition
+        ) {
+            const auto key = std::make_pair(definition.index, instance_definition.index);
+            if (auto i = device.instanced_vertex_definitions.find(key); i != device.instanced_vertex_definitions.end())
+                return i->second.declaration;
+            std::vector<D3DVERTEXELEMENT9> elements;
+            for (const auto &e : definition.elements) {
+                D3DVERTEXELEMENT9 out{};
+                out.Stream = 0; out.Offset = static_cast<WORD>(e.offset); out.Method = D3DDECLMETHOD_DEFAULT;
+                switch (e.attribute) {
+                case vertex_attr::position: out.Usage = D3DDECLUSAGE_POSITION; break;
+                case vertex_attr::normal: out.Usage = D3DDECLUSAGE_NORMAL; break;
+                case vertex_attr::color_attr: out.Usage = D3DDECLUSAGE_COLOR; break;
+                case vertex_attr::tex_coord: out.Usage = D3DDECLUSAGE_TEXCOORD; break;
+                }
+                switch (e.storage) {
+                case vertex_storage::float_2: out.Type = D3DDECLTYPE_FLOAT2; break;
+                case vertex_storage::float_3: out.Type = D3DDECLTYPE_FLOAT3; break;
+                case vertex_storage::float_4: out.Type = D3DDECLTYPE_FLOAT4; break;
+                }
+                elements.push_back(out);
+            }
+            for (const auto &e : instance_definition.elements) {
+                D3DVERTEXELEMENT9 out{};
+                out.Stream = 1; out.Offset = static_cast<WORD>(e.offset); out.Method = D3DDECLMETHOD_DEFAULT;
+                out.Usage = D3DDECLUSAGE_TEXCOORD; out.UsageIndex = static_cast<BYTE>(1 + e.slot);
+                switch (e.storage) {
+                case vertex_storage::float_2: out.Type = D3DDECLTYPE_FLOAT2; break;
+                case vertex_storage::float_3: out.Type = D3DDECLTYPE_FLOAT3; break;
+                case vertex_storage::float_4: out.Type = D3DDECLTYPE_FLOAT4; break;
+                }
+                elements.push_back(out);
+            }
+            elements.push_back(D3DDECL_END());
+            IDirect3DVertexDeclaration9 *declaration = nullptr;
+            if (FAILED(device.device->CreateVertexDeclaration(elements.data(), &declaration)))
+                throw std::runtime_error("D3D9 instancing: failed to create a vertex declaration");
+            auto [i, inserted] = device.instanced_vertex_definitions.emplace(key, d3d9_compiled_vertex_definition(declaration));
+            return i->second.declaration;
+        }
+        IDirect3DIndexBuffer9 *sequential_indices(d3d9_device &device, int vertex_count) {
+            const index_format format = vertex_count <= 65536 ? index_format::u16 : index_format::u32;
+            if (device.sequential_ib && device.sequential_ib_count >= vertex_count && device.sequential_ib_format == format)
+                return device.sequential_ib;
+            const auto byte_count = static_cast<std::uint64_t>(vertex_count) * index_size(format);
+            if (byte_count > (std::numeric_limits<UINT>::max)())
+                throw std::length_error("D3D9 instancing: sequential index buffer is too large");
+            IDirect3DIndexBuffer9 *buffer = nullptr;
+            if (FAILED(device.device->CreateIndexBuffer(static_cast<UINT>(byte_count), D3DUSAGE_WRITEONLY,
+                    to_d3d(format), D3DPOOL_MANAGED, &buffer, nullptr)))
+                throw std::runtime_error("D3D9 instancing: failed to create a sequential index buffer");
+            void *data = nullptr;
+            if (FAILED(buffer->Lock(0, 0, &data, 0))) {
+                buffer->Release();
+                throw std::runtime_error("D3D9 instancing: failed to lock the sequential index buffer");
+            }
+            if (format == index_format::u16) {
+                auto *indices = static_cast<std::uint16_t *>(data);
+                for (int i = 0; i != vertex_count; ++i)
+                    indices[i] = static_cast<std::uint16_t>(i);
+            } else {
+                auto *indices = static_cast<std::uint32_t *>(data);
+                for (int i = 0; i != vertex_count; ++i)
+                    indices[i] = static_cast<std::uint32_t>(i);
+            }
+            if (FAILED(buffer->Unlock())) {
+                buffer->Release();
+                throw std::runtime_error("D3D9 instancing: failed to unlock the sequential index buffer");
+            }
+            if (device.sequential_ib)
+                device.sequential_ib->Release();
+            device.sequential_ib = buffer;
+            device.sequential_ib_count = vertex_count;
+            device.sequential_ib_format = format;
+            return buffer;
         }
         int primitive_count(primitive_topology topology, int count) {
             if (count < 3) return 0;
@@ -133,12 +212,43 @@ namespace alia {
             device.device->SetTransform(D3DTS_VIEW, reinterpret_cast<const D3DMATRIX *>(&device.transforms.view.m[0][0]));
             device.device->SetTransform(D3DTS_PROJECTION, reinterpret_cast<const D3DMATRIX *>(&device.transforms.projection.m[0][0]));
         }
+        void draw_instanced(
+            d3d9_device &device, primitive_topology topology, IDirect3DIndexBuffer9 *indices,
+            int vertex_count, int first_index, int index_count, int base_vertex,
+            int instance_count, int first_instance
+        ) {
+            const int count = primitive_count(topology, index_count);
+            if (!count)
+                return;
+            prepare_draw(device);
+            struct stream_scope {
+                IDirect3DDevice9 *device;
+                ~stream_scope() {
+                    device->SetStreamSourceFreq(0, 1);
+                    device->SetStreamSourceFreq(1, 1);
+                    device->SetStreamSource(1, nullptr, 0, 0);
+                }
+            } streams{device.device};
+            const UINT stride = static_cast<UINT>(device.state.vertex_layout.stride);
+            const UINT instance_stride = static_cast<UINT>(device.state.instance_layout.stride);
+            const UINT instance_offset = static_cast<UINT>(first_instance) * instance_stride;
+            if (FAILED(device.device->SetStreamSource(0, device.current_vb->buffer, 0, stride)) ||
+                FAILED(device.device->SetStreamSourceFreq(0, D3DSTREAMSOURCE_INDEXEDDATA | static_cast<UINT>(instance_count))) ||
+                FAILED(device.device->SetStreamSource(1, device.current_instance_vb->buffer, instance_offset, instance_stride)) ||
+                FAILED(device.device->SetStreamSourceFreq(1, D3DSTREAMSOURCE_INSTANCEDATA | 1)) ||
+                FAILED(device.device->SetIndices(indices)) ||
+                FAILED(device.device->DrawIndexedPrimitive(to_d3d(topology), base_vertex, 0,
+                    static_cast<UINT>(vertex_count), static_cast<UINT>(first_index), static_cast<UINT>(count))))
+                throw std::runtime_error("D3D9 instancing: failed to submit draw");
+        }
     }
 
     void d3d9_set_render_state(device_handle *h, const render_state &state) {
         auto &device = *as_d3d9_device(h);
         if (state.vertex_layout.stride > 0)
-            device.device->SetVertexDeclaration(get_or_compile(device, state.vertex_layout));
+            device.device->SetVertexDeclaration(state.instance_layout.stride > 0
+                ? get_or_compile(device, state.vertex_layout, state.instance_layout)
+                : get_or_compile(device, state.vertex_layout));
         if (state.shader) {
             const auto *shader = as_d3d9_shader_program(state.shader);
             device.device->SetVertexShader(shader->vertex_shader);
@@ -209,6 +319,10 @@ namespace alia {
     }
     void d3d9_reset_frame_state(d3d9_device &device) {
         device.device->SetStreamSource(0, nullptr, 0, 0); device.device->SetIndices(nullptr);
+        device.device->SetStreamSource(1, nullptr, 0, 0);
+        device.device->SetStreamSourceFreq(0, 1);
+        device.device->SetStreamSourceFreq(1, 1);
+        device.current_instance_vb = nullptr;
         device.state = {}; device.transforms = {};
         device.surface_material = {};
         for (int index = 0; index != device.enabled_light_count; ++index)
@@ -228,6 +342,9 @@ namespace alia {
     }
     void d3d9_bind_vertex_buffer(device_handle *h, vertex_buffer_handle *buffer) {
         auto &device = *as_d3d9_device(h); device.current_vb = buffer ? as_d3d9_vertex_buffer(buffer) : nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0;
+    }
+    void d3d9_bind_instance_buffer(device_handle *h, vertex_buffer_handle *buffer) {
+        as_d3d9_device(h)->current_instance_vb = buffer ? as_d3d9_vertex_buffer(buffer) : nullptr;
     }
     void d3d9_bind_index_buffer(device_handle *h, index_buffer_handle *buffer) {
         auto &device = *as_d3d9_device(h); device.current_ib = buffer ? as_d3d9_index_buffer(buffer) : nullptr; device.transient_indices = nullptr; device.transient_index_count = 0;
@@ -270,6 +387,18 @@ namespace alia {
             const auto *indices = static_cast<const std::byte *>(device.transient_indices) + first_index * index_size(device.transient_index_format);
             device.device->DrawIndexedPrimitiveUP(to_d3d(topology), 0, static_cast<UINT>(device.transient_vertex_bytes / stride - base_vertex), static_cast<UINT>(count), indices, to_d3d(device.transient_index_format), static_cast<const std::byte *>(device.transient_vertices) + base_vertex * stride, static_cast<UINT>(stride));
         }
+    }
+    void d3d9_draw_instanced(device_handle *h, primitive_topology topology, int vertex_count, int first_vertex, int instance_count, int first_instance) {
+        auto &device = *as_d3d9_device(h);
+        if (!primitive_count(topology, vertex_count))
+            return;
+        auto *indices = sequential_indices(device, vertex_count);
+        draw_instanced(device, topology, indices, vertex_count, 0, vertex_count, first_vertex, instance_count, first_instance);
+    }
+    void d3d9_draw_indexed_instanced(device_handle *h, primitive_topology topology, int index_count, int first_index, int base_vertex, int instance_count, int first_instance) {
+        auto &device = *as_d3d9_device(h);
+        draw_instanced(device, topology, device.current_ib->buffer, device.current_vb->count - base_vertex,
+            first_index, index_count, base_vertex, instance_count, first_instance);
     }
 } // namespace alia
 

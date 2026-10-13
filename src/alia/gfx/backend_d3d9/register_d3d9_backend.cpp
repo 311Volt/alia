@@ -43,6 +43,9 @@ namespace alia {
         iface.caps.separate_alpha_blend =
             (raw->caps.PrimitiveMiscCaps & D3DPMISCCAPS_SEPARATEALPHABLEND) != 0;
         iface.caps.index32 = caps.MaxVertexIndex > 0xFFFF;
+        iface.caps.instancing = can_use_shaders &&
+            D3DSHADER_VERSION_MAJOR(caps.VertexShaderVersion) >= 3 &&
+            (caps.DevCaps2 & D3DDEVCAPS2_STREAMOFFSET) != 0;
         iface.caps.spot_model = spot_light_model::inner_outer;
         const DWORD required_light_caps = D3DVTXPCAPS_DIRECTIONALLIGHTS | D3DVTXPCAPS_POSITIONALLIGHTS;
         const bool supports_light_types = (caps.VertexProcessingCaps & required_light_caps) == required_light_caps;
@@ -155,6 +158,16 @@ namespace alia {
         iface.bind_resources              = {d3d9_bind_resources};
         iface.draw                        = {d3d9_draw};
         iface.draw_indexed                = {d3d9_draw_indexed};
+        if (iface.caps.instancing) {
+            iface.bind_instance_buffer = {d3d9_bind_instance_buffer};
+            iface.draw_instanced = {d3d9_draw_instanced};
+            iface.draw_indexed_instanced = {d3d9_draw_indexed_instanced};
+        } else {
+            const char *reason = "instancing requires vs_3_0 and stream offsets";
+            iface.bind_instance_buffer = {nullptr, reason};
+            iface.draw_instanced = {nullptr, reason};
+            iface.draw_indexed_instanced = {nullptr, reason};
+        }
 
         return {raw, std::move(iface)};
     }

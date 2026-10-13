@@ -62,6 +62,7 @@ namespace alia {
         bool separate_specular_color = false;
         bool radial_fog = false;
         ogl_vertex_buffer *current_vb = nullptr;
+        ogl_vertex_buffer *current_instance_vb = nullptr;
         ogl_index_buffer *current_ib = nullptr;
         const void *transient_vertices = nullptr;
         int transient_vertex_bytes = 0;
@@ -71,6 +72,7 @@ namespace alia {
         const ogl_compiled_vertex_definition *applied_layout = nullptr;
         bool applied_shader_active = false;
         const void *applied_base = nullptr;
+        ogl_vertex_buffer *applied_vb = nullptr;
         GLuint target_fbo = 0;
         ogl_swapchain *current_swapchain = nullptr;
     };
@@ -162,8 +164,15 @@ namespace alia {
     void ogl_apply_material(ogl_device &);
     bool ogl_set_render_target(device_handle *, const render_target_info &); bool ogl_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void ogl_reset_frame_state(ogl_device &); void ogl_set_viewport(device_handle *, const render_viewport &);
     void ogl_bind_vertex_buffer(device_handle *, vertex_buffer_handle *); void ogl_bind_index_buffer(device_handle *, index_buffer_handle *);
+    void ogl_bind_instance_buffer(device_handle *, vertex_buffer_handle *);
     void ogl_upload_transient_vertex_data(device_handle *, const void *, int); void ogl_upload_transient_index_data(device_handle *, const void *, int, index_format);
     void ogl_bind_resources(device_handle *, const texture_sampler_binding &); void ogl_draw(device_handle *, primitive_topology, int, int); void ogl_draw_indexed(device_handle *, primitive_topology, int, int, int);
+    void ogl_draw_instanced(device_handle *, primitive_topology, int, int, int, int);
+    void ogl_draw_indexed_instanced(device_handle *, primitive_topology, int, int, int, int, int);
+
+    extern PFNGLVERTEXATTRIBDIVISORPROC ogl_s_glVertexAttribDivisor;
+    extern PFNGLDRAWARRAYSINSTANCEDPROC ogl_s_glDrawArraysInstanced;
+    extern PFNGLDRAWELEMENTSINSTANCEDPROC ogl_s_glDrawElementsInstanced;
 
     extern PFNGLGENERATEMIPMAPPROC ogl_s_glGenerateMipmap;
     extern PFNGLCREATESHADERPROC ogl_s_glCreateShader; extern PFNGLSHADERSOURCEPROC ogl_s_glShaderSource; extern PFNGLCOMPILESHADERPROC ogl_s_glCompileShader; extern PFNGLGETSHADERIVPROC ogl_s_glGetShaderiv; extern PFNGLGETSHADERINFOLOGPROC ogl_s_glGetShaderInfoLog; extern PFNGLDELETESHADERPROC ogl_s_glDeleteShader;

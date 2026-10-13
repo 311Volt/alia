@@ -17,6 +17,10 @@ namespace alia {
             if (first < 0 || count < 0 || first > total || count > total - first)
                 throw std::out_of_range(std::string(name) + ": range is outside the buffer");
         }
+        int resolve_draw_count(int first, int count, int total) {
+            // Keep subtraction in range; validate_range rejects negative starts.
+            return count == -1 ? total - (std::max)(0, first) : count;
+        }
         bool same_transform(const transform &a, const transform &b) noexcept {
             for (int row = 0; row != 4; ++row)
                 for (int column = 0; column != 4; ++column)
@@ -30,7 +34,9 @@ namespace alia {
         }
         bool same_render_state(const render_state &a, const render_state &b) noexcept {
             return a.shader == b.shader && a.vertex_layout.index == b.vertex_layout.index &&
-                a.vertex_layout.stride == b.vertex_layout.stride && a.texture_op == b.texture_op &&
+                a.vertex_layout.stride == b.vertex_layout.stride &&
+                a.instance_layout.index == b.instance_layout.index &&
+                a.instance_layout.stride == b.instance_layout.stride && a.texture_op == b.texture_op &&
                 a.blend == b.blend && a.depth == b.depth && a.raster.cull == b.raster.cull &&
                 a.lighting == b.lighting && a.vertex_color_material == b.vertex_color_material &&
                 a.fog == b.fog;
@@ -494,7 +500,7 @@ namespace alia {
         ensure_active();
         swapchain_->backend_->set_viewport.get_or_throw()(swapchain_->device_, viewport);
     }
-    void frame::prepare_draw(const vertex_definition_view &definition) {
+    void frame::prepare_draw(const vertex_definition_view &definition, const instance_definition_view &instance_definition) {
         ensure_active();
         if (definition.stride <= 0)
             throw std::invalid_argument("frame: vertex definition has no layout");
@@ -512,7 +518,7 @@ namespace alia {
             ? texture_operation::vertex_color
             : slot0_kind_ == slot0_kind::alpha_mask ? texture_operation::alpha_mask : texture_operation::modulate;
         const render_state next{
-            shader_ ? shader_->impl() : nullptr, definition, texture_op,
+            shader_ ? shader_->impl() : nullptr, definition, instance_definition, texture_op,
             blend_, depth_, {cull_}, lit, lit && material_.use_vertex_color && has_color,
             fog_.mode != fog_mode::none && !shader_};
         const bool render_state_changed = !same_render_state(state_, next);
@@ -654,6 +660,59 @@ namespace alia {
             frame.backend()->bind_vertex_buffer.get_or_throw()(frame.device(), vertices);
             frame.backend()->bind_index_buffer.get_or_throw()(frame.device(), indices);
             frame.backend()->draw_indexed.get_or_throw()(frame.device(), topology, index_count, first_index, base_vertex);
+        }
+        void frame_draw_instanced_buffered(
+            frame &frame, vertex_buffer_handle *vertices, int vertex_total, int first_vertex, int vertex_count,
+            vertex_buffer_handle *instances, int instance_total, int first_instance, int instance_count,
+            const vertex_definition_view &definition, const instance_definition_view &instance_definition,
+            primitive_topology topology
+        ) {
+            frame.ensure_active();
+            const auto draw = frame.backend()->draw_instanced.get_or_throw();
+            vertex_count = resolve_draw_count(first_vertex, vertex_count, vertex_total);
+            instance_count = resolve_draw_count(first_instance, instance_count, instance_total);
+            if (vertex_count <= 0 || instance_count <= 0)
+                return;
+            if (!vertices || !instances)
+                throw std::invalid_argument("frame::draw_instanced: buffer is not valid");
+            validate_range("frame::draw_instanced", first_vertex, vertex_count, vertex_total);
+            validate_range("frame::draw_instanced", first_instance, instance_count, instance_total);
+            if (vertex_count > 65536 && !frame.backend()->caps.index32)
+                throw unsupported_operation_exception("frame::draw_instanced: more than 65536 vertices require 32-bit indices");
+            if (!frame.shader_)
+                throw std::invalid_argument("frame::draw_instanced: instanced draws require a shader");
+            frame.prepare_draw(definition, instance_definition);
+            frame.backend()->bind_vertex_buffer.get_or_throw()(frame.device(), vertices);
+            frame.backend()->bind_instance_buffer.get_or_throw()(frame.device(), instances);
+            draw(frame.device(), topology, vertex_count, first_vertex, instance_count, first_instance);
+        }
+
+        void frame_draw_indexed_instanced_buffered(
+            frame &frame, vertex_buffer_handle *vertices, int vertex_count,
+            index_buffer_handle *indices, int index_total, int first_index, int index_count, int base_vertex,
+            vertex_buffer_handle *instances, int instance_total, int first_instance, int instance_count,
+            const vertex_definition_view &definition, const instance_definition_view &instance_definition,
+            primitive_topology topology
+        ) {
+            frame.ensure_active();
+            const auto draw = frame.backend()->draw_indexed_instanced.get_or_throw();
+            index_count = resolve_draw_count(first_index, index_count, index_total);
+            instance_count = resolve_draw_count(first_instance, instance_count, instance_total);
+            if (vertex_count <= 0 || index_count <= 0 || instance_count <= 0)
+                return;
+            if (!vertices || !indices || !instances)
+                throw std::invalid_argument("frame::draw_indexed_instanced: buffer is not valid");
+            validate_range("frame::draw_indexed_instanced", first_index, index_count, index_total);
+            validate_range("frame::draw_indexed_instanced", first_instance, instance_count, instance_total);
+            if (base_vertex < 0 || base_vertex >= vertex_count)
+                throw std::out_of_range("frame::draw_indexed_instanced: base vertex is outside the vertex buffer");
+            if (!frame.shader_)
+                throw std::invalid_argument("frame::draw_instanced: instanced draws require a shader");
+            frame.prepare_draw(definition, instance_definition);
+            frame.backend()->bind_vertex_buffer.get_or_throw()(frame.device(), vertices);
+            frame.backend()->bind_index_buffer.get_or_throw()(frame.device(), indices);
+            frame.backend()->bind_instance_buffer.get_or_throw()(frame.device(), instances);
+            draw(frame.device(), topology, index_count, first_index, base_vertex, instance_count, first_instance);
         }
     } // namespace detail
 } // namespace alia

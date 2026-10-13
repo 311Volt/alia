@@ -118,6 +118,20 @@ namespace alia {
         return ok;
     }
 
+    static bool load_instancing_procs() {
+        bool ok = true;
+        ok = (load_gl_proc(ogl_s_glVertexAttribDivisor, "glVertexAttribDivisor") ||
+              load_gl_proc(ogl_s_glVertexAttribDivisor, "glVertexAttribDivisorARB") ||
+              load_gl_proc(ogl_s_glVertexAttribDivisor, "glVertexAttribDivisorEXT")) && ok;
+        ok = (load_gl_proc(ogl_s_glDrawArraysInstanced, "glDrawArraysInstanced") ||
+              load_gl_proc(ogl_s_glDrawArraysInstanced, "glDrawArraysInstancedARB") ||
+              load_gl_proc(ogl_s_glDrawArraysInstanced, "glDrawArraysInstancedEXT")) && ok;
+        ok = (load_gl_proc(ogl_s_glDrawElementsInstanced, "glDrawElementsInstanced") ||
+              load_gl_proc(ogl_s_glDrawElementsInstanced, "glDrawElementsInstancedARB") ||
+              load_gl_proc(ogl_s_glDrawElementsInstanced, "glDrawElementsInstancedEXT")) && ok;
+        return ok;
+    }
+
     static bool load_framebuffer_procs() {
         bool ok = true;
         ok = (load_gl_proc(ogl_s_glGenFramebuffers, "glGenFramebuffers") ||
@@ -151,6 +165,8 @@ namespace alia {
 
         // For GL 3.0+ core, glGenerateMipmap is always available
         const bool gl30_or_later = (gl_major > 3 || (gl_major == 3 && gl_minor >= 0));
+        const bool gl31_or_later = (gl_major > 3 || (gl_major == 3 && gl_minor >= 1));
+        const bool gl33_or_later = (gl_major > 3 || (gl_major == 3 && gl_minor >= 3));
         const bool gl20_or_later = (gl_major > 2 || (gl_major == 2 && gl_minor >= 0));
         const bool gl15_or_later = (gl_major > 1 || (gl_major == 1 && gl_minor >= 5));
         const bool gl13_or_later = (gl_major > 1 || (gl_major == 1 && gl_minor >= 3));
@@ -177,6 +193,10 @@ namespace alia {
 
         const bool has_shaders = gl20_or_later && load_shader_procs();
         const bool has_buffers = gl15_or_later && load_buffer_procs();
+        const bool has_instancing = has_shaders && has_buffers &&
+            (gl33_or_later || has_gl_extension("GL_ARB_instanced_arrays")) &&
+            (gl31_or_later || has_gl_extension("GL_ARB_draw_instanced") || has_gl_extension("GL_EXT_draw_instanced")) &&
+            load_instancing_procs();
         const bool has_framebuffers =
             (gl30_or_later || has_gl_extension("GL_EXT_framebuffer_object")) &&
             load_framebuffer_procs();
@@ -193,6 +213,7 @@ namespace alia {
         iface.caps.cube_textures = has_cube_maps;
         iface.caps.render_to_texture = has_framebuffers;
         iface.caps.index32 = true; // Desktop OpenGL 1.1 supports GL_UNSIGNED_INT.
+        iface.caps.instancing = has_instancing;
         iface.caps.separate_alpha_blend =
             gl_major > 1 || (gl_major == 1 && gl_minor >= 4) ||
             has_gl_extension("GL_EXT_blend_func_separate");
@@ -328,6 +349,16 @@ namespace alia {
         iface.bind_resources               = {ogl_bind_resources};
         iface.draw                         = {ogl_draw};
         iface.draw_indexed                 = {ogl_draw_indexed};
+        if (has_instancing) {
+            iface.bind_instance_buffer = {ogl_bind_instance_buffer};
+            iface.draw_instanced = {ogl_draw_instanced};
+            iface.draw_indexed_instanced = {ogl_draw_indexed_instanced};
+        } else {
+            const char *reason = "instancing requires shaders, buffers, OpenGL 3.3 or GL_ARB_instanced_arrays, OpenGL 3.1 or GL_ARB_draw_instanced/GL_EXT_draw_instanced, and instancing entry points";
+            iface.bind_instance_buffer = {nullptr, reason};
+            iface.draw_instanced = {nullptr, reason};
+            iface.draw_indexed_instanced = {nullptr, reason};
+        }
 
         return {raw, std::move(iface)};
     }

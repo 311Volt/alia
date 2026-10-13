@@ -31,6 +31,16 @@ namespace alia {
         int offset;
     };
 
+    inline constexpr int max_instance_attributes = 8;
+
+    // Slot n is HLSL TEXCOORD<n+1> and GLSL a_instance<n> at location 4+n.
+    // A 4x4 matrix uses four float_4 elements in consecutive slots.
+    struct instance_element {
+        int slot;
+        vertex_storage storage;
+        int offset;
+    };
+
     // ── Concept: a standard-layout type with static constexpr elements() ─
 
     namespace detail {
@@ -39,10 +49,25 @@ namespace alia {
 
         template <typename T>
         struct has_elements<T, std::void_t<decltype(T::elements())>> : std::true_type {};
+
+        template <typename T, typename = void>
+        struct has_instance_elements : std::false_type {};
+
+        template <typename T>
+        struct has_instance_elements<T, std::void_t<decltype(T::instance_elements())>> : std::true_type {};
     } // namespace detail
 
     template <typename T>
-    concept vertex_type = std::is_standard_layout_v<T> && detail::has_elements<T>::value;
+    concept vertex_type = std::is_standard_layout_v<T> && detail::has_elements<T>::value &&
+        !detail::has_instance_elements<T>::value;
+
+    // A standard-layout type with static constexpr instance_elements(), returning
+    // instance_element descriptors. Nonempty layouts, unique slots and offsets
+    // within sizeof(T) are checked at compile time when the draw layout is used.
+    // Instance data cannot also be vertex data.
+    template <typename T>
+    concept instance_type = std::is_standard_layout_v<T> && detail::has_instance_elements<T>::value &&
+        !detail::has_elements<T>::value;
 
     // ── Built-in vertex types ────────────────────────────────────────────
 

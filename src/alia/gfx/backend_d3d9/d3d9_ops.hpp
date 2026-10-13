@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <map>
 #include <optional>
 #include <span>
 #include <string>
@@ -46,11 +47,16 @@ namespace alia {
         D3DDEVTYPE device_type = D3DDEVTYPE_HAL;
         bool hardware_vertex_processing = false;
         std::vector<std::optional<d3d9_compiled_vertex_definition>> vertex_definitions;
+        std::map<std::pair<std::size_t, std::size_t>, d3d9_compiled_vertex_definition> instanced_vertex_definitions;
+        IDirect3DIndexBuffer9 *sequential_ib = nullptr;
+        int sequential_ib_count = 0;
+        index_format sequential_ib_format = index_format::u16;
         render_state state = {};
         transform_state transforms = {};
         material surface_material = {};
         int enabled_light_count = 0;
         d3d9_vertex_buffer *current_vb = nullptr;
+        d3d9_vertex_buffer *current_instance_vb = nullptr;
         d3d9_index_buffer *current_ib = nullptr;
         const void *transient_vertices = nullptr;
         int transient_vertex_bytes = 0;
@@ -195,8 +201,11 @@ namespace alia {
     void d3d9_set_fog(device_handle *, const fog_state &);
     bool d3d9_set_render_target(device_handle *, const render_target_info &); bool d3d9_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void d3d9_reset_frame_state(d3d9_device &); void d3d9_set_viewport(device_handle *, const render_viewport &);
     void d3d9_bind_vertex_buffer(device_handle *, vertex_buffer_handle *); void d3d9_bind_index_buffer(device_handle *, index_buffer_handle *);
+    void d3d9_bind_instance_buffer(device_handle *, vertex_buffer_handle *);
     void d3d9_upload_transient_vertex_data(device_handle *, const void *, int); void d3d9_upload_transient_index_data(device_handle *, const void *, int, index_format);
     void d3d9_bind_resources(device_handle *, const texture_sampler_binding &); void d3d9_draw(device_handle *, primitive_topology, int, int); void d3d9_draw_indexed(device_handle *, primitive_topology, int, int, int);
+    void d3d9_draw_instanced(device_handle *, primitive_topology, int, int, int, int);
+    void d3d9_draw_indexed_instanced(device_handle *, primitive_topology, int, int, int, int, int);
 } // namespace alia
 #endif
 #endif

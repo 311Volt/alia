@@ -19,6 +19,8 @@ namespace alia {
         void frame_draw_buffered(frame &, vertex_buffer_handle *, int, int, const vertex_definition_view &, primitive_topology);
         void frame_draw_indexed_transient(frame &, const void *, int, const void *, int, index_format, const vertex_definition_view &, primitive_topology);
         void frame_draw_indexed_buffered(frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, const vertex_definition_view &, primitive_topology);
+        void frame_draw_instanced_buffered(frame &, vertex_buffer_handle *, int, int, int, vertex_buffer_handle *, int, int, int, const vertex_definition_view &, const instance_definition_view &, primitive_topology);
+        void frame_draw_indexed_instanced_buffered(frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, vertex_buffer_handle *, int, int, int, const vertex_definition_view &, const instance_definition_view &, primitive_topology);
     }
 
     // A frame owns all drawing state for one swapchain update. It starts on
@@ -169,6 +171,34 @@ namespace alia {
             detail::frame_draw_indexed_buffered(*this, vertices.impl(), vertices.count(), indices.impl(), indices.count(), first_index, index_count, base_vertex, detail::vertex_definition_of<TVertex>(), topology);
         }
 
+        // Instanced draws require caps().instancing and a selected shader. Unsupported
+        // hardware throws unsupported_operation_exception before checking counts.
+        // Counts of -1 consume the remaining buffer records; empty draws do nothing.
+        // Nonempty draws require valid buffers and ranges (std::invalid_argument for
+        // invalid buffers or a missing shader, std::out_of_range for invalid ranges).
+        // Non-indexed draws above 65536 vertices require caps().index32.
+        // first_instance offsets the input stream; shaders receive slots described
+        // by TInstance::instance_elements(). Later ordinary draws use no instance stream.
+        template <vertex_type TVertex, instance_type TInstance>
+        void draw_instanced(vertex_buffer<TVertex> &vertices, instance_buffer<TInstance> &instances,
+                            int first_vertex = 0, int vertex_count = -1,
+                            int first_instance = 0, int instance_count = -1,
+                            primitive_topology topology = primitive_topology::triangle_list) {
+            detail::frame_draw_instanced_buffered(*this, vertices.impl(), vertices.count(), first_vertex, vertex_count,
+                instances.impl(), instances.count(), first_instance, instance_count,
+                detail::vertex_definition_of<TVertex>(), detail::instance_definition_of<TInstance>(), topology);
+        }
+        template <vertex_type TVertex, index_type TIndex, instance_type TInstance>
+        void draw_indexed_instanced(vertex_buffer<TVertex> &vertices, index_buffer<TIndex> &indices, instance_buffer<TInstance> &instances,
+                                    int first_index = 0, int index_count = -1, int base_vertex = 0,
+                                    int first_instance = 0, int instance_count = -1,
+                                    primitive_topology topology = primitive_topology::triangle_list) {
+            detail::frame_draw_indexed_instanced_buffered(*this, vertices.impl(), vertices.count(),
+                indices.impl(), indices.count(), first_index, index_count, base_vertex,
+                instances.impl(), instances.count(), first_instance, instance_count,
+                detail::vertex_definition_of<TVertex>(), detail::instance_definition_of<TInstance>(), topology);
+        }
+
         void copy_to_texture(texture &dst, rect_i src_rect, vec2i dst_pos = {}, int dst_level = 0);
         void copy_to_texture(
             cube_texture &dst,
@@ -187,10 +217,12 @@ namespace alia {
         friend void detail::frame_draw_buffered(frame &, vertex_buffer_handle *, int, int, const vertex_definition_view &, primitive_topology);
         friend void detail::frame_draw_indexed_transient(frame &, const void *, int, const void *, int, index_format, const vertex_definition_view &, primitive_topology);
         friend void detail::frame_draw_indexed_buffered(frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, const vertex_definition_view &, primitive_topology);
+        friend void detail::frame_draw_instanced_buffered(frame &, vertex_buffer_handle *, int, int, int, vertex_buffer_handle *, int, int, int, const vertex_definition_view &, const instance_definition_view &, primitive_topology);
+        friend void detail::frame_draw_indexed_instanced_buffered(frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, vertex_buffer_handle *, int, int, int, const vertex_definition_view &, const instance_definition_view &, primitive_topology);
         explicit frame(swapchain &);
         void finish_without_present() noexcept;
         void ensure_active() const;
-        void prepare_draw(const vertex_definition_view &);
+        void prepare_draw(const vertex_definition_view &, const instance_definition_view & = {});
         void unbind_render_target_source(texture_handle *);
         [[nodiscard]] const graphics_backend_interface *backend() const noexcept { return swapchain_->backend_; }
         [[nodiscard]] device_handle *device() const noexcept { return swapchain_->device_; }

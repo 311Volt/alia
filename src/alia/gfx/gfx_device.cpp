@@ -162,5 +162,16 @@ namespace alia {
             indices.emplace(vertex_type, index);
             return index;
         }
+
+        std::size_t register_instance_definition(std::type_index instance_type) {
+            static std::mutex mutex;
+            static std::unordered_map<std::type_index, std::size_t> indices;
+            std::lock_guard lock(mutex);
+            if (auto i = indices.find(instance_type); i != indices.end())
+                return i->second;
+            const std::size_t index = indices.size();
+            indices.emplace(instance_type, index);
+            return index;
+        }
     } // namespace detail
 } // namespace alia

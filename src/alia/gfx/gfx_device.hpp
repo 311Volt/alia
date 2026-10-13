@@ -3,6 +3,7 @@
 
 #include "graphics_backend_interface.hpp"
 
+#include <array>
 #include <memory>
 #include <typeindex>
 #include <utility>
@@ -110,12 +111,47 @@ namespace alia {
 
     namespace detail {
         std::size_t register_vertex_definition(std::type_index vertex_type);
+        std::size_t register_instance_definition(std::type_index instance_type);
 
         template <vertex_type TVertex>
         [[nodiscard]] const vertex_definition_view &vertex_definition_of() {
             static constexpr auto elements = TVertex::elements();
             static const vertex_definition_view definition{
                 register_vertex_definition(typeid(TVertex)), static_cast<int>(sizeof(TVertex)), elements};
+            return definition;
+        }
+
+        template <instance_type TInstance>
+        consteval bool valid_instance_definition() {
+            constexpr auto elements = TInstance::instance_elements();
+            if (elements.empty())
+                return false;
+            std::array<bool, max_instance_attributes> slots{};
+            for (const auto &element : elements) {
+                if (element.slot < 0 || element.slot >= max_instance_attributes || slots[element.slot])
+                    return false;
+                slots[element.slot] = true;
+                std::size_t size = 0;
+                switch (element.storage) {
+                case vertex_storage::float_2: size = 2 * sizeof(float); break;
+                case vertex_storage::float_3: size = 3 * sizeof(float); break;
+                case vertex_storage::float_4: size = 4 * sizeof(float); break;
+                default: return false;
+                }
+                if (element.offset < 0 || size > sizeof(TInstance) ||
+                    static_cast<std::size_t>(element.offset) > sizeof(TInstance) - size)
+                    return false;
+            }
+            return true;
+        }
+
+        template <instance_type TInstance>
+        [[nodiscard]] const instance_definition_view &instance_definition_of() {
+            static_assert(valid_instance_definition<TInstance>(),
+                "instance_elements() must be nonempty, use unique slots in [0, max_instance_attributes), and fit inside the instance type");
+            static constexpr auto elements = TInstance::instance_elements();
+            static const instance_definition_view definition{
+                register_instance_definition(typeid(TInstance)), static_cast<int>(sizeof(TInstance)), elements};
             return definition;
         }
     } // namespace detail

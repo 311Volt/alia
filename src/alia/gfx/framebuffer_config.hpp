@@ -110,6 +110,7 @@ namespace alia {
         bool render_to_texture = false;
         bool separate_alpha_blend = false;
         bool index32 = false; // 32-bit index buffers and transient indices.
+        bool instancing = false; // Shader draws using per-instance buffer attributes.
         int max_lights = 0; // Zero means fixed-function lighting is unsupported.
         // Which of the two required spot parameter sets this device applies.
         spot_light_model spot_model = spot_light_model::inner_outer;

@@ -7,6 +7,10 @@
 #include <vector>
 
 namespace alia {
+    PFNGLVERTEXATTRIBDIVISORPROC ogl_s_glVertexAttribDivisor = nullptr;
+    PFNGLDRAWARRAYSINSTANCEDPROC ogl_s_glDrawArraysInstanced = nullptr;
+    PFNGLDRAWELEMENTSINSTANCEDPROC ogl_s_glDrawElementsInstanced = nullptr;
+
     namespace {
         constexpr int index_size(index_format format) {
             return format == index_format::u16 ? sizeof(uint16_t) : sizeof(uint32_t);
@@ -102,16 +106,43 @@ namespace alia {
         void clear_applied_layout(ogl_device &device) {
             if (device.applied_layout) device.applied_layout->teardown(device.applied_shader_active);
             device.applied_layout = nullptr; device.applied_base = nullptr; device.applied_shader_active = false;
+            device.applied_vb = nullptr;
         }
         void apply_layout(ogl_device &device, const void *base) {
             const auto &layout = get_or_compile(device, device.state.vertex_layout);
             const bool shader = device.state.shader != nullptr;
-            if (&layout == device.applied_layout && shader == device.applied_shader_active && base == device.applied_base) return;
+            if (&layout == device.applied_layout && shader == device.applied_shader_active &&
+                base == device.applied_base && device.current_vb == device.applied_vb) return;
             clear_applied_layout(device);
             if (ogl_s_glBindBuffer) ogl_s_glBindBuffer(GL_ARRAY_BUFFER, device.current_vb ? device.current_vb->buffer_id : 0);
             layout.setup(base, device.state.vertex_layout.stride, shader);
             device.applied_layout = &layout; device.applied_shader_active = shader; device.applied_base = base;
+            device.applied_vb = device.current_vb;
         }
+        void apply_instance_layout(ogl_device &device, int first_instance) {
+            const auto &definition = device.state.instance_layout;
+            ogl_s_glBindBuffer(GL_ARRAY_BUFFER, device.current_instance_vb->buffer_id);
+            const auto base = static_cast<std::uintptr_t>(first_instance) * definition.stride;
+            for (const auto &element : definition.elements) {
+                const GLuint location = static_cast<GLuint>(4 + element.slot);
+                const int components = element.storage == vertex_storage::float_2 ? 2 :
+                    element.storage == vertex_storage::float_3 ? 3 : 4;
+                const void *offset = reinterpret_cast<const void *>(base + element.offset);
+                ogl_s_glEnableVertexAttribArray(location);
+                ogl_s_glVertexAttribPointer(location, components, GL_FLOAT, GL_FALSE, definition.stride, offset);
+                ogl_s_glVertexAttribDivisor(location, 1);
+            }
+        }
+        struct instance_layout_scope {
+            const instance_definition_view &definition;
+            ~instance_layout_scope() {
+                for (const auto &element : definition.elements) {
+                    const GLuint location = static_cast<GLuint>(4 + element.slot);
+                    ogl_s_glVertexAttribDivisor(location, 0);
+                    ogl_s_glDisableVertexAttribArray(location);
+                }
+            }
+        };
         void prepare_draw(ogl_device &device) {
             if (device.lights_need_upload)
                 ogl_upload_lights(device);
@@ -213,9 +244,13 @@ namespace alia {
         device.surface_material = {};
         device.lights_need_upload = false;
         device.current_vb = nullptr; device.current_ib = nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; device.transient_indices = nullptr; device.transient_index_count = 0;
+        device.current_instance_vb = nullptr;
     }
     void ogl_set_viewport(device_handle *, const render_viewport &viewport) { glViewport(viewport.origin.x, viewport.origin.y, viewport.size.x, viewport.size.y); glDepthRange(viewport.min_depth, viewport.max_depth); }
     void ogl_bind_vertex_buffer(device_handle *h, vertex_buffer_handle *buffer) { auto &device = *as_ogl_device(h); device.current_vb = buffer ? as_ogl_vertex_buffer(buffer) : nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; }
+    void ogl_bind_instance_buffer(device_handle *h, vertex_buffer_handle *buffer) {
+        as_ogl_device(h)->current_instance_vb = buffer ? as_ogl_vertex_buffer(buffer) : nullptr;
+    }
     void ogl_bind_index_buffer(device_handle *h, index_buffer_handle *buffer) { auto &device = *as_ogl_device(h); device.current_ib = buffer ? as_ogl_index_buffer(buffer) : nullptr; device.transient_indices = nullptr; device.transient_index_count = 0; }
     void ogl_upload_transient_vertex_data(device_handle *h, const void *data, int bytes) { auto &device = *as_ogl_device(h); device.current_vb = nullptr; device.transient_vertices = data; device.transient_vertex_bytes = bytes; }
     void ogl_upload_transient_index_data(device_handle *h, const void *indices, int index_count, index_format format) { auto &device = *as_ogl_device(h); device.current_ib = nullptr; device.transient_indices = indices; device.transient_index_count = index_count; device.transient_index_format = format; }
@@ -239,6 +274,31 @@ namespace alia {
         const auto offset_bytes = static_cast<std::uintptr_t>(first_index) * index_size(format);
         const void *indices = device.current_ib ? reinterpret_cast<const void *>(offset_bytes) : static_cast<const std::byte *>(device.transient_indices) + offset_bytes;
         glDrawElements(to_gl(topology), index_count, to_gl(format), indices);
+    }
+    void ogl_draw_instanced(device_handle *h, primitive_topology topology, int vertex_count, int first_vertex, int instance_count, int first_instance) {
+        auto &device = *as_ogl_device(h);
+        if (vertex_count < 3)
+            return;
+        apply_layout(device, nullptr);
+        prepare_draw(device);
+        apply_instance_layout(device, first_instance);
+        instance_layout_scope instances{device.state.instance_layout};
+        ogl_s_glDrawArraysInstanced(to_gl(topology), first_vertex, vertex_count, instance_count);
+    }
+    void ogl_draw_indexed_instanced(device_handle *h, primitive_topology topology, int index_count, int first_index, int base_vertex, int instance_count, int first_instance) {
+        auto &device = *as_ogl_device(h);
+        if (index_count < 3)
+            return;
+        const auto offset_bytes = static_cast<std::uintptr_t>(base_vertex) * device.state.vertex_layout.stride;
+        apply_layout(device, reinterpret_cast<const void *>(offset_bytes));
+        prepare_draw(device);
+        apply_instance_layout(device, first_instance);
+        instance_layout_scope instances{device.state.instance_layout};
+        ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, device.current_ib->buffer_id);
+        const index_format format = device.current_ib->format;
+        const auto index_offset_bytes = static_cast<std::uintptr_t>(first_index) * index_size(format);
+        ogl_s_glDrawElementsInstanced(to_gl(topology), index_count, to_gl(format),
+            reinterpret_cast<const void *>(index_offset_bytes), instance_count);
     }
 } // namespace alia
 

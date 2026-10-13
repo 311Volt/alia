@@ -305,9 +305,15 @@ namespace alia {
         int stride = 0;
         std::span<const vertex_element> elements;
     };
+    struct instance_definition_view {
+        std::size_t index = 0;
+        int stride = 0;
+        std::span<const instance_element> elements;
+    };
     struct render_state {
         shader_program_handle *shader = nullptr;
         vertex_definition_view vertex_layout;
+        instance_definition_view instance_layout; // A zero stride means no instance stream.
         texture_operation texture_op = texture_operation::vertex_color;
         blend_state blend = {};
         depth_state depth = {};
@@ -712,6 +718,13 @@ namespace alia {
         /// @return Nothing.
         gfx_backend_op<void(device_handle *device, vertex_buffer_handle *buffer)> bind_vertex_buffer;
 
+        /// @brief Record a vertex buffer as the per-instance source for the next instanced draw.
+        /// Null, with reason_unsupported, when caps.instancing is false.
+        /// @param device Device whose draw source is changed.
+        /// @param buffer Instance buffer to use, or null to clear the bound source.
+        /// @return Nothing.
+        gfx_backend_op<void(device_handle *device, vertex_buffer_handle *buffer)> bind_instance_buffer;
+
         /// @brief Record an index buffer as the index source for the next indexed draw.
         /// @param device Device whose draw source is changed.
         /// @param buffer Index buffer to use, or null to clear the bound source.
@@ -755,6 +768,29 @@ namespace alia {
         /// @param base_vertex Vertex offset added to each index before fetching from the vertex source.
         /// @return Nothing.
         gfx_backend_op<void(device_handle *device, primitive_topology topology, int index_count, int first_index, int base_vertex)> draw_indexed;
+
+        /// @brief Submit a shader draw of repeated geometry using the recorded vertex and instance buffers.
+        /// Null, with reason_unsupported, when caps.instancing is false.
+        /// @param device Device on which to draw; a shader and instance layout must be selected.
+        /// @param topology Triangle list, strip, or fan interpretation of the vertices.
+        /// @param vertex_count Vertices per instance; at most 65536 unless caps.index32 is true.
+        /// @param first_vertex First vertex in the bound vertex buffer.
+        /// @param instance_count Number of copies of the geometry to draw.
+        /// @param first_instance First record in the instance buffer, applied as a stream offset.
+        /// @return Nothing.
+        gfx_backend_op<void(device_handle *device, primitive_topology topology, int vertex_count, int first_vertex, int instance_count, int first_instance)> draw_instanced;
+
+        /// @brief Submit a shader draw of repeated indexed geometry using the recorded buffers.
+        /// Null, with reason_unsupported, when caps.instancing is false.
+        /// @param device Device on which to draw; a shader and instance layout must be selected.
+        /// @param topology Triangle list, strip, or fan interpretation of the indices.
+        /// @param index_count Number of indices consumed per instance.
+        /// @param first_index First index in the bound index buffer.
+        /// @param base_vertex Vertex offset added to each index.
+        /// @param instance_count Number of copies of the geometry to draw.
+        /// @param first_instance First record in the instance buffer, applied as a stream offset.
+        /// @return Nothing.
+        gfx_backend_op<void(device_handle *device, primitive_topology topology, int index_count, int first_index, int base_vertex, int instance_count, int first_instance)> draw_indexed_instanced;
     };
 
     struct created_device {

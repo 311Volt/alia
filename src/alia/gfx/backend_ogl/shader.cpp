@@ -203,6 +203,10 @@ namespace alia {
         ogl_s_glBindAttribLocation(program_id, attr_color, "a_color");
         ogl_s_glBindAttribLocation(program_id, attr_tex_coord, "a_tex_coord");
         ogl_s_glBindAttribLocation(program_id, attr_normal, "a_normal");
+        for (int slot = 0; slot != max_instance_attributes; ++slot) {
+            const std::string name = "a_instance" + std::to_string(slot);
+            ogl_s_glBindAttribLocation(program_id, static_cast<GLuint>(4 + slot), name.c_str());
+        }
         ogl_s_glLinkProgram(program_id);
 
         ogl_s_glDeleteShader(vertex_shader);
