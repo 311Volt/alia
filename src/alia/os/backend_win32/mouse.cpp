@@ -4,11 +4,11 @@
 #define NOMINMAX
 #include <windows.h>
 
-#include "mouse_impl.hpp"
-#include "../events/event_source_impl.hpp"
-#include "../gfx/bitmap/bitmap.hpp"
-#include "../gfx/bitmap/pixel_types.hpp"
-#include "../os/window_events.hpp"
+#include "win32_ops.hpp"
+#include "../../events/event_source_impl.hpp"
+#include "../../gfx/bitmap/bitmap.hpp"
+#include "../../gfx/bitmap/pixel_types.hpp"
+#include "../../os/window_events.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -21,22 +21,6 @@
 
 namespace alia::detail {
 namespace {
-
-class win32_mouse_cursor final : public mouse_cursor_impl {
-public:
-    explicit win32_mouse_cursor(HCURSOR cursor) : cursor_(cursor) {}
-    ~win32_mouse_cursor() override {
-        if (cursor_)
-            DestroyCursor(cursor_);
-    }
-
-    void *native_handle() const noexcept override {
-        return reinterpret_cast<void *>(cursor_);
-    }
-
-private:
-    HCURSOR cursor_ = nullptr;
-};
 
 void copy_cursor_pixels(bitmap &destination, const any_bitmap_view &source) {
     converting_blit_lossy(destination.view(), source);
@@ -283,34 +267,35 @@ POINT raw_absolute_position(const RAWMOUSE &mouse) {
 
 } // namespace
 
-std::shared_ptr<const mouse_cursor_impl> create_platform_mouse_cursor(
-    const any_bitmap_view &bitmap, vec2i hotspot) {
+os_cursor_handle *win32_create_cursor(os_context_handle *, const any_bitmap_view &bitmap, vec2i hotspot) {
+    auto result = std::make_unique<win32_cursor>();
     HCURSOR cursor = create_cursor(bitmap, hotspot);
-    if (!cursor)
-        throw std::runtime_error("mouse_cursor: CreateIconIndirect failed");
-    return std::make_shared<win32_mouse_cursor>(cursor);
+    if (!cursor) return nullptr;
+    result->cursor = cursor; return result.release();
 }
+void win32_destroy_cursor(os_cursor_handle *cursor) { auto *value = static_cast<win32_cursor *>(cursor); DestroyCursor(value->cursor); delete value; }
+void *win32_cursor_native_handle(const os_cursor_handle *cursor) { return static_cast<const win32_cursor *>(cursor)->cursor; }
 
-unsigned platform_mouse_num_axes() {
+unsigned win32_platform_mouse_num_axes() {
     return GetSystemMetrics(SM_MOUSEPRESENT) ? 4u : 0u;
 }
 
-unsigned platform_mouse_num_buttons() {
+unsigned win32_platform_mouse_num_buttons() {
     if (!GetSystemMetrics(SM_MOUSEPRESENT))
         return 0;
     return static_cast<unsigned>((std::max)(0, GetSystemMetrics(SM_CMOUSEBUTTONS)));
 }
 
-bool platform_can_get_mouse_cursor_position() { return true; }
+bool win32_platform_can_get_mouse_cursor_position() { return true; }
 
-std::optional<vec2i> platform_get_mouse_cursor_position() {
+std::optional<vec2i> win32_platform_get_mouse_cursor_position() {
     POINT point{};
     if (!GetCursorPos(&point))
         return std::nullopt;
     return vec2i{point.x, point.y};
 }
 
-bool platform_set_mouse_mode(
+bool win32_platform_set_mouse_mode(
     void *owner_token, void *native_window, event_source &source,
     mouse_mode requested) {
     auto &value = coordinator();
@@ -329,7 +314,7 @@ bool platform_set_mouse_mode(
     }
 
     if (value.owner == owner_token && value.requested == requested) {
-        platform_refresh_mouse_bounds(owner_token);
+        win32_platform_refresh_mouse_bounds(owner_token);
         return true;
     }
 
@@ -364,17 +349,17 @@ bool platform_set_mouse_mode(
     return true;
 }
 
-mouse_mode platform_requested_mouse_mode(void *owner_token) {
+mouse_mode win32_platform_requested_mouse_mode(void *owner_token) {
     const auto &value = coordinator();
     return value.owner == owner_token ? value.requested : mouse_mode::normal;
 }
 
-mouse_mode platform_active_mouse_mode(void *owner_token) {
+mouse_mode win32_platform_active_mouse_mode(void *owner_token) {
     const auto &value = coordinator();
     return value.owner == owner_token ? value.active : mouse_mode::normal;
 }
 
-void platform_mouse_window_focus_changed(
+void win32_platform_mouse_window_focus_changed(
     void *owner_token, bool focused, bool minimized) {
     auto &value = coordinator();
     if (value.owner != owner_token || !on_ui_thread(value))
@@ -389,7 +374,7 @@ void platform_mouse_window_focus_changed(
         set_effective_mode(value.requested);
 }
 
-void platform_refresh_mouse_bounds(void *owner_token) {
+void win32_platform_refresh_mouse_bounds(void *owner_token) {
     auto &value = coordinator();
     if (value.owner != owner_token ||
         value.active == mouse_mode::normal || !on_ui_thread(value))
@@ -400,13 +385,13 @@ void platform_refresh_mouse_bounds(void *owner_token) {
     }
 }
 
-void platform_mouse_window_destroyed(void *owner_token) {
+void win32_platform_mouse_window_destroyed(void *owner_token) {
     auto &value = coordinator();
     if (value.owner == owner_token)
         cancel_owner(false);
 }
 
-bool platform_ungrab_mouse() {
+bool win32_platform_ungrab_mouse() {
     auto &value = coordinator();
     if (!value.owner)
         return true;
@@ -415,7 +400,7 @@ bool platform_ungrab_mouse() {
     return cancel_owner(true);
 }
 
-bool platform_mouse_handle_raw_input(void *owner_token, void *raw_input) {
+bool win32_platform_mouse_handle_raw_input(void *owner_token, void *raw_input) {
     auto &value = coordinator();
     if (value.owner != owner_token ||
         value.active != mouse_mode::relative || !value.source)

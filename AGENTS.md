@@ -79,6 +79,36 @@ sample frame contains all channel points at that instant (AIFF terminology).
   Optional MMCSS functions are loaded dynamically; no avrt/mmdevapi imports are
   required just to start a program on systems without WASAPI.
 
+## OS subsystem
+
+API-level behaviour is documented in `src/alia/os/`.
+
+| Layer | Location | Role |
+|-------|----------|------|
+| L1 | `os/*.hpp` public | Contexts, windows, displays, monitors, clipboard and dialogs |
+| L2 | Header templates/overloads | Typed bitmap views erase to `any_bitmap_view`; text-log formatting erases to text |
+| L3 | `os/*.cpp`, common `io/*.cpp` | Registry, ownership, validation, default-context dispatch and closest-mode selection |
+| L4 | `os_backend_interface` | One stable table of `os_backend_op` slots per context |
+
+- Backends live in `os/backend_<name>/`, with concrete handles, casts and operation
+  declarations in `<name>_ops.hpp` and registration in `register_<name>_os_backend.cpp`.
+  There is no virtual window/cursor implementation in public headers.
+- Contexts outlive their windows, cursors and text logs. Moving contexts preserves
+  backend-table addresses. Moving windows preserves native handles and event sources
+  and updates their owner pointers and tracked input associations.
+- Create, use, poll and destroy a context and its children on the same thread.
+  Convenience APIs use the lazily created thread-local `get_os_context()`.
+- All native operations use `.get_or_throw()`. Null slots describe absent platform
+  services, with `reason_unsupported`; they never represent unfinished code.
+- L3 selects closest display modes. Backends apply an explicitly requested mode
+  exactly or fail. X11 restores its saved RandR configuration when leaving exclusive
+  fullscreen, losing focus, or destroying a window.
+- X11 owns one Display connection per context. Polling dispatches all its windows
+  and clipboard selections. Clipboard owners must keep polling to serve requests;
+  transfers have a two-second timeout and a 16 MiB text limit.
+- X11 probes RandR, XInput2, XKB, screen-saver and EWMH support at context creation.
+  File pickers use the optional Zenity service; missing services have explicit reasons.
+
 ## The `slop` folder
 
 The folder contains AI-generated design documents. They may, or may not be in any way relevant to the current state of the repo. They may, or may not be in any way aligned with the user's intent. Only intentionally read documents from that folder if explicitly asked to / pointed at by the user.

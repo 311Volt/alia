@@ -5,9 +5,17 @@
 #include <string_view>
 
 namespace alia {
+class os_context;
 
 // Clipboard operations
 namespace clipboard {
+    // Overloads without a context use get_os_context(). X11 selection owners
+    // must keep polling their context to serve other applications. Text is UTF-8.
+    [[nodiscard]] bool has_text(os_context &);
+    [[nodiscard]] std::string get_text(os_context &);
+    bool set_text(os_context &, std::string_view text);
+    [[nodiscard]] bool has_image(os_context &);
+    void clear(os_context &);
     // Text
     [[nodiscard]] bool has_text();
     [[nodiscard]] std::string get_text();

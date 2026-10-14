@@ -4,7 +4,7 @@
 #define NOMINMAX
 #include <windows.h>
 
-#include "../io/keyboard.hpp"
+#include "win32_ops.hpp"
 
 namespace alia {
     namespace {
@@ -30,7 +30,7 @@ namespace alia {
         }
     }
 
-    key_led get_keyboard_leds() {
+    key_led win32_keyboard_leds(os_context_handle *) {
         BYTE state[256]{};
         if (!GetKeyboardState(state))
             return key_led::none;
@@ -45,8 +45,8 @@ namespace alia {
         return leds;
     }
 
-    void set_keyboard_leds(key_led leds) {
-        const key_led current = get_keyboard_leds();
+    void win32_set_keyboard_leds(os_context_handle *, key_led leds) {
+        const key_led current = win32_keyboard_leds(nullptr);
         set_led(
             VK_NUMLOCK,
             true,

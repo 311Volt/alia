@@ -1,4 +1,5 @@
 #include "keyboard.hpp"
+#include "../os/os_context.hpp"
 
 #include <algorithm>
 #include <array>
@@ -7,6 +8,9 @@
 #include <string_view>
 
 namespace alia {
+    key_led get_keyboard_leds() { auto &c = get_os_context(); return c.backend()->keyboard_leds.get_or_throw()(c.handle()); }
+    void set_keyboard_leds(key_led leds) { auto &c = get_os_context(); c.backend()->set_keyboard_leds.get_or_throw()(c.handle(), leds); }
+
     namespace {
         constexpr key_mod lock_modifiers =
             key_mod::caps_lock | key_mod::num_lock | key_mod::scroll_lock;

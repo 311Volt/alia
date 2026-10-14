@@ -3,6 +3,8 @@
 
 #include "../events/event_source_impl.hpp"
 #include "../os/platform.hpp"
+#include "../os/os_context.hpp"
+#include "../gfx/bitmap/bitmap.hpp"
 #include "../os/window_events.hpp"
 
 #include <algorithm>
@@ -100,10 +102,21 @@ constexpr std::uint32_t button_bit(unsigned button) {
 } // namespace
 
 mouse_cursor::mouse_cursor(const any_bitmap_view &bitmap, vec2i hotspot)
-    : impl_(detail::create_platform_mouse_cursor(bitmap, hotspot)) {
-    if (!impl_)
-        throw std::runtime_error("mouse_cursor: native cursor creation failed");
+    : mouse_cursor(get_os_context(), bitmap, hotspot) {}
+mouse_cursor::mouse_cursor(os_context &context, const any_bitmap_view &bitmap, vec2i hotspot) {
+    if (!context || bitmap.width() <= 0 || bitmap.height() <= 0 || !bitmap.line(0) ||
+        hotspot.x < 0 || hotspot.y < 0 || hotspot.x >= bitmap.width() || hotspot.y >= bitmap.height())
+        throw std::invalid_argument("invalid mouse cursor bitmap or hotspot");
+    auto result = std::make_shared<detail::mouse_cursor_impl>();
+    result->context = context.handle(); result->backend = context.backend();
+    result->handle = result->backend->create_cursor.get_or_throw()(result->context, bitmap, hotspot);
+    if (!result->handle) throw std::runtime_error("mouse_cursor: native cursor creation failed");
+    impl_ = std::move(result);
 }
+detail::mouse_cursor_impl::~mouse_cursor_impl() {
+    if (handle) backend->destroy_cursor.get_or_throw()(handle);
+}
+void *detail::mouse_cursor_impl::native_handle() const { return backend->cursor_native_handle.get_or_throw()(handle); }
 
 mouse_cursor::~mouse_cursor() = default;
 mouse_cursor::mouse_cursor(mouse_cursor &&) noexcept = default;
@@ -160,15 +173,15 @@ bool is_mouse_button_down(const mouse_state &state, unsigned button) {
     return state.is_button_down(button);
 }
 
-unsigned get_mouse_num_axes() { return detail::platform_mouse_num_axes(); }
-unsigned get_mouse_num_buttons() { return detail::platform_mouse_num_buttons(); }
+unsigned get_mouse_num_axes() { auto &c = get_os_context(); return c.backend()->mouse_num_axes.get_or_throw()(c.handle()); }
+unsigned get_mouse_num_buttons() { auto &c = get_os_context(); return c.backend()->mouse_num_buttons.get_or_throw()(c.handle()); }
 
 bool can_get_mouse_cursor_position() {
-    return detail::platform_can_get_mouse_cursor_position();
+    return get_os_context().backend()->mouse_cursor_position.is_supported();
 }
 
 std::optional<vec2i> get_mouse_cursor_position() {
-    return detail::platform_get_mouse_cursor_position();
+    auto &c = get_os_context(); return c.backend()->mouse_cursor_position.get_or_throw()(c.handle());
 }
 
 namespace {
@@ -213,7 +226,7 @@ void set_mouse_wheel_precision(int precision) {
     tracked_mouse().wheel_precision = (std::max)(1, precision);
 }
 
-bool ungrab_mouse() { return detail::platform_ungrab_mouse(); }
+bool ungrab_mouse() { auto &c = get_os_context(); return c.backend()->ungrab_mouse.get_or_throw()(c.handle()); }
 
 namespace detail {
 
@@ -350,27 +363,7 @@ bool set_mouse_axis_for_testing(unsigned axis, int value) {
     return set_tracked_mouse_axis(axis, value);
 }
 
-#ifndef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
-std::shared_ptr<const mouse_cursor_impl> create_platform_mouse_cursor(
-    const any_bitmap_view &, vec2i) {
-    throw std::runtime_error("mouse_cursor: unsupported platform");
-}
-unsigned platform_mouse_num_axes() { return 0; }
-unsigned platform_mouse_num_buttons() { return 0; }
-bool platform_can_get_mouse_cursor_position() { return false; }
-std::optional<vec2i> platform_get_mouse_cursor_position() { return std::nullopt; }
-bool platform_ungrab_mouse() { return false; }
-bool platform_set_mouse_mode(
-    void *, void *, event_source &, mouse_mode requested) {
-    return requested == mouse_mode::normal;
-}
-mouse_mode platform_requested_mouse_mode(void *) { return mouse_mode::normal; }
-mouse_mode platform_active_mouse_mode(void *) { return mouse_mode::normal; }
-void platform_mouse_window_focus_changed(void *, bool, bool) {}
-void platform_refresh_mouse_bounds(void *) {}
-void platform_mouse_window_destroyed(void *) {}
-bool platform_mouse_handle_raw_input(void *, void *) { return false; }
-#endif
+
 
 } // namespace detail
 } // namespace alia

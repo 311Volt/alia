@@ -17,6 +17,7 @@
 #include "os/dialog.hpp"
 #include "os/clipboard.hpp"
 #include "os/platform.hpp"
+#include "os/os_context.hpp"
 
 #include "io/keycodes.hpp"
 #include "io/keyboard.hpp"

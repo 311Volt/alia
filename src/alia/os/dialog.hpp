@@ -6,11 +6,17 @@
 #include <optional>
 #include <memory>
 #include <format>
+#include <string_view>
+#include <utility>
 #include "../events/event_source.hpp"
 
 namespace alia {
 
 class window;
+class os_context;
+struct os_context_handle;
+struct os_text_log_handle;
+struct os_backend_interface;
 
 // File dialog filter
 struct file_filter {
@@ -110,8 +116,9 @@ void show_error_box(const char* title, const char* message,
 // Text log window (for debug output)
 class text_log {
 public:
-    text_log() = default;
+    text_log() noexcept = default;
     text_log(const char* title, bool monospace = true);
+    text_log(os_context &, const char* title, bool monospace = true);
     
     text_log(text_log&&) noexcept;
     text_log& operator=(text_log&&) noexcept;
@@ -125,7 +132,7 @@ public:
     void append(std::string_view text);
     
     template<typename... Args>
-    void printf(const char* fmt, Args&&... args) {
+    void printf(std::format_string<Args...> fmt, Args&&... args) {
         append(std::format(fmt, std::forward<Args>(args)...));
     }
     
@@ -141,8 +148,8 @@ public:
     event_source& get_event_source();
     
 private:
-    struct impl;
-    std::unique_ptr<impl> impl_;
+    os_text_log_handle *handle_ = nullptr;
+    const os_backend_interface *backend_ = nullptr;
 };
 
 } // namespace alia

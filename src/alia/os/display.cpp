@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include "os_context.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -7,6 +8,11 @@
 #include <vector>
 
 namespace alia {
+    std::vector<display_mode> get_display_modes(int index) { auto &c = get_os_context(); return c.backend()->display_modes.get_or_throw()(c.handle(), index); }
+    std::vector<display_mode> get_display_modes() { return get_display_modes(0); }
+    display_mode get_desktop_mode(int index) { auto &c = get_os_context(); return c.backend()->desktop_mode.get_or_throw()(c.handle(), index); }
+    display_mode get_desktop_mode() { return get_desktop_mode(0); }
+
     namespace {
         struct indexed_mode {
             display_mode mode;

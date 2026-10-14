@@ -1,5 +1,6 @@
-#include "dialog.hpp"
-#include "window.hpp"
+#ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
+#include "win32_ops.hpp"
+#include "../../events/event_source_impl.hpp"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -18,8 +19,9 @@ std::wstring utf8_to_utf16(const char* utf8)
     if (!utf8 || *utf8 == '\0') return L"";
     int size = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
     if (size <= 0) return L"";
-    std::wstring result(size - 1, L'\0');
+    std::wstring result(size, L'\0');
     MultiByteToWideChar(CP_UTF8, 0, utf8, -1, &result[0], size);
+    result.pop_back();
     return result;
 }
 
@@ -38,8 +40,9 @@ std::string utf16_to_utf8(const wchar_t* utf16)
     if (!utf16 || *utf16 == L'\0') return "";
     int size = WideCharToMultiByte(CP_UTF8, 0, utf16, -1, nullptr, 0, nullptr, nullptr);
     if (size <= 0) return "";
-    std::string result(size - 1, '\0');
+    std::string result(size, '\0');
     WideCharToMultiByte(CP_UTF8, 0, utf16, -1, &result[0], size, nullptr, nullptr);
+    result.pop_back();
     return result;
 }
 
@@ -53,7 +56,7 @@ HWND get_hwnd(const window* parent)
 
 } // namespace
 
-message_box_result show_message_box(
+message_box_result win32_message_box(os_context_handle *,
     const char* title,
     const char* message,
     message_box_buttons buttons,
@@ -98,33 +101,13 @@ message_box_result show_message_box(
     }
 }
 
-void show_info_box(const char* title, const char* message, const window* parent)
-{
-    show_message_box(title, message, message_box_buttons::ok, message_box_icon::info, parent);
-}
-
-void show_warning_box(const char* title, const char* message, const window* parent)
-{
-    show_message_box(title, message, message_box_buttons::ok, message_box_icon::warning, parent);
-}
-
-void show_error_box(const char* title, const char* message, const window* parent)
-{
-    show_message_box(title, message, message_box_buttons::ok, message_box_icon::error, parent);
-}
-
-bool show_confirm_box(const char* title, const char* message, const window* parent)
-{
-    return show_message_box(title, message, message_box_buttons::yes_no, message_box_icon::question, parent) == message_box_result::yes;
-}
-
 // File Dialog Helper
 struct com_initializer {
-    com_initializer() { CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED); }
-    ~com_initializer() { CoUninitialize(); }
+    HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    ~com_initializer() { if (SUCCEEDED(result)) CoUninitialize(); }
 };
 
-std::optional<std::string> show_open_file_dialog(
+std::optional<std::string> win32_show_open_file_dialog(os_context_handle *,
     const window* parent,
     const char* title,
     const file_dialog_options& options
@@ -141,6 +124,8 @@ std::optional<std::string> show_open_file_dialog(
         std::vector<COMDLG_FILTERSPEC> specs;
         std::vector<std::wstring> descriptions;
         std::vector<std::wstring> patterns;
+        descriptions.reserve(options.filters.size());
+        patterns.reserve(options.filters.size());
         for (const auto& f : options.filters) {
             descriptions.push_back(utf8_to_utf16(f.description));
             patterns.push_back(utf8_to_utf16(f.patterns));
@@ -188,7 +173,7 @@ std::optional<std::string> show_open_file_dialog(
     return result;
 }
 
-std::vector<std::string> show_open_files_dialog(
+std::vector<std::string> win32_show_open_files_dialog(os_context_handle *,
     const window* parent,
     const char* title,
     const file_dialog_options& options
@@ -205,6 +190,8 @@ std::vector<std::string> show_open_files_dialog(
         std::vector<COMDLG_FILTERSPEC> specs;
         std::vector<std::wstring> descriptions;
         std::vector<std::wstring> patterns;
+        descriptions.reserve(options.filters.size());
+        patterns.reserve(options.filters.size());
         for (const auto& f : options.filters) {
             descriptions.push_back(utf8_to_utf16(f.description));
             patterns.push_back(utf8_to_utf16(f.patterns));
@@ -249,7 +236,7 @@ std::vector<std::string> show_open_files_dialog(
     return result;
 }
 
-std::optional<std::string> show_save_file_dialog(
+std::optional<std::string> win32_show_save_file_dialog(os_context_handle *,
     const window* parent,
     const char* title,
     const file_dialog_options& options
@@ -266,6 +253,8 @@ std::optional<std::string> show_save_file_dialog(
         std::vector<COMDLG_FILTERSPEC> specs;
         std::vector<std::wstring> descriptions;
         std::vector<std::wstring> patterns;
+        descriptions.reserve(options.filters.size());
+        patterns.reserve(options.filters.size());
         for (const auto& f : options.filters) {
             descriptions.push_back(utf8_to_utf16(f.description));
             patterns.push_back(utf8_to_utf16(f.patterns));
@@ -299,7 +288,7 @@ std::optional<std::string> show_save_file_dialog(
     return result;
 }
 
-std::optional<std::string> show_folder_dialog(
+std::optional<std::string> win32_show_folder_dialog(os_context_handle *,
     const window* parent,
     const char* title,
     const char* initial_path
@@ -348,15 +337,7 @@ std::optional<std::string> show_folder_dialog(
 }
 
 // text_log implementation
-struct text_log::impl {
-    HWND hwnd = nullptr;
-    HWND edit_hwnd = nullptr;
-    event_source events;
-    bool monospace = true;
-    std::wstring title;
-    HFONT font = nullptr;
-
-    impl(const char* title_str, bool mono) : monospace(mono), title(utf8_to_utf16(title_str)) {
+win32_text_log::win32_text_log(const char* title_str, bool mono) : monospace(mono), title(utf8_to_utf16(title_str)) {
         register_class();
         hwnd = CreateWindowExW(
             0, L"AliaTextLog", title.c_str(),
@@ -365,6 +346,7 @@ struct text_log::impl {
             nullptr, nullptr, GetModuleHandle(nullptr), this
         );
 
+        if (!hwnd) throw std::runtime_error("text_log: CreateWindowExW failed");
         edit_hwnd = CreateWindowExW(
             0, L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY,
@@ -384,12 +366,12 @@ struct text_log::impl {
         }
     }
 
-    ~impl() {
+win32_text_log::~win32_text_log() {
         if (hwnd) DestroyWindow(hwnd);
         if (font) DeleteObject(font);
     }
 
-    static void register_class() {
+void win32_text_log::register_class() {
         static bool registered = false;
         if (registered) return;
         WNDCLASSEXW wc = { sizeof(WNDCLASSEXW) };
@@ -402,11 +384,11 @@ struct text_log::impl {
         registered = true;
     }
 
-    static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
-        impl* self = reinterpret_cast<impl*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+LRESULT CALLBACK win32_text_log::wnd_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+        win32_text_log* self = reinterpret_cast<win32_text_log*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
         if (msg == WM_NCCREATE) {
             CREATESTRUCTW* cs = reinterpret_cast<CREATESTRUCTW*>(lparam);
-            self = reinterpret_cast<impl*>(cs->lpCreateParams);
+            self = reinterpret_cast<win32_text_log*>(cs->lpCreateParams);
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
         }
 
@@ -419,7 +401,7 @@ struct text_log::impl {
                     return 0;
                 }
                 case WM_CLOSE: {
-                    // self->events.post(close_event{}); // Need to define what event to post
+                    self->events.emit(window_close_event{});
                     ShowWindow(hwnd, SW_HIDE);
                     return 0;
                 }
@@ -428,7 +410,7 @@ struct text_log::impl {
         return DefWindowProcW(hwnd, msg, wparam, lparam);
     }
 
-    void append(const char* text) {
+void win32_text_log::append(const char* text) {
         std::wstring wtext = utf8_to_utf16(text);
         // Replace \n with \r\n for Windows EDIT control
         std::wstring processed;
@@ -444,36 +426,9 @@ struct text_log::impl {
         SendMessageW(edit_hwnd, WM_VSCROLL, SB_BOTTOM, 0);
     }
 
-    void clear() {
+void win32_text_log::clear() {
         SetWindowTextW(edit_hwnd, L"");
     }
-};
-
-text_log::text_log(const char* title, bool monospace)
-    : impl_(std::make_unique<impl>(title, monospace)) {}
-
-text_log::text_log(text_log&& other) noexcept = default;
-text_log& text_log::operator=(text_log&& other) noexcept = default;
-text_log::~text_log() = default;
-
-bool text_log::valid() const { return impl_ != nullptr; }
-
-void text_log::append(const char* text) { if (impl_) impl_->append(text); }
-void text_log::append(std::string_view text) { 
-    if (impl_) {
-        std::string s(text);
-        impl_->append(s.c_str());
-    }
-}
-
-void text_log::clear() { if (impl_) impl_->clear(); }
-void text_log::show() { if (impl_) ShowWindow(impl_->hwnd, SW_SHOW); }
-void text_log::hide() { if (impl_) ShowWindow(impl_->hwnd, SW_HIDE); }
-bool text_log::is_visible() const { return impl_ && IsWindowVisible(impl_->hwnd); }
-
-event_source& text_log::get_event_source() {
-    if (!impl_) throw std::runtime_error("text_log is not valid");
-    return impl_->events;
-}
-
 } // namespace alia
+
+#endif

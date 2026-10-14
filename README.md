@@ -45,6 +45,48 @@ ALIA only serves to abstract away the underlying platform and is not a game engi
 
 TODO
 
+# OS contexts and X11
+
+`alia/os/os_context.hpp` provides a move-only OS context and backend selection:
+
+```cpp
+auto os = alia::os_context::create(alia::os_backend::x11);
+alia::window win(os, {800, 600}, {.title = "ALIA", .resizable = true});
+// Call os.poll() regularly on this thread, then consume queued window events.
+```
+
+Destroy windows, custom mouse cursors and text logs before their context. Moving
+the context preserves their backend references. Existing `window(size, options)`
+and free OS functions use a lazy context on the calling thread; `auto_` tries
+Win32 then X11 among compiled backends. Explicit contexts also provide monitor
+and display-mode queries, and clipboard functions have context-taking overloads.
+
+`ALIA_COMPILE_PLATFORM_BACKEND_X11` enables Xlib, RandR, Xi, Xcursor and Xss
+dependencies. Their development headers and libraries must be installed. At runtime
+the backend probes server extensions and window-manager capabilities. Unsupported
+services throw `unsupported_operation_exception` with an explanation. X11 window
+geometry uses native pixels, and changes requested through a window manager become
+visible when its events are polled. Exclusive modes are applied exactly; RandR
+framebuffers expand when necessary and the saved configuration is restored on
+exit or focus loss when the remaining active displays permit it.
+
+X11 clipboard text uses UTF-8 and the CLIPBOARD selection. Keep polling the owning
+context while other applications read it. Transfers support the INCR protocol,
+with a two-second timeout and a 16 MiB limit. Text remains available while the
+context owns the selection; shutdown does not transfer ownership to a clipboard
+manager. Set the application's character locale before context creation for XIM
+composition and font-set text rendering.
+
+File pickers use Zenity when it is found in PATH at context creation. Without it,
+file-picker slots report an unavailable desktop service. Zenity controls hidden-file
+visibility through its own UI; requesting `show_hidden = true` explicitly reports
+that this option cannot be forced. Message boxes and text logs use Xlib directly.
+
+`alia_example_os_context x11` demonstrates OS windows, keyboard/text events,
+resizing, fullscreen and clipboard access. It does not create a graphics device.
+The `alia_example_mouse` example also supports X11. OpenGL context/surface support
+is a separate graphics-backend concern; this OS backend does not add GLX.
+
 # Timing and FPS measurement
 
 Include `alia/core/timing.hpp` for measurement helpers, or `alia/alia.hpp` for the

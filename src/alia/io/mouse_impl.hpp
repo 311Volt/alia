@@ -10,6 +10,10 @@
 
 namespace alia {
 
+struct os_context_handle;
+struct os_cursor_handle;
+struct os_backend_interface;
+
 class any_bitmap_view;
 class window;
 
@@ -37,20 +41,16 @@ private:
     std::vector<vec2i> pending_;
 };
 
-class mouse_cursor_impl {
-public:
-    virtual ~mouse_cursor_impl() = default;
-    [[nodiscard]] virtual void *native_handle() const noexcept = 0;
+struct mouse_cursor_impl {
+    mouse_cursor_impl() = default;
+    mouse_cursor_impl(const mouse_cursor_impl &) = delete;
+    mouse_cursor_impl &operator=(const mouse_cursor_impl &) = delete;
+    os_context_handle *context = nullptr;
+    const os_backend_interface *backend = nullptr;
+    os_cursor_handle *handle = nullptr;
+    ~mouse_cursor_impl();
+    [[nodiscard]] void *native_handle() const;
 };
-
-std::shared_ptr<const mouse_cursor_impl> create_platform_mouse_cursor(
-    const any_bitmap_view &bitmap, vec2i hotspot);
-
-unsigned platform_mouse_num_axes();
-unsigned platform_mouse_num_buttons();
-bool platform_can_get_mouse_cursor_position();
-std::optional<vec2i> platform_get_mouse_cursor_position();
-bool platform_ungrab_mouse();
 
 void mouse_handle_axes(
     window *owner, event_source &source, vec2i position,
@@ -77,17 +77,6 @@ void mouse_window_destroyed(window *owner);
 // Test support for the backend-independent state machine.
 void reset_mouse_state_for_testing();
 bool set_mouse_axis_for_testing(unsigned axis, int value);
-
-bool platform_set_mouse_mode(
-    void *owner_token, void *native_window, event_source &source,
-    mouse_mode requested);
-mouse_mode platform_requested_mouse_mode(void *owner_token);
-mouse_mode platform_active_mouse_mode(void *owner_token);
-void platform_mouse_window_focus_changed(
-    void *owner_token, bool focused, bool minimized);
-void platform_refresh_mouse_bounds(void *owner_token);
-void platform_mouse_window_destroyed(void *owner_token);
-bool platform_mouse_handle_raw_input(void *owner_token, void *raw_input);
 
 } // namespace detail
 } // namespace alia

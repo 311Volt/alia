@@ -4,9 +4,9 @@
 #define NOMINMAX
 #include <windows.h>
 
-#include "monitor.hpp"
-#include "monitor_win32.hpp"
-#include "window.hpp"
+#include "win32_ops.hpp"
+#include "win32_ops.hpp"
+#include "../window.hpp"
 
 #include <algorithm>
 #include <stdexcept>
@@ -122,7 +122,7 @@ namespace alia {
         }
     }
 
-    std::vector<display_mode> get_display_modes(int monitor_index) {
+    std::vector<display_mode> win32_display_modes(os_context_handle *, int monitor_index) {
         const std::wstring device = detail::win32_monitor_device_name(monitor_index);
         std::vector<display_mode> modes;
         DEVMODEW native = {};
@@ -140,11 +140,7 @@ namespace alia {
         return modes;
     }
 
-    std::vector<display_mode> get_display_modes() {
-        return get_display_modes(0);
-    }
-
-    display_mode get_desktop_mode(int monitor_index) {
+    display_mode win32_desktop_mode(os_context_handle *, int monitor_index) {
         const std::wstring device = detail::win32_monitor_device_name(monitor_index);
         DEVMODEW native = {};
         native.dmSize = sizeof(native);
@@ -153,11 +149,7 @@ namespace alia {
         return mode_from_devmode(native);
     }
 
-    display_mode get_desktop_mode() {
-        return get_desktop_mode(0);
-    }
-
-    std::vector<monitor_info> get_monitors() {
+    std::vector<monitor_info> win32_monitors(os_context_handle *) {
         const auto native = enumerate_native_monitors();
         std::vector<monitor_info> result;
         result.reserve(native.size());
@@ -177,39 +169,13 @@ namespace alia {
             info.dpi = dpi;
             info.scale_factor = dpi / 96.0f;
             info.is_primary = (entry.info.dwFlags & MONITORINFOF_PRIMARY) != 0;
-            info.current_mode = get_desktop_mode(info.index);
-            info.modes = get_display_modes(info.index);
+            info.current_mode = win32_desktop_mode(nullptr, info.index);
+            info.modes = win32_display_modes(nullptr, info.index);
             result.push_back(std::move(info));
         }
         return result;
     }
 
-    int get_monitor_count() {
-        return static_cast<int>(enumerate_native_monitors().size());
-    }
-
-    monitor_info get_primary_monitor() {
-        return get_monitor(0);
-    }
-
-    monitor_info get_monitor(int index) {
-        auto monitors = get_monitors();
-        if (index < 0 || index >= static_cast<int>(monitors.size()))
-            throw std::out_of_range("get_monitor: monitor index is out of range");
-        return std::move(monitors[static_cast<std::size_t>(index)]);
-    }
-
-    monitor_info get_monitor_at(vec2i point) {
-        const POINT native{point.x, point.y};
-        HMONITOR handle = MonitorFromPoint(native, MONITOR_DEFAULTTOPRIMARY);
-        return get_monitor(detail::win32_monitor_index(handle));
-    }
-
-    monitor_info get_window_monitor(const window &window) {
-        HMONITOR handle = MonitorFromWindow(
-            static_cast<HWND>(window.native_handle()), MONITOR_DEFAULTTOPRIMARY);
-        return get_monitor(detail::win32_monitor_index(handle));
-    }
 } // namespace alia
 
 #endif // ALIA_COMPILE_PLATFORM_BACKEND_WIN32

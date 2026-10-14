@@ -10,6 +10,7 @@ namespace alia {
 
 class any_bitmap_view;
 class window;
+class os_context;
 
 // Mouse buttons are one-based so button N maps directly to bit N - 1.
 enum class mouse_button : unsigned {
@@ -57,6 +58,7 @@ class mouse_cursor_impl;
 class mouse_cursor {
 public:
     mouse_cursor(const any_bitmap_view &bitmap, vec2i hotspot);
+    mouse_cursor(os_context &, const any_bitmap_view &bitmap, vec2i hotspot);
     ~mouse_cursor();
 
     mouse_cursor(mouse_cursor &&) noexcept;

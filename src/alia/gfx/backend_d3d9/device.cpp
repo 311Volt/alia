@@ -1,7 +1,7 @@
 #ifdef ALIA_COMPILE_GFX_BACKEND_D3D9
 
 #include "d3d9_ops.hpp"
-#include "../../os/monitor_win32.hpp"
+#include "../../os/backend_win32/win32_ops.hpp"
 
 #include <algorithm>
 
