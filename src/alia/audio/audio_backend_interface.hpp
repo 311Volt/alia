@@ -10,6 +10,9 @@ namespace alia {
     template <class Signature> using audio_backend_op = backend_op<Signature>;
     struct audio_context_handle {};
     struct audio_stream_handle {};
+    /// auto_ tries the compiled backends in WASAPI, MME, ALSA order.
+    /// MME uses Windows waveform audio; ALSA uses Linux PCM devices.
+    /// MME/ALSA discard queued buffers on stop; restart reports discontinuity.
     enum class audio_backend { auto_, wasapi, mme, alsa, null };
     enum class audio_direction { output, input };
     enum class audio_stream_state { stopped, running, failed };
@@ -28,6 +31,9 @@ namespace alia {
     };
     struct audio_context_config {};
     struct audio_device_info {
+        /// Backend-local endpoint id. MME exposes "default", "out:<index>"
+        /// and "in:<index>"; ALSA exposes PCM names such as "default" and
+        /// "hw:CARD=PCH,DEV=0". An opened stream retains its selected endpoint.
         std::string id, name;
         audio_direction direction{};
         bool is_default = false;
