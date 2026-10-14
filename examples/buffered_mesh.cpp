@@ -70,36 +70,6 @@ mesh_data make_sphere_mesh(int stacks, int slices) {
     return mesh;
 }
 
-alia::transform rotate_x(float angle) {
-    alia::transform r = alia::transform::identity();
-    const float c = std::cos(angle);
-    const float s = std::sin(angle);
-    r.m[1][1] = c;
-    r.m[1][2] = s;
-    r.m[2][1] = -s;
-    r.m[2][2] = c;
-    return r;
-}
-
-alia::transform rotate_y(float angle) {
-    alia::transform r = alia::transform::identity();
-    const float c = std::cos(angle);
-    const float s = std::sin(angle);
-    r.m[0][0] = c;
-    r.m[0][2] = -s;
-    r.m[2][0] = s;
-    r.m[2][2] = c;
-    return r;
-}
-
-alia::transform scale3d(float s) {
-    alia::transform r = alia::transform::identity();
-    r.m[0][0] = s;
-    r.m[1][1] = s;
-    r.m[2][2] = s;
-    return r;
-}
-
 alia::transform make_projection(alia::vec2i size) {
     const float aspect = size.y > 0 ? static_cast<float>(size.x) / static_cast<float>(size.y) : 1.0f;
     return alia::transform::ortho(-1.55f * aspect, 1.55f * aspect, -1.55f, 1.55f);
@@ -260,9 +230,9 @@ int main(int argc, char **argv) {
 
             const alia::transform projection = make_projection(win.size());
             const alia::transform model =
-                scale3d(0.95f) *
-                rotate_x(-0.35f) *
-                rotate_y(t * 0.75f);
+                alia::transform::scale(alia::vec3f{0.95f, 0.95f, 0.95f})
+                    .then_rotate_x(-0.35f)
+                    .then_rotate_y(t * 0.75f);
 
             projection_constant.set_value(projection);
             transform_constant.set_value(model);

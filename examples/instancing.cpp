@@ -7,7 +7,6 @@
 #include "alia/os/window.hpp"
 
 #include <array>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -65,15 +64,6 @@ cube_mesh make_cube() {
             mesh.indices[face * 6 + i] = indices[i];
     }
     return mesh;
-}
-
-alia::transform rotate_y(float angle) {
-    auto result = alia::transform::identity();
-    const float c = std::cos(angle);
-    const float s = std::sin(angle);
-    result.m[0][0] = c; result.m[0][2] = -s;
-    result.m[2][0] = s; result.m[2][2] = c;
-    return result;
 }
 
 constexpr std::string_view d3d9_vertex_shader = R"(
@@ -219,7 +209,7 @@ int main(int argc, char **argv) {
             const float t = static_cast<float>(clock.tick().elapsed);
             const auto size = swapchain.size();
             const auto view = alia::transform::look_at({24.0f, 25.0f, 30.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f});
-            const auto projection = device.perspective_fov(45.0f, static_cast<float>(size.x) / size.y, 0.1f, 100.0f);
+            const auto projection = device.perspective_vfov(45.0f, static_cast<float>(size.x) / size.y, 0.1f, 100.0f);
             view_projection.set_value(view * projection);
 
             auto frame = swapchain.begin_frame();
@@ -227,7 +217,7 @@ int main(int argc, char **argv) {
             frame.set_shader(shader);
             frame.set_blend(alia::no_blend);
             frame.set_depth(alia::depth_test_write);
-            rotation.set_value(rotate_y(t * 0.7f));
+            rotation.set_value(alia::transform::rotate_y(t * 0.7f));
             frame.draw_indexed_instanced(cube_vertices, cube_indices, instances, 0, -1, 0, 1, cube_count);
             rotation.set_value(alia::transform::identity());
             frame.draw_instanced(strip_vertices, instances, 0, -1, 1 + cube_count, cube_count, alia::primitive_topology::triangle_strip);

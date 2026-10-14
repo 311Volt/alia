@@ -1,6 +1,7 @@
 #ifndef ALIA_HPP
 #define ALIA_HPP
 
+#include "core/angle.hpp"
 #include "core/vec.hpp"
 #include "core/rect.hpp"
 #include "core/color.hpp"

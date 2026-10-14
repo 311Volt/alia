@@ -218,28 +218,6 @@ void main() {
 }
 )";
 
-alia::transform rotation_x(float angle) {
-    alia::transform result = alia::transform::identity();
-    const float cosine = std::cos(angle);
-    const float sine = std::sin(angle);
-    result.m[1][1] = cosine;
-    result.m[1][2] = sine;
-    result.m[2][1] = -sine;
-    result.m[2][2] = cosine;
-    return result;
-}
-
-alia::transform rotation_y(float angle) {
-    alia::transform result = alia::transform::identity();
-    const float cosine = std::cos(angle);
-    const float sine = std::sin(angle);
-    result.m[0][0] = cosine;
-    result.m[0][2] = -sine;
-    result.m[2][0] = sine;
-    result.m[2][2] = cosine;
-    return result;
-}
-
 sphere_mesh make_sphere(int rings, int slices) {
     sphere_mesh result;
     result.vertices.reserve(static_cast<std::size_t>((rings + 1) * (slices + 1)));
@@ -426,7 +404,7 @@ int main(int argc, char **argv) {
                 ? static_cast<float>(frame.target_size().x) / frame.target_size().y
                 : 1.0f;
             const auto projection =
-                device.perspective_fov(55.0f, aspect, 0.05f, 30.0f);
+                device.perspective_vfov(55.0f, aspect, 0.05f, 30.0f);
 
             {
                 auto scene = frame.save_state();
@@ -444,7 +422,9 @@ int main(int argc, char **argv) {
                 frame.draw_indexed<alia::vertex3d>(sky_vertices, sky_indices);
 
                 frame.set_view(view);
-                frame.set_world(rotation_y(time * 0.32f) * rotation_x(-0.18f));
+                frame.set_world(
+                    alia::transform::rotate_y(time * 0.32f) *
+                    alia::transform::rotate_x(-0.18f));
                 world_constant.set_value(frame.world());
                 view_projection_constant.set_value(frame.view() * frame.projection());
                 camera_constant.set_value(camera_position);

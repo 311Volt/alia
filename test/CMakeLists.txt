@@ -34,6 +34,17 @@ target_link_libraries(vec_tests
     GTest::gtest_main
 )
 
+add_executable(transform_tests
+    transform_test.cpp
+)
+
+target_link_libraries(transform_tests
+    PRIVATE
+    alia
+    GTest::gtest
+    GTest::gtest_main
+)
+
 add_executable(primitive_renderer_tests
     primitive_renderer_test.cpp
 )
@@ -124,6 +135,7 @@ include(GoogleTest)
 gtest_discover_tests(cstring_view_tests)
 gtest_discover_tests(array_map_tests)
 gtest_discover_tests(vec_tests)
+gtest_discover_tests(transform_tests)
 gtest_discover_tests(primitive_renderer_tests)
 gtest_discover_tests(text_layout_tests)
 gtest_discover_tests(soo_any_tests)

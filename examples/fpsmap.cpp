@@ -344,7 +344,7 @@ int main(int argc, char **argv) {
                 const float aspect = frame.target_size().y > 0
                     ? static_cast<float>(frame.target_size().x) / frame.target_size().y
                     : 1.0f;
-                frame.set_projection(device.perspective_fov(78.0f, aspect, 0.01f, 10000.0f));
+                frame.set_projection(device.perspective_vfov(78.0f, aspect, 0.01f, 10000.0f));
                 frame.set_view(alia::transform::look_at(
                     {0.0f, 0.0f, 0.0f},
                     player_camera.forward(),

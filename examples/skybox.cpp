@@ -283,7 +283,7 @@ int main(int argc, char **argv) {
                     std::sin(pitch),
                     std::cos(pitch) * std::cos(yaw),
                 };
-                frame.set_projection(device.perspective_fov(78.0f, aspect, 0.05f, 10.0f));
+                frame.set_projection(device.perspective_vfov(78.0f, aspect, 0.05f, 10.0f));
                 frame.set_view(alia::transform::look_at(
                     {}, direction, {0.0f, 1.0f, 0.0f}));
                 view_projection.set_value(frame.view() * frame.projection());

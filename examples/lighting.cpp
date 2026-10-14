@@ -70,24 +70,6 @@ mesh_data make_sphere_mesh(int stacks, int slices) {
     return mesh;
 }
 
-alia::transform rotation_y(float angle) {
-    auto result = alia::transform::identity();
-    const float c = std::cos(angle), s = std::sin(angle);
-    result.m[0][0] = c;
-    result.m[0][2] = -s;
-    result.m[2][0] = s;
-    result.m[2][2] = c;
-    return result;
-}
-
-alia::transform translation(alia::vec3f position) {
-    auto result = alia::transform::identity();
-    result.m[3][0] = position.x;
-    result.m[3][1] = position.y;
-    result.m[3][2] = position.z;
-    return result;
-}
-
 const char *on_off(bool value) { return value ? "on" : "off"; }
 
 const char *fog_name(alia::fog_mode mode) {
@@ -191,7 +173,7 @@ int main(int argc, char **argv) {
                 auto scene = frame.save_state();
                 const auto size = frame.target_size();
                 const float aspect = size.y > 0 ? static_cast<float>(size.x) / size.y : 1.0f;
-                frame.set_projection(device.perspective_fov(45.0f, aspect, 0.1f, 40.0f));
+                frame.set_projection(device.perspective_vfov(45.0f, aspect, 0.1f, 40.0f));
                 frame.set_view(alia::transform::look_at(
                     {7.2f * std::sin(camera_angle), 1.0f, -7.2f * std::cos(camera_angle)},
                     {}, {0.0f, 1.0f, 0.0f}));
@@ -209,14 +191,18 @@ int main(int argc, char **argv) {
                     .use_vertex_color = vertex_colors};
                 frame.set_material(surface);
                 {
-                    auto object = frame.push_world(rotation_y(time * 0.22f) * translation({1.25f, 0.0f, 0.0f}));
+                    auto object = frame.push_world(
+                        alia::transform::rotate_y(time * 0.22f) *
+                        alia::transform::translate(alia::vec3f{1.25f, 0.0f, 0.0f}));
                     frame.draw_indexed<alia::full_vertex3d>(vertices, indices);
                 }
                 // Uniform reference also exercises restoration after GL color material.
                 surface.use_vertex_color = false;
                 frame.set_material(surface);
                 {
-                    auto object = frame.push_world(rotation_y(time * 0.22f) * translation({-1.25f, 0.0f, 0.0f}));
+                    auto object = frame.push_world(
+                        alia::transform::rotate_y(time * 0.22f) *
+                        alia::transform::translate(alia::vec3f{-1.25f, 0.0f, 0.0f}));
                     frame.draw_indexed<alia::full_vertex3d>(vertices, indices);
                 }
             }

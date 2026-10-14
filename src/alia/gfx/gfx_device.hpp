@@ -49,9 +49,32 @@ namespace alia {
             return ortho_ui(static_cast<float>(size.x), static_cast<float>(size.y));
         }
 
+        // Right-handed orthographic projection with backend-specific clip depth.
+        // Bounds and planes must be finite, with l != r, b != t, and near != far.
+        // Invalid inputs throw std::invalid_argument in debug builds.
+        [[nodiscard]] transform orthographic(
+            float l, float r, float b, float t,
+            float near_plane, float far_plane) const;
+
+        // Right-handed perspective frustum; bounds are on the near plane.
+        // Uses backend-specific clip depth. Finite inputs, l != r, b != t,
+        // and 0 < near < far are checked in debug builds (std::invalid_argument).
+        [[nodiscard]] transform perspective(
+            float l, float r, float b, float t,
+            float near_plane, float far_plane) const;
+
         // Right-handed perspective projection with backend-specific clip depth.
-        [[nodiscard]] transform perspective_fov(
-            float fov_degrees,
+        // Vertical field of view in degrees; debug builds validate finite inputs,
+        // 0 < fov < 180, aspect > 0, and 0 < near < far (std::invalid_argument).
+        [[nodiscard]] transform perspective_vfov(
+            float vfov_degrees,
+            float aspect,
+            float near_plane,
+            float far_plane) const;
+
+        // Like perspective_vfov, with a horizontal field of view in degrees.
+        [[nodiscard]] transform perspective_hfov(
+            float hfov_degrees,
             float aspect,
             float near_plane,
             float far_plane) const;
