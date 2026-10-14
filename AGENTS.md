@@ -40,6 +40,45 @@ Draw helpers (`draw_texture`, text drawing, primitive renderers) follow these ru
 3. Wire the slot in `register_*_backend.cpp`: set the `operation` pointer, or if the op is hardware-conditional, leave it null and set `reason_unsupported`.
 4. Add the L3 free function or method that calls `.get_or_throw()`.
 
+## Audio subsystem
+
+API-level behaviour is documented in `src/alia/audio/`. Counts are sample-frame
+counts (`frame_count`): a sample point is one channel value at one instant; a
+sample frame contains all channel points at that instant (AIFF terminology).
+
+| Layer | Location | Role |
+|-------|----------|------|
+| L1 | `audio/*.hpp` public | Sample concepts/formats, clips/views, ring buffer, context and streams |
+| L2 | `audio/*.hpp` templates | Typed-to-erased clip views and callback shims |
+| L3 | `audio/*.cpp` | Registry, lifetime, negotiation, format fallback and conversion trampolines |
+| L4 | `audio_backend_interface` | Per-context table of `audio_backend_op` slots |
+
+- Backend files live in `audio/backend_<name>/`; concrete handles and casts live
+  in `<name>_ops.hpp`, and registration in `register_<name>_audio_backend.cpp`.
+  The operation-adding recipe above applies with these audio names.
+- `backend_op` and `unsupported_operation_exception` live in `core/backend_op.hpp`;
+  `gfx_backend_op` and `audio_backend_op` are aliases.
+- Backends never substitute formats or rates. Create delivers exactly the
+  requested callback format or returns null. Host conversion (e.g. WASAPI
+  AUTOCONVERTPCM) is allowed; fallback belongs to L3. L3 does not resample.
+- A null slot means hardware/platform support is absent, with an explanatory
+  `reason_unsupported`; it never denotes unfinished implementation.
+- Callbacks run on backend-owned threads with at most `max_callback_frames`.
+  Provision all buffers/converters at open. The callback path must not allocate,
+  take blocking locks, or emit events. Best-effort `try_lock` is used only by the
+  microphone example; the audio runtime itself takes no callback-path locks.
+- Stop and destroy synchronously quiesce callbacks. Neither may be called from
+  a callback. Join the worker before destroying callback objects or buffers.
+- Device loss latches `failed`, ends callbacks, and never reroutes automatically.
+  A throwing user callback also latches failure and silences subsequent output.
+- Contexts must outlive their streams, which hold raw pointers into the context.
+  Moves preserve the heap-allocated backend table and stream runtime addresses.
+- `ring_buffer` has fixed capacity and no synchronization. Only construction and
+  explicit `reserve` allocate. Use external synchronization between threads.
+- WASAPI uses shared mode and a worker-owned COM apartment for each stream.
+  Optional MMCSS functions are loaded dynamically; no avrt/mmdevapi imports are
+  required just to start a program on systems without WASAPI.
+
 ## The `slop` folder
 
 The folder contains AI-generated design documents. They may, or may not be in any way relevant to the current state of the repo. They may, or may not be in any way aligned with the user's intent. Only intentionally read documents from that folder if explicitly asked to / pointed at by the user.

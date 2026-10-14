@@ -3,6 +3,8 @@
 
 #include <cmath>
 #include <type_traits>
+#include <tuple>
+#include <utility>
 #include "arithmetic.hpp"
 
 namespace alia {
@@ -10,6 +12,13 @@ namespace alia {
 template <typename T>
 struct vec2 {
     T x, y;
+
+    template <std::size_t I>
+    constexpr auto &&get(this auto &&self) noexcept {
+        static_assert(I < 2);
+        if constexpr (I == 0) return std::forward_like<decltype(self)>(self.x);
+        else return std::forward_like<decltype(self)>(self.y);
+    }
 
     constexpr vec2() : x(0), y(0) {}
     constexpr vec2(T x, T y) : x(x), y(y) {}
@@ -55,6 +64,14 @@ struct vec2 {
 template <typename T>
 struct vec3 {
     T x, y, z;
+
+    template <std::size_t I>
+    constexpr auto &&get(this auto &&self) noexcept {
+        static_assert(I < 3);
+        if constexpr (I == 0) return std::forward_like<decltype(self)>(self.x);
+        else if constexpr (I == 1) return std::forward_like<decltype(self)>(self.y);
+        else return std::forward_like<decltype(self)>(self.z);
+    }
 
     constexpr vec3() : x(0), y(0), z(0) {}
     constexpr vec3(T x, T y, T z) : x(x), y(y), z(z) {}
@@ -118,6 +135,15 @@ template <typename T>
 struct vec4 {
     T x, y, z, w;
 
+    template <std::size_t I>
+    constexpr auto &&get(this auto &&self) noexcept {
+        static_assert(I < 4);
+        if constexpr (I == 0) return std::forward_like<decltype(self)>(self.x);
+        else if constexpr (I == 1) return std::forward_like<decltype(self)>(self.y);
+        else if constexpr (I == 2) return std::forward_like<decltype(self)>(self.z);
+        else return std::forward_like<decltype(self)>(self.w);
+    }
+
     constexpr vec4() : x(0), y(0), z(0), w(0) {}
     constexpr vec4(T x, T y, T z, T w) : x(x), y(y), z(z), w(w) {}
     template <typename U>
@@ -177,5 +203,14 @@ using vec4f = vec4<float>;
 using vec4d = vec4<double>;
 
 } // namespace alia
+
+namespace std {
+    template <class T> struct tuple_size<alia::vec2<T>> : integral_constant<size_t, 2> {};
+    template <class T> struct tuple_size<alia::vec3<T>> : integral_constant<size_t, 3> {};
+    template <class T> struct tuple_size<alia::vec4<T>> : integral_constant<size_t, 4> {};
+    template <size_t I, class T> struct tuple_element<I, alia::vec2<T>> { static_assert(I < 2); using type = T; };
+    template <size_t I, class T> struct tuple_element<I, alia::vec3<T>> { static_assert(I < 3); using type = T; };
+    template <size_t I, class T> struct tuple_element<I, alia::vec4<T>> { static_assert(I < 4); using type = T; };
+}
 
 #endif // ALIA_CORE_VEC_HPP

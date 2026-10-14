@@ -115,6 +115,16 @@ if(ALIA_COMPILE_GFX_BACKEND_OPENGL)
   endif()
 endif()
 
+# Audio backends. Other backend ids are reserved until their implementations land.
+option(ALIA_COMPILE_AUDIO_BACKEND_WASAPI "Compile WASAPI audio backend (Windows)" ${WIN32})
+if(ALIA_COMPILE_AUDIO_BACKEND_WASAPI)
+  if(NOT WIN32)
+    message(FATAL_ERROR "The WASAPI audio backend requires Windows")
+  endif()
+  target_compile_definitions(alia PUBLIC ALIA_COMPILE_AUDIO_BACKEND_WASAPI)
+  target_link_libraries(alia PRIVATE ole32)
+endif()
+
 include(GNUInstallDirs)
 install(TARGETS alia
     EXPORT alia-targets

@@ -1,5 +1,5 @@
 /* Streamed music, a triggered sound effect, and a simple text prompt.
- * Not implementable yet: alia has no audio subsystem. The program below is
+ * Not implementable yet: alia has no audio mixers or decoders. The program below is
  * written against a hypothetical API; its shape is intentionally kept here
  * so that the proposed interface can be reviewed. The expected assets are
  * ./resources/audio/spring_in_my_step.ogg and ./resources/audio/uuhhh.ogg. */
@@ -19,15 +19,15 @@ int main() {
         alia::gfx_device device = alia::gfx_device::create();
         auto swapchain = device.create_swapchain({.target = win});
 
-        // HYPOTHETICAL alia API: decoded streams and samples share a mixer.
-        alia::audio_device audio = alia::audio_device::create();
-        alia::audio_stream music = alia::load_audio_stream(
+        // HYPOTHETICAL alia API: decoded streams and clips share a mixer.
+        alia::audio_context audio = alia::audio_context::create();
+        alia::any_output_stream music = alia::load_audio_stream(
             "./resources/audio/spring_in_my_step.ogg");
         audio.default_mixer().attach(music);
         music.set_gain(0.6f);
         music.set_play_mode(alia::play_mode::loop);
         music.play();
-        alia::sample sfx = alia::load_sample("./resources/audio/uuhhh.ogg");
+        alia::audio_clip sfx = alia::load_audio_clip("./resources/audio/uuhhh.ogg");
 
         alia::ttf_font font = alia::load_ttf_font("./resources/roboto.ttf", 36);
         alia::hardware_glyph_buffer glyphs(device, font);
@@ -73,6 +73,6 @@ int main() {
 #include <iostream>
 
 int main() {
-    std::cout << "audio example: requires an alia audio subsystem, which does not exist yet. See the #if 0 block in examples/audio.cpp\n";
+    std::cout << "audio example: requires audio mixers and decoders. See the #if 0 block in examples/audio.cpp\n";
     return 0;
 }

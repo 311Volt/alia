@@ -132,6 +132,12 @@ target_link_libraries(vertex_definition_registry_tests
 
 # Register tests with CTest
 include(GoogleTest)
+
+foreach(audio_test IN ITEMS audio_sample audio_clip ring_buffer audio_stream)
+    add_executable(${audio_test}_tests ${audio_test}_test.cpp)
+    target_link_libraries(${audio_test}_tests PRIVATE alia GTest::gtest GTest::gtest_main)
+    gtest_discover_tests(${audio_test}_tests)
+endforeach()
 gtest_discover_tests(cstring_view_tests)
 gtest_discover_tests(array_map_tests)
 gtest_discover_tests(vec_tests)

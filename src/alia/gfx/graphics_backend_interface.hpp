@@ -2,6 +2,7 @@
 #define GRAPHICS_BACKEND_INTERFACE_C6537708_AD74_4B03_AB5F_5848902518DF
 
 #include "../core/color.hpp"
+#include "../core/backend_op.hpp"
 #include "../core/rect.hpp"
 #include "../core/vec.hpp"
 #include "bitmap/pixel.hpp"
@@ -20,35 +21,12 @@
 
 namespace alia {
 
-    struct unsupported_operation_exception : std::runtime_error {
-        using std::runtime_error::runtime_error;
-    };
-
     struct shader_error : std::runtime_error {
         using std::runtime_error::runtime_error;
     };
 
-    template <class R, class... Args>
-    struct gfx_backend_op;
-
-    // One backend operation slot. A null operation means the hardware lacks
-    // the feature (probed at device creation), never that the backend has not
-    // implemented it yet; reason_unsupported then says why.
-    template <class R, class... Args>
-    struct gfx_backend_op<R(Args...)> {
-        R (*operation)(Args...) = nullptr;
-        std::optional<std::string> reason_unsupported;
-
-        [[nodiscard]] bool is_supported() const noexcept {
-            return operation != nullptr;
-        }
-
-        auto get_or_throw() const -> R (*)(Args...) {
-            if (operation)
-                return operation;
-            throw unsupported_operation_exception(reason_unsupported.value_or("operation not supported by this backend"));
-        }
-    };
+    template <class Signature>
+    using gfx_backend_op = backend_op<Signature>;
 
     // Opaque bases. Concrete backend handles inherit these types and are only
     // downcast inside their own backend implementation files. 2D and cube
