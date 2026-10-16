@@ -49,22 +49,27 @@ namespace alia {
         [[nodiscard]] pixel_format format() const noexcept {
             return pixel_format_;
         }
+
         /// @returns Width of the view in pixels.
         [[nodiscard]] int width() const noexcept {
             return width_;
         }
+
         /// @returns Height of the view in pixels.
         [[nodiscard]] int height() const noexcept {
             return height_;
         }
+
         /// @returns Dimensions of the view in pixels.
         [[nodiscard]] vec2i size() const noexcept {
             return {width_, height_};
         }
+
         /// @returns Bounds of the view in its own coordinate space.
         [[nodiscard]] rect_i rect() const noexcept {
             return rect_i{{0, 0}, size()};
         }
+
         /// @returns Row stride in bytes.
         [[nodiscard]] int stride_bytes() const noexcept {
             return stride_bytes_;
@@ -140,18 +145,22 @@ namespace alia {
         [[nodiscard]] int width() const noexcept {
             return width_;
         }
+
         /// @returns Height of the view in pixels.
         [[nodiscard]] int height() const noexcept {
             return height_;
         }
+
         /// @returns Dimensions of the view in pixels.
         [[nodiscard]] vec2i size() const noexcept {
             return {width_, height_};
         }
+
         /// @returns Bounds of the view in its own coordinate space.
         [[nodiscard]] rect_i rect() const noexcept {
             return rect_i{{0, 0}, size()};
         }
+
         /// @returns Row stride in bytes.
         [[nodiscard]] int stride_bytes() const noexcept {
             return stride_bytes_;
@@ -187,7 +196,9 @@ namespace alia {
         auto line(this auto &&self, int y) noexcept {
             using SelfT = std::remove_reference_t<decltype(self)>;
             if constexpr (std::is_const_v<SelfT>)
-                return std::span<const TPixel>(reinterpret_cast<const TPixel *>(self.data_ + y * self.stride_bytes_), self.width_);
+                return std::span<const TPixel>(
+                    reinterpret_cast<const TPixel *>(self.data_ + y * self.stride_bytes_), self.width_
+                );
             else
                 return std::span<TPixel>(reinterpret_cast<TPixel *>(self.data_ + y * self.stride_bytes_), self.width_);
         }
@@ -216,7 +227,8 @@ namespace alia {
         bitmap_view subview(this auto &&self, rect_i region) noexcept {
             const rect_i bounds{{0, 0}, {self.width_, self.height_}};
             const rect_i clamped = bounds.intersection_with(region);
-            std::byte *ptr = self.data_ + clamped.top() * self.stride_bytes_ + clamped.left() * static_cast<int>(sizeof(TPixel));
+            std::byte *ptr =
+                self.data_ + clamped.top() * self.stride_bytes_ + clamped.left() * static_cast<int>(sizeof(TPixel));
             return bitmap_view(clamped.width(), clamped.height(), self.stride_bytes_, ptr);
         }
 
@@ -261,7 +273,8 @@ namespace alia {
          */
         template <pixel TPixel>
         bitmap(vec2i size, std::span<const TPixel> pixels)
-            : pixel_format_(TPixel::format_id), width_(size.x), height_(size.y), stride_bytes_(size.x * static_cast<int>(sizeof(TPixel))),
+            : pixel_format_(TPixel::format_id), width_(size.x), height_(size.y),
+              stride_bytes_(size.x * static_cast<int>(sizeof(TPixel))),
               data_(std::make_unique<std::byte[]>(static_cast<std::size_t>(stride_bytes_) * size.y)) {
             std::memcpy(data_.get(), pixels.data(), static_cast<std::size_t>(stride_bytes_) * height_);
         }
@@ -305,7 +318,8 @@ namespace alia {
          */
         template <pixel TPixel>
         bitmap(vec2i size, TPixel color = {})
-            : pixel_format_(TPixel::format_id), width_(size.x), height_(size.y), stride_bytes_(size.x * static_cast<int>(sizeof(TPixel))),
+            : pixel_format_(TPixel::format_id), width_(size.x), height_(size.y),
+              stride_bytes_(size.x * static_cast<int>(sizeof(TPixel))),
               data_(std::make_unique<std::byte[]>(static_cast<std::size_t>(stride_bytes_) * size.y)) {
             auto *pixels = reinterpret_cast<TPixel *>(data_.get());
             const std::size_t n = static_cast<std::size_t>(width_) * height_;
@@ -322,22 +336,27 @@ namespace alia {
         [[nodiscard]] pixel_format format() const noexcept {
             return pixel_format_;
         }
+
         /// @returns Width in pixels.
         [[nodiscard]] int width() const noexcept {
             return width_;
         }
+
         /// @returns Height in pixels.
         [[nodiscard]] int height() const noexcept {
             return height_;
         }
+
         /// @returns Dimensions of the bitmap in pixels.
         [[nodiscard]] vec2i size() const noexcept {
             return {width_, height_};
         }
+
         /// @returns Bounds of the bitmap in its own coordinate space.
         [[nodiscard]] rect_i rect() const noexcept {
             return rect_i{{0, 0}, size()};
         }
+
         /// @returns Row stride in bytes.
         [[nodiscard]] int stride_bytes() const noexcept {
             return stride_bytes_;
@@ -414,7 +433,8 @@ namespace alia {
                 throw std::invalid_argument(std::string(operation) + ": source and destination sizes differ");
         }
 
-        [[nodiscard]] inline blit_rects resolve_blit_rects(rect_i dst_bounds, rect_i src_bounds, rect_i src_rect, vec2i dst_pos) {
+        [[nodiscard]] inline blit_rects
+        resolve_blit_rects(rect_i dst_bounds, rect_i src_bounds, rect_i src_rect, vec2i dst_pos) {
             if (src_rect.width() <= 0 || src_rect.height() <= 0)
                 return {};
 
@@ -471,13 +491,13 @@ namespace alia {
     template <pixel TDstPixel, pixel TSrcPixel>
         requires is_convert_pixel_allowed_v<TSrcPixel, TDstPixel>
     void converting_blit(bitmap_view<TDstPixel> dst, bitmap_view<TSrcPixel> src) {
-        converting_blit(dst, src, [](TSrcPixel px) {
-            return convert_pixel<TDstPixel>(px);
-        });
+        converting_blit(dst, src, [](TSrcPixel px) { return convert_pixel<TDstPixel>(px); });
     }
 
     template <pixel TDstPixel, pixel TSrcPixel, typename Conv>
-    void converting_blit(bitmap_view<TDstPixel> dst, bitmap_view<TSrcPixel> src, rect_i src_rect, vec2i dst_pos, Conv &&converter) {
+    void converting_blit(
+        bitmap_view<TDstPixel> dst, bitmap_view<TSrcPixel> src, rect_i src_rect, vec2i dst_pos, Conv &&converter
+    ) {
         const detail::blit_rects rects = detail::resolve_blit_rects(dst.rect(), src.rect(), src_rect, dst_pos);
         if (rects.dst.width() <= 0 || rects.dst.height() <= 0)
             return;
@@ -493,9 +513,7 @@ namespace alia {
     template <pixel TDstPixel, pixel TSrcPixel>
         requires is_convert_pixel_allowed_v<TSrcPixel, TDstPixel>
     void converting_blit(bitmap_view<TDstPixel> dst, bitmap_view<TSrcPixel> src, rect_i src_rect, vec2i dst_pos) {
-        converting_blit(dst, src, src_rect, dst_pos, [](TSrcPixel px) {
-            return convert_pixel<TDstPixel>(px);
-        });
+        converting_blit(dst, src, src_rect, dst_pos, [](TSrcPixel px) { return convert_pixel<TDstPixel>(px); });
     }
 
     void converting_blit(any_bitmap_view dst, any_bitmap_view src);

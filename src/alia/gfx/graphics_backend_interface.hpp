@@ -33,10 +33,15 @@ namespace alia {
     // textures share texture_handle; concrete texture records carry their kind
     // and shared texture operations dispatch on it.
     struct device_handle {};
+
     struct texture_handle {};
+
     struct vertex_buffer_handle {};
+
     struct index_buffer_handle {};
+
     struct swapchain_handle {};
+
     struct shader_program_handle {};
 
     enum class gfx_backend {
@@ -53,6 +58,7 @@ namespace alia {
         suggest, // Request synchronization, but allow creation without control.
         require  // Request synchronization; fail creation if rejected.
     };
+
     struct swapchain_desc {
         vsync_mode vsync = vsync_mode::disable;
         framebuffer_config framebuffer;
@@ -109,12 +115,14 @@ namespace alia {
         std::string_view entry_point = "main";
         std::string_view profile;
     };
+
     /// Both stages for one backend; auto_ is the fallback for backends without their own entry.
     struct shader_program_source {
         gfx_backend backend = gfx_backend::auto_;
         shader_stage_source vertex;
         shader_stage_source pixel;
     };
+
     struct shader_program_desc {
         std::span<const shader_program_source> sources;
         /// Optional; stage names in compile errors are derived from it.
@@ -129,14 +137,19 @@ namespace alia {
             return name;
         }
     } // namespace detail
+
     struct shader_register {
-        enum class kind { float4, int4 };
+        enum class kind {
+            float4,
+            int4
+        };
         kind kind;
         int index;
 
         static constexpr shader_register c(int index) noexcept {
             return {kind::float4, index};
         }
+
         static constexpr shader_register i(int index) noexcept {
             return {kind::int4, index};
         }
@@ -152,11 +165,13 @@ namespace alia {
         int_4,
         matrix_4x4,
     };
+
     struct shader_constant_payload {
         shader_constant_value_type type = shader_constant_value_type::float_1;
         std::span<const float> floats;
         std::span<const int> ints;
     };
+
     struct shader_constant_slot {
         bool valid = false;
         shader_type stage = shader_type::vertex;
@@ -165,6 +180,7 @@ namespace alia {
         // Declared shader type, or nullopt when reflection is unavailable.
         std::optional<shader_constant_value_type> type;
     };
+
     struct shader_sampler_slot {
         bool valid = false;
         shader_type stage = shader_type::pixel;
@@ -179,15 +195,28 @@ namespace alia {
         texture_wrap wrap_u = texture_wrap::clamp;
         texture_wrap wrap_v = texture_wrap::clamp;
     };
+
     inline constexpr sampler_state linear_clamp{};
     inline constexpr sampler_state linear_wrap{
-        texture_filter::linear, texture_filter::linear, texture_filter::linear, texture_wrap::repeat, texture_wrap::repeat
+        texture_filter::linear,
+        texture_filter::linear,
+        texture_filter::linear,
+        texture_wrap::repeat,
+        texture_wrap::repeat
     };
     inline constexpr sampler_state nearest_clamp{
-        texture_filter::nearest, texture_filter::nearest, texture_filter::nearest, texture_wrap::clamp, texture_wrap::clamp
+        texture_filter::nearest,
+        texture_filter::nearest,
+        texture_filter::nearest,
+        texture_wrap::clamp,
+        texture_wrap::clamp
     };
     inline constexpr sampler_state nearest_wrap{
-        texture_filter::nearest, texture_filter::nearest, texture_filter::nearest, texture_wrap::repeat, texture_wrap::repeat
+        texture_filter::nearest,
+        texture_filter::nearest,
+        texture_filter::nearest,
+        texture_wrap::repeat,
+        texture_wrap::repeat
     };
 
     struct texture_lock_info {
@@ -198,6 +227,7 @@ namespace alia {
         int face = 0; // Locked cube face; zero for 2D textures.
         std::byte *data = nullptr;
     };
+
     struct buffer_lock_info {
         int offset_bytes = 0;
         int size_bytes = 0;
@@ -250,6 +280,7 @@ namespace alia {
         float min_depth = 0.0f;
         float max_depth = 1.0f;
     };
+
     struct blend_state {
         bool enabled = false;
         blend_factor src = blend_factor::src_alpha;
@@ -257,18 +288,22 @@ namespace alia {
         blend_op op = blend_op::add;
         bool operator==(const blend_state &) const = default;
     };
+
     inline constexpr blend_state alpha_blend{true};
     inline constexpr blend_state no_blend{};
     // Add the source color weighted by its alpha to the destination.
     inline constexpr blend_state additive_blend{true, blend_factor::src_alpha, blend_factor::one};
+
     struct depth_state {
         bool test_enabled = false;
         bool write_enabled = false;
         compare_func compare = compare_func::less_equal;
         bool operator==(const depth_state &) const = default;
     };
+
     inline constexpr depth_state depth_test{true, false, compare_func::less_equal};
     inline constexpr depth_state depth_test_write{true, true, compare_func::less_equal};
+
     struct raster_state {
         cull_mode cull = cull_mode::none;
     };
@@ -278,16 +313,19 @@ namespace alia {
         texture_handle *texture = nullptr;
         sampler_state sampler = {};
     };
+
     struct vertex_definition_view {
         std::size_t index = 0;
         int stride = 0;
         std::span<const vertex_element> elements;
     };
+
     struct instance_definition_view {
         std::size_t index = 0;
         int stride = 0;
         std::span<const instance_element> elements;
     };
+
     struct render_state {
         shader_program_handle *shader = nullptr;
         vertex_definition_view vertex_layout;
@@ -302,16 +340,19 @@ namespace alia {
         // Resolved by L3: an enabled fog mode, with no shader selected.
         bool fog = false;
     };
+
     // Row vectors are transformed by world, then view, then projection.
     struct transform_state {
         transform world = transform::identity();
         transform view = transform::identity();
         transform projection = transform::identity();
     };
+
     struct lighting_state {
         color ambient = black;
         std::span<const light> lights;
     };
+
     struct render_target_info {
         swapchain_handle *swapchain = nullptr;
         texture_handle *target_texture = nullptr;
@@ -348,7 +389,10 @@ namespace alia {
         /// @param role Whether the texture stores color or an alpha mask.
         /// @param usage Whether the texture is for sampling only or can be a render target.
         /// @return New texture handle, or null if the format is unsupported or creation fails.
-        gfx_backend_op<texture_handle *(device_handle *device, pixel_format format, vec2i size, int mip_levels, texture_role role, texture_usage usage)> create_texture;
+        gfx_backend_op<texture_handle
+                           *(device_handle *device, pixel_format format, vec2i size, int mip_levels, texture_role role,
+                             texture_usage usage)>
+            create_texture;
 
         /// @brief Query support for an exact 2D texture format without creating a texture.
         /// @param device Device that would own the texture.
@@ -357,7 +401,9 @@ namespace alia {
         /// @param role Whether the texture stores color or an alpha mask.
         /// @param usage Whether the texture is for sampling only or can be a render target.
         /// @return True if the requested format is supported for these settings.
-        gfx_backend_op<bool(device_handle *device, pixel_format format, int mip_levels, texture_role role, texture_usage usage)> texture_format_supported;
+        gfx_backend_op<
+            bool(device_handle *device, pixel_format format, int mip_levels, texture_role role, texture_usage usage)>
+            texture_format_supported;
 
         /// @brief Create an uninitialized cube texture with six square faces.
         /// @param device Device that will own the texture.
@@ -366,7 +412,9 @@ namespace alia {
         /// @param mip_levels Number of levels; one means no mipmaps, zero requests a full chain.
         /// @param usage Whether the texture is for sampling only or can be a render target.
         /// @return New cube texture handle, or null if the format is unsupported or creation fails.
-        gfx_backend_op<texture_handle *(device_handle *device, pixel_format format, int edge, int mip_levels, texture_usage usage)> create_cube_texture;
+        gfx_backend_op<
+            texture_handle *(device_handle *device, pixel_format format, int edge, int mip_levels, texture_usage usage)>
+            create_cube_texture;
 
         /// @brief Query support for an exact color cube texture format without creating a texture.
         /// @param device Device that would own the texture.
@@ -374,7 +422,8 @@ namespace alia {
         /// @param mip_levels Number of levels; one means no mipmaps, zero requests a full chain.
         /// @param usage Whether the texture is for sampling only or can be a render target.
         /// @return True if the requested format is supported for these settings.
-        gfx_backend_op<bool(device_handle *device, pixel_format format, int mip_levels, texture_usage usage)> cube_texture_format_supported;
+        gfx_backend_op<bool(device_handle *device, pixel_format format, int mip_levels, texture_usage usage)>
+            cube_texture_format_supported;
 
         /// @brief Release a 2D or cube texture handle and its backend resource.
         /// @param texture Texture handle to release.
@@ -417,9 +466,13 @@ namespace alia {
         /// @param region Requested rectangle in mip-level pixel coordinates.
         /// @param level Mip level to lock, where zero is the base level.
         /// @param mode Whether the caller reads, writes, or both; write-only locks need not preserve old contents.
-        /// @param info Output lock record; on success describes the clipped accessible origin, extent, byte stride, level, face zero, and data pointer. It is usable only when the call returns true.
-        /// @return True if the region was locked and `info` was populated; false if it could not be locked or the rectangle does not overlap the mip level.
-        gfx_backend_op<bool(texture_handle *texture, rect_i region, int level, texture_lock_mode mode, texture_lock_info &info)> texture_lock;
+        /// @param info Output lock record; on success describes the clipped accessible origin, extent, byte stride,
+        /// level, face zero, and data pointer. It is usable only when the call returns true.
+        /// @return True if the region was locked and `info` was populated; false if it could not be locked or the
+        /// rectangle does not overlap the mip level.
+        gfx_backend_op<
+            bool(texture_handle *texture, rect_i region, int level, texture_lock_mode mode, texture_lock_info &info)>
+            texture_lock;
 
         /// @brief Lock a rectangular region of one cube-texture face and mip level for CPU access.
         /// @param texture Cube texture to lock.
@@ -427,14 +480,21 @@ namespace alia {
         /// @param region Requested rectangle in face mip-level pixel coordinates.
         /// @param level Mip level to lock, where zero is the base level.
         /// @param mode Whether the caller reads, writes, or both; write-only locks need not preserve old contents.
-        /// @param info Output lock record; on success describes the clipped accessible origin, extent, byte stride, level, face, and data pointer. It is usable only when the call returns true.
-        /// @return True if the face region was locked and `info` was populated; false if it could not be locked or the rectangle does not overlap the face mip level.
-        gfx_backend_op<bool(texture_handle *texture, cube_face face, rect_i region, int level, texture_lock_mode mode, texture_lock_info &info)> cube_texture_lock;
+        /// @param info Output lock record; on success describes the clipped accessible origin, extent, byte stride,
+        /// level, face, and data pointer. It is usable only when the call returns true.
+        /// @return True if the face region was locked and `info` was populated; false if it could not be locked or the
+        /// rectangle does not overlap the face mip level.
+        gfx_backend_op<bool(
+            texture_handle *texture, cube_face face, rect_i region, int level, texture_lock_mode mode,
+            texture_lock_info &info
+        )>
+            cube_texture_lock;
 
         /// @brief Release a previously successful texture lock and commit writes when requested.
         /// @param texture Texture whose level or face is locked.
         /// @param info Lock record returned by `texture_lock` or `cube_texture_lock` for this lock.
-        /// @param wrote True if the caller may have changed pixels and the region must be committed; false for read-only access.
+        /// @param wrote True if the caller may have changed pixels and the region must be committed; false for
+        /// read-only access.
         /// @return Nothing.
         gfx_backend_op<void(texture_handle *texture, const texture_lock_info &info, bool wrote)> texture_unlock;
 
@@ -452,12 +512,17 @@ namespace alia {
         /// @param device Device whose current render target supplies the pixels.
         /// @param destination Destination texture; may be 2D or cube.
         /// @param source_region Rectangle in current-target pixel coordinates.
-        /// @param source_size Size of the current render target in pixels, used to translate top-left source coordinates for the backend.
+        /// @param source_size Size of the current render target in pixels, used to translate top-left source
+        /// coordinates for the backend.
         /// @param destination_origin Top-left destination pixel in the selected mip level.
         /// @param destination_level Destination mip level, where zero is the base level.
         /// @param destination_face Destination cube face index; zero for a 2D texture.
         /// @return True if the region was copied; false if the source, format, or destination cannot be copied.
-        gfx_backend_op<bool(device_handle *device, texture_handle *destination, rect_i source_region, vec2i source_size, vec2i destination_origin, int destination_level, int destination_face)> copy_render_target_to_texture;
+        gfx_backend_op<bool(
+            device_handle *device, texture_handle *destination, rect_i source_region, vec2i source_size,
+            vec2i destination_origin, int destination_level, int destination_face
+        )>
+            copy_render_target_to_texture;
 
         /// @brief Allocate a vertex buffer and optionally initialize all its vertices.
         /// @param device Device that will own the buffer.
@@ -466,7 +531,10 @@ namespace alia {
         /// @param usage Static or dynamic buffer usage hint.
         /// @param initial_data Optional pointer to `vertex_count * vertex_stride` initial bytes; may be null.
         /// @return New vertex-buffer handle, or null if allocation fails.
-        gfx_backend_op<vertex_buffer_handle *(device_handle *device, int vertex_stride, int vertex_count, buffer_usage usage, const void *initial_data)> create_vertex_buffer;
+        gfx_backend_op<vertex_buffer_handle *(
+            device_handle *device, int vertex_stride, int vertex_count, buffer_usage usage, const void *initial_data
+        )>
+            create_vertex_buffer;
 
         /// @brief Release a vertex buffer and its backend resource.
         /// @param buffer Vertex buffer to release.
@@ -495,14 +563,19 @@ namespace alia {
         /// @param mode Whether the caller reads, writes, or both; write-only locks need not preserve old contents.
         /// @param info Output lock record; on success gives byte offset, byte size, and the first accessible data byte.
         /// @return True if the range was locked and `info` was populated; false if it could not be locked.
-        gfx_backend_op<bool(vertex_buffer_handle *buffer, int first_vertex, int vertex_count, buffer_lock_mode mode, buffer_lock_info &info)> vertex_buffer_lock;
+        gfx_backend_op<bool(
+            vertex_buffer_handle *buffer, int first_vertex, int vertex_count, buffer_lock_mode mode,
+            buffer_lock_info &info
+        )>
+            vertex_buffer_lock;
 
         /// @brief Release a previously successful vertex-buffer lock and commit writes when requested.
         /// @param buffer Locked vertex buffer.
         /// @param info Lock record returned by `vertex_buffer_lock` for this lock.
         /// @param wrote True if the caller may have changed vertices; false for read-only access.
         /// @return Nothing.
-        gfx_backend_op<void(vertex_buffer_handle *buffer, const buffer_lock_info &info, bool wrote)> vertex_buffer_unlock;
+        gfx_backend_op<void(vertex_buffer_handle *buffer, const buffer_lock_info &info, bool wrote)>
+            vertex_buffer_unlock;
 
         /// @brief Allocate an index buffer and optionally initialize all its indices.
         /// @param device Device that will own the buffer.
@@ -511,7 +584,10 @@ namespace alia {
         /// @param usage Static or dynamic buffer usage hint.
         /// @param initial_data Optional pointer to `index_count` indices; may be null.
         /// @return New index-buffer handle, or null if allocation fails.
-        gfx_backend_op<index_buffer_handle *(device_handle *device, index_format format, int index_count, buffer_usage usage, const void *initial_data)> create_index_buffer;
+        gfx_backend_op<index_buffer_handle *(
+            device_handle *device, index_format format, int index_count, buffer_usage usage, const void *initial_data
+        )>
+            create_index_buffer;
 
         /// @brief Release an index buffer and its backend resource.
         /// @param buffer Index buffer to release.
@@ -535,7 +611,10 @@ namespace alia {
         /// @param mode Whether the caller reads, writes, or both; write-only locks need not preserve old contents.
         /// @param info Output lock record; on success gives byte offset, byte size, and the first accessible data byte.
         /// @return True if the range was locked and `info` was populated; false if it could not be locked.
-        gfx_backend_op<bool(index_buffer_handle *buffer, int first_index, int index_count, buffer_lock_mode mode, buffer_lock_info &info)> index_buffer_lock;
+        gfx_backend_op<bool(
+            index_buffer_handle *buffer, int first_index, int index_count, buffer_lock_mode mode, buffer_lock_info &info
+        )>
+            index_buffer_lock;
 
         /// @brief Release a previously successful index-buffer lock and commit writes when requested.
         /// @param buffer Locked index buffer.
@@ -547,8 +626,10 @@ namespace alia {
         /// @brief Create a program from vertex and pixel source text or backend bytecode.
         /// @param device Device that will own the program.
         /// @param description Shader sources; each supplies exactly one of text and bytecode.
-        /// @return New shader-program handle. Compilation, linking, or invalid source errors are reported by throwing `shader_error`.
-        gfx_backend_op<shader_program_handle *(device_handle *device, const shader_program_desc &description)> create_shader_program;
+        /// @return New shader-program handle. Compilation, linking, or invalid source errors are reported by throwing
+        /// `shader_error`.
+        gfx_backend_op<shader_program_handle *(device_handle *device, const shader_program_desc &description)>
+            create_shader_program;
 
         /// @brief Release a compiled shader program.
         /// @param program Shader program to release.
@@ -559,32 +640,47 @@ namespace alia {
         /// @param program Program containing the constant.
         /// @param name Constant name as used by the shader.
         /// @param stage Shader stage that owns the constant; OpenGL uniforms are program-wide.
-        /// @param explicit_register Optional register for bytecode without reflection; checked against reflection when available. OpenGL ignores it.
-        /// @return A slot with the reflected type when known, or an invalid slot when reflection exists but the name is absent or optimized out.
-        /// @throws shader_error For unsupported declared types (including bool, mat3, arrays and structs), a register mismatch, or missing reflection without an explicit register.
-        gfx_backend_op<shader_constant_slot(shader_program_handle *program, std::string_view name, shader_type stage, std::optional<shader_register> explicit_register)> shader_lookup_constant;
+        /// @param explicit_register Optional register for bytecode without reflection; checked against reflection when
+        /// available. OpenGL ignores it.
+        /// @return A slot with the reflected type when known, or an invalid slot when reflection exists but the name is
+        /// absent or optimized out.
+        /// @throws shader_error For unsupported declared types (including bool, mat3, arrays and structs), a register
+        /// mismatch, or missing reflection without an explicit register.
+        gfx_backend_op<shader_constant_slot(
+            shader_program_handle *program, std::string_view name, shader_type stage,
+            std::optional<shader_register> explicit_register
+        )>
+            shader_lookup_constant;
 
         /// @brief Record a shader constant value for application when the program is used.
         /// @param program Program whose constant state is updated.
         /// @param slot Valid constant slot returned by `shader_lookup_constant`.
         /// @param payload Typed scalar, vector, or matrix data to store; its spans must remain valid for this call.
         /// @return Nothing.
-        gfx_backend_op<void(shader_program_handle *program, const shader_constant_slot &slot, const shader_constant_payload &payload)> shader_set_constant;
+        gfx_backend_op<void(
+            shader_program_handle *program, const shader_constant_slot &slot, const shader_constant_payload &payload
+        )>
+            shader_set_constant;
 
         /// @brief Find a named shader sampler and describe its location and texture unit.
         /// @param program Program containing the sampler.
         /// @param name Sampler name as used by the shader.
         /// @param stage Shader stage that owns the sampler.
-        /// @param unit Texture unit to assign; D3D9 returns the reflected s# register when known and otherwise trusts this unit.
-        /// @return A valid slot when found, or an invalid slot when reflection exists but the name is absent. OpenGL records the unit even if no texture is assigned.
-        gfx_backend_op<shader_sampler_slot(shader_program_handle *program, std::string_view name, shader_type stage, int unit)> shader_lookup_sampler;
+        /// @param unit Texture unit to assign; D3D9 returns the reflected s# register when known and otherwise trusts
+        /// this unit.
+        /// @return A valid slot when found, or an invalid slot when reflection exists but the name is absent. OpenGL
+        /// records the unit even if no texture is assigned.
+        gfx_backend_op<
+            shader_sampler_slot(shader_program_handle *program, std::string_view name, shader_type stage, int unit)>
+            shader_lookup_sampler;
 
         /// @brief Record the texture assigned to a shader sampler for application when the program is used.
         /// @param program Program whose sampler state is updated.
         /// @param slot Valid sampler slot returned by `shader_lookup_sampler`.
         /// @param texture Texture to assign, or null to clear the sampler binding.
         /// @return Nothing.
-        gfx_backend_op<void(shader_program_handle *program, const shader_sampler_slot &slot, texture_handle *texture)> shader_set_sampler;
+        gfx_backend_op<void(shader_program_handle *program, const shader_sampler_slot &slot, texture_handle *texture)>
+            shader_set_sampler;
 
         /// @brief Create a swapchain for a native window surface.
         /// @param device Device that will own the swapchain.
@@ -592,7 +688,10 @@ namespace alia {
         /// @param size Initial surface size in pixels.
         /// @param description Requested vsync and framebuffer properties.
         /// @return New swapchain handle, or null if it cannot be created.
-        gfx_backend_op<swapchain_handle *(device_handle *device, void *native_surface, vec2i size, const swapchain_desc &description)> create_swapchain;
+        gfx_backend_op<swapchain_handle *(
+            device_handle *device, void *native_surface, vec2i size, const swapchain_desc &description
+        )>
+            create_swapchain;
 
         /// @brief Release a swapchain and its surface-dependent resources.
         /// @param swapchain Swapchain to release.
@@ -601,7 +700,8 @@ namespace alia {
 
         /// @brief Report the actual framebuffer properties provided by a swapchain.
         /// @param swapchain Swapchain to query.
-        /// @return Properties selected by the backend, including color, depth, stencil, multisampling, and regional-update support.
+        /// @return Properties selected by the backend, including color, depth, stencil, multisampling, and
+        /// regional-update support.
         gfx_backend_op<framebuffer_properties(const swapchain_handle *swapchain)> swapchain_properties;
 
         /// @brief Prepare the swapchain backend for rendering a new frame.
@@ -609,7 +709,8 @@ namespace alia {
         /// @return Nothing.
         gfx_backend_op<void(swapchain_handle *swapchain)> swapchain_begin_frame;
 
-        /// @brief Finish rendering on a swapchain without presenting its backbuffer and clear recorded transient draw sources.
+        /// @brief Finish rendering on a swapchain without presenting its backbuffer and clear recorded transient draw
+        /// sources.
         /// @param swapchain Swapchain whose frame is ending.
         /// @return Nothing.
         gfx_backend_op<void(swapchain_handle *swapchain)> swapchain_end_frame;
@@ -622,7 +723,8 @@ namespace alia {
         /// @brief Present only a rectangular portion of the completed swapchain backbuffer when supported.
         /// @param swapchain Swapchain to present.
         /// @param region Rectangle in swapchain pixel coordinates to update.
-        /// @return True if the requested region was presented; false if the backend could not perform the regional update.
+        /// @return True if the requested region was presented; false if the backend could not perform the regional
+        /// update.
         gfx_backend_op<bool(swapchain_handle *swapchain, rect_i region)> swapchain_present_region;
 
         /// @brief Resize swapchain-dependent buffers and state after the native surface changes size.
@@ -671,9 +773,11 @@ namespace alia {
         /// @param fog Parameters to apply; distances follow caps.fog_distance.
         gfx_backend_op<void(device_handle *device, const fog_state &fog)> set_fog;
 
-        /// @brief Select the swapchain backbuffer or a texture mip/face as the current render target and reset the viewport to its full extent.
+        /// @brief Select the swapchain backbuffer or a texture mip/face as the current render target and reset the
+        /// viewport to its full extent.
         /// @param device Device whose render target is changed.
-        /// @param target Target description; exactly one of `swapchain` and `target_texture` identifies the target, with level, face, and size describing texture targets.
+        /// @param target Target description; exactly one of `swapchain` and `target_texture` identifies the target,
+        /// with level, face, and size describing texture targets.
         /// @return True if the target was selected; false if it is incomplete or unsupported.
         gfx_backend_op<bool(device_handle *device, const render_target_info &target)> set_render_target;
 
@@ -682,7 +786,10 @@ namespace alia {
         /// @param clear_color Optional color value; absent leaves color unchanged.
         /// @param clear_depth Optional depth value; absent leaves depth unchanged.
         /// @return True if the requested clear succeeded or no attachments were requested; false on backend failure.
-        gfx_backend_op<bool(device_handle *device, const std::optional<color> &clear_color, const std::optional<float> &clear_depth)> clear;
+        gfx_backend_op<bool(
+            device_handle *device, const std::optional<color> &clear_color, const std::optional<float> &clear_depth
+        )>
+            clear;
 
         /// @brief Set the current render viewport and depth range.
         /// @param device Device whose viewport is changed.
@@ -709,22 +816,28 @@ namespace alia {
         /// @return Nothing.
         gfx_backend_op<void(device_handle *device, index_buffer_handle *buffer)> bind_index_buffer;
 
-        /// @brief Record caller-owned vertex bytes as the source for subsequent draw calls in this frame; the backend does not copy the bytes.
+        /// @brief Record caller-owned vertex bytes as the source for subsequent draw calls in this frame; the backend
+        /// does not copy the bytes.
         /// @param device Device receiving the transient source.
-        /// @param data Address of the first byte of vertex data; it must remain valid through the next vertex bind/upload or frame end.
+        /// @param data Address of the first byte of vertex data; it must remain valid through the next vertex
+        /// bind/upload or frame end.
         /// @param byte_count Number of valid bytes beginning at `data`.
         /// @return Nothing.
         gfx_backend_op<void(device_handle *device, const void *data, int byte_count)> upload_transient_vertex_data;
 
-        /// @brief Record caller-owned indices as the source for subsequent indexed draws in this frame; the backend does not copy the indices.
+        /// @brief Record caller-owned indices as the source for subsequent indexed draws in this frame; the backend
+        /// does not copy the indices.
         /// @param device Device receiving the transient source.
-        /// @param indices Index values; the referenced storage must remain valid through the next index bind/upload or frame end.
+        /// @param indices Index values; the referenced storage must remain valid through the next index bind/upload or
+        /// frame end.
         /// @param index_count Number of indices in the source.
         /// @param format Index width; u32 is only requested when caps.index32 is true.
         /// @return Nothing.
-        gfx_backend_op<void(device_handle *device, const void *indices, int index_count, index_format format)> upload_transient_index_data;
+        gfx_backend_op<void(device_handle *device, const void *indices, int index_count, index_format format)>
+            upload_transient_index_data;
 
-        /// @brief Record a texture and sampler state for a slot; a null texture clears that slot, and the recorded binding is consumed at draw time.
+        /// @brief Record a texture and sampler state for a slot; a null texture clears that slot, and the recorded
+        /// binding is consumed at draw time.
         /// @param device Device whose resource binding is changed.
         /// @param binding Slot, optional texture, and sampler configuration; a null texture clears that slot.
         /// @return Nothing.
@@ -736,7 +849,8 @@ namespace alia {
         /// @param vertex_count Number of vertices to consume from the selected source.
         /// @param first_vertex First vertex in the bound buffer or transient data source.
         /// @return Nothing.
-        gfx_backend_op<void(device_handle *device, primitive_topology topology, int vertex_count, int first_vertex)> draw;
+        gfx_backend_op<void(device_handle *device, primitive_topology topology, int vertex_count, int first_vertex)>
+            draw;
 
         /// @brief Submit an indexed draw using the current render state and recorded vertex and index sources.
         /// @param device Device on which to draw.
@@ -745,7 +859,9 @@ namespace alia {
         /// @param first_index First index in the bound index buffer or transient index span.
         /// @param base_vertex Vertex offset added to each index before fetching from the vertex source.
         /// @return Nothing.
-        gfx_backend_op<void(device_handle *device, primitive_topology topology, int index_count, int first_index, int base_vertex)> draw_indexed;
+        gfx_backend_op<
+            void(device_handle *device, primitive_topology topology, int index_count, int first_index, int base_vertex)>
+            draw_indexed;
 
         /// @brief Submit a shader draw of repeated geometry using the recorded vertex and instance buffers.
         /// Null, with reason_unsupported, when caps.instancing is false.
@@ -756,7 +872,11 @@ namespace alia {
         /// @param instance_count Number of copies of the geometry to draw.
         /// @param first_instance First record in the instance buffer, applied as a stream offset.
         /// @return Nothing.
-        gfx_backend_op<void(device_handle *device, primitive_topology topology, int vertex_count, int first_vertex, int instance_count, int first_instance)> draw_instanced;
+        gfx_backend_op<void(
+            device_handle *device, primitive_topology topology, int vertex_count, int first_vertex, int instance_count,
+            int first_instance
+        )>
+            draw_instanced;
 
         /// @brief Submit a shader draw of repeated indexed geometry using the recorded buffers.
         /// Null, with reason_unsupported, when caps.instancing is false.
@@ -768,7 +888,11 @@ namespace alia {
         /// @param instance_count Number of copies of the geometry to draw.
         /// @param first_instance First record in the instance buffer, applied as a stream offset.
         /// @return Nothing.
-        gfx_backend_op<void(device_handle *device, primitive_topology topology, int index_count, int first_index, int base_vertex, int instance_count, int first_instance)> draw_indexed_instanced;
+        gfx_backend_op<void(
+            device_handle *device, primitive_topology topology, int index_count, int first_index, int base_vertex,
+            int instance_count, int first_instance
+        )>
+            draw_indexed_instanced;
     };
 
     struct created_device {
@@ -776,13 +900,17 @@ namespace alia {
         // Not "interface": that is a macro in MinGW's COM headers.
         graphics_backend_interface iface;
     };
+
     struct gfx_backend_factory {
         gfx_backend id;
-        /// @brief Select an adapter and render method, create a device, probe capabilities, and build the full interface.
+        /// @brief Select an adapter and render method, create a device, probe capabilities, and build the full
+        /// interface.
         /// @param config Adapter and rendering requirements for device creation.
-        /// @return The new device handle and populated operation table; the handle is null if this backend cannot create a usable device.
+        /// @return The new device handle and populated operation table; the handle is null if this backend cannot
+        /// create a usable device.
         created_device (*create)(const gfx_device_config &config);
     };
+
     void register_gfx_backend(gfx_backend_factory factory);
 
 } // namespace alia

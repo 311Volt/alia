@@ -22,9 +22,7 @@ namespace alia {
 
         DWORD lock_flags(buffer_usage usage, buffer_lock_mode mode, int offset_bytes, int size_bytes, int total_bytes) {
             DWORD flags = mode == buffer_lock_mode::read_only ? D3DLOCK_READONLY : 0u;
-            if (usage == buffer_usage::dynamic_mesh &&
-                mode == buffer_lock_mode::write_only &&
-                offset_bytes == 0 &&
+            if (usage == buffer_usage::dynamic_mesh && mode == buffer_lock_mode::write_only && offset_bytes == 0 &&
                 size_bytes == total_bytes) {
                 flags |= D3DLOCK_DISCARD;
             }
@@ -34,11 +32,7 @@ namespace alia {
     } // namespace
 
     vertex_buffer_handle *d3d9_create_vertex_buffer(
-        device_handle *dev_h,
-        int vertex_stride,
-        int vertex_count,
-        buffer_usage usage,
-        const void *initial_data
+        device_handle *dev_h, int vertex_stride, int vertex_count, buffer_usage usage, const void *initial_data
     ) {
         if (vertex_stride <= 0 || vertex_count <= 0)
             return nullptr;
@@ -48,13 +42,9 @@ namespace alia {
 
         IDirect3DVertexBuffer9 *buffer = nullptr;
         if (FAILED(dev->device->CreateVertexBuffer(
-                static_cast<UINT>(size_bytes),
-                buffer_usage_flags(usage),
-                0,
-                buffer_pool(usage),
-                &buffer,
-                nullptr
-            )) || !buffer)
+                static_cast<UINT>(size_bytes), buffer_usage_flags(usage), 0, buffer_pool(usage), &buffer, nullptr
+            )) ||
+            !buffer)
             return nullptr;
 
         if (initial_data) {
@@ -101,11 +91,7 @@ namespace alia {
     }
 
     bool d3d9_vertex_buffer_lock(
-        vertex_buffer_handle *h,
-        int first_vertex,
-        int vertex_count,
-        buffer_lock_mode mode,
-        buffer_lock_info &out
+        vertex_buffer_handle *h, int first_vertex, int vertex_count, buffer_lock_mode mode, buffer_lock_info &out
     ) {
         auto *buffer = as_d3d9_vertex_buffer(h);
         if (first_vertex < 0 || vertex_count <= 0 || first_vertex + vertex_count > buffer->count)
@@ -135,11 +121,7 @@ namespace alia {
     }
 
     index_buffer_handle *d3d9_create_index_buffer(
-        device_handle *dev_h,
-        index_format format,
-        int index_count,
-        buffer_usage usage,
-        const void *initial_data
+        device_handle *dev_h, index_format format, int index_count, buffer_usage usage, const void *initial_data
     ) {
         if (index_count <= 0)
             return nullptr;
@@ -155,7 +137,8 @@ namespace alia {
                 buffer_pool(usage),
                 &buffer,
                 nullptr
-            )) || !buffer)
+            )) ||
+            !buffer)
             return nullptr;
 
         if (initial_data) {
@@ -198,11 +181,7 @@ namespace alia {
     }
 
     bool d3d9_index_buffer_lock(
-        index_buffer_handle *h,
-        int first_index,
-        int index_count,
-        buffer_lock_mode mode,
-        buffer_lock_info &out
+        index_buffer_handle *h, int first_index, int index_count, buffer_lock_mode mode, buffer_lock_info &out
     ) {
         auto *buffer = as_d3d9_index_buffer(h);
         if (first_index < 0 || index_count <= 0 || first_index + index_count > buffer->count)

@@ -49,6 +49,7 @@ namespace alia {
     struct ogl_vertex_buffer;
     struct ogl_index_buffer;
     struct ogl_swapchain;
+
     struct ogl_device : device_handle {
         void *ctx = nullptr;
         std::vector<std::unique_ptr<ogl_compiled_vertex_definition>> vertex_definitions;
@@ -76,6 +77,7 @@ namespace alia {
         GLuint target_fbo = 0;
         ogl_swapchain *current_swapchain = nullptr;
     };
+
     struct ogl_texture : texture_handle {
         GLuint tex_id = 0;
         GLenum target = GL_TEXTURE_2D;
@@ -87,8 +89,20 @@ namespace alia {
         std::unique_ptr<std::byte[]> stage_buf;
         std::size_t stage_buf_bytes = 0;
     };
-    struct ogl_vertex_buffer : vertex_buffer_handle { GLuint buffer_id = 0; int stride = 0, count = 0; buffer_usage usage = buffer_usage::static_mesh; };
-    struct ogl_index_buffer : index_buffer_handle { GLuint buffer_id = 0; int count = 0; index_format format = index_format::u16; buffer_usage usage = buffer_usage::static_mesh; };
+
+    struct ogl_vertex_buffer : vertex_buffer_handle {
+        GLuint buffer_id = 0;
+        int stride = 0, count = 0;
+        buffer_usage usage = buffer_usage::static_mesh;
+    };
+
+    struct ogl_index_buffer : index_buffer_handle {
+        GLuint buffer_id = 0;
+        int count = 0;
+        index_format format = index_format::u16;
+        buffer_usage usage = buffer_usage::static_mesh;
+    };
+
     struct ogl_swapchain : swapchain_handle {
         ogl_device *owner = nullptr;
         void *surface = nullptr;
@@ -98,63 +112,123 @@ namespace alia {
         GLuint target_fbo = 0;
         framebuffer_properties props;
     };
+
     struct ogl_stored_shader_constant {
         shader_constant_slot slot = {};
         shader_constant_value_type type = shader_constant_value_type::float_1;
         std::vector<float> floats;
         std::vector<int> ints;
     };
-    struct ogl_stored_shader_sampler { GLint location = -1; int unit = 0; texture_handle *texture = nullptr; };
+
+    struct ogl_stored_shader_sampler {
+        GLint location = -1;
+        int unit = 0;
+        texture_handle *texture = nullptr;
+    };
+
     struct ogl_shader_program : shader_program_handle {
         GLuint program = 0;
         std::vector<ogl_stored_shader_constant> stored_constants;
         std::vector<ogl_stored_shader_sampler> stored_samplers;
     };
 
-    inline ogl_device *as_ogl_device(device_handle *h) { return static_cast<ogl_device *>(h); }
-    inline ogl_texture *as_ogl_texture(texture_handle *h) { return static_cast<ogl_texture *>(h); }
-    inline const ogl_texture *as_ogl_texture(const texture_handle *h) { return static_cast<const ogl_texture *>(h); }
-    inline GLenum ogl_face_target(const ogl_texture &texture, int face) {
-        return texture.target == GL_TEXTURE_CUBE_MAP
-            ? static_cast<GLenum>(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face)
-            : GL_TEXTURE_2D;
+    inline ogl_device *as_ogl_device(device_handle *h) {
+        return static_cast<ogl_device *>(h);
     }
-    inline ogl_vertex_buffer *as_ogl_vertex_buffer(vertex_buffer_handle *h) { return static_cast<ogl_vertex_buffer *>(h); }
-    inline const ogl_vertex_buffer *as_ogl_vertex_buffer(const vertex_buffer_handle *h) { return static_cast<const ogl_vertex_buffer *>(h); }
-    inline ogl_index_buffer *as_ogl_index_buffer(index_buffer_handle *h) { return static_cast<ogl_index_buffer *>(h); }
-    inline const ogl_index_buffer *as_ogl_index_buffer(const index_buffer_handle *h) { return static_cast<const ogl_index_buffer *>(h); }
-    inline ogl_swapchain *as_ogl_swapchain(swapchain_handle *h) { return static_cast<ogl_swapchain *>(h); }
-    inline const ogl_swapchain *as_ogl_swapchain(const swapchain_handle *h) { return static_cast<const ogl_swapchain *>(h); }
-    inline ogl_shader_program *as_ogl_shader_program(shader_program_handle *h) { return static_cast<ogl_shader_program *>(h); }
+
+    inline ogl_texture *as_ogl_texture(texture_handle *h) {
+        return static_cast<ogl_texture *>(h);
+    }
+
+    inline const ogl_texture *as_ogl_texture(const texture_handle *h) {
+        return static_cast<const ogl_texture *>(h);
+    }
+
+    inline GLenum ogl_face_target(const ogl_texture &texture, int face) {
+        return texture.target == GL_TEXTURE_CUBE_MAP ? static_cast<GLenum>(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face)
+                                                     : GL_TEXTURE_2D;
+    }
+
+    inline ogl_vertex_buffer *as_ogl_vertex_buffer(vertex_buffer_handle *h) {
+        return static_cast<ogl_vertex_buffer *>(h);
+    }
+
+    inline const ogl_vertex_buffer *as_ogl_vertex_buffer(const vertex_buffer_handle *h) {
+        return static_cast<const ogl_vertex_buffer *>(h);
+    }
+
+    inline ogl_index_buffer *as_ogl_index_buffer(index_buffer_handle *h) {
+        return static_cast<ogl_index_buffer *>(h);
+    }
+
+    inline const ogl_index_buffer *as_ogl_index_buffer(const index_buffer_handle *h) {
+        return static_cast<const ogl_index_buffer *>(h);
+    }
+
+    inline ogl_swapchain *as_ogl_swapchain(swapchain_handle *h) {
+        return static_cast<ogl_swapchain *>(h);
+    }
+
+    inline const ogl_swapchain *as_ogl_swapchain(const swapchain_handle *h) {
+        return static_cast<const ogl_swapchain *>(h);
+    }
+
+    inline ogl_shader_program *as_ogl_shader_program(shader_program_handle *h) {
+        return static_cast<ogl_shader_program *>(h);
+    }
 
     inline GLenum to_gl(index_format format) {
         return format == index_format::u16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
     }
 
-    ogl_device *ogl_create_device(const gfx_device_config &); void ogl_destroy_device(device_handle *);
-    texture_handle *ogl_create_texture(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage); void ogl_destroy_texture(texture_handle *);
+    ogl_device *ogl_create_device(const gfx_device_config &);
+    void ogl_destroy_device(device_handle *);
+    texture_handle *ogl_create_texture(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage);
+    void ogl_destroy_texture(texture_handle *);
     texture_handle *ogl_create_cube_texture(device_handle *, pixel_format, int, int, texture_usage);
     bool ogl_texture_format_supported(device_handle *, pixel_format, int, texture_role, texture_usage);
     bool ogl_cube_texture_format_supported(device_handle *, pixel_format, int, texture_usage);
-    pixel_format ogl_texture_format(const texture_handle *); int ogl_texture_width(const texture_handle *); int ogl_texture_height(const texture_handle *); int ogl_texture_mip_levels(const texture_handle *);
-    sampler_state ogl_texture_sampler(const texture_handle *); void ogl_texture_set_sampler(texture_handle *, const sampler_state &);
-    bool ogl_texture_lock(texture_handle *, rect_i, int, texture_lock_mode, texture_lock_info &); void ogl_texture_unlock(texture_handle *, const texture_lock_info &, bool);
+    pixel_format ogl_texture_format(const texture_handle *);
+    int ogl_texture_width(const texture_handle *);
+    int ogl_texture_height(const texture_handle *);
+    int ogl_texture_mip_levels(const texture_handle *);
+    sampler_state ogl_texture_sampler(const texture_handle *);
+    void ogl_texture_set_sampler(texture_handle *, const sampler_state &);
+    bool ogl_texture_lock(texture_handle *, rect_i, int, texture_lock_mode, texture_lock_info &);
+    void ogl_texture_unlock(texture_handle *, const texture_lock_info &, bool);
     bool ogl_cube_texture_lock(texture_handle *, cube_face, rect_i, int, texture_lock_mode, texture_lock_info &);
-    void ogl_texture_generate_mipmaps(texture_handle *); texture_handle *ogl_texture_clone(const texture_handle *);
+    void ogl_texture_generate_mipmaps(texture_handle *);
+    texture_handle *ogl_texture_clone(const texture_handle *);
     bool ogl_copy_render_target_to_texture(device_handle *, texture_handle *, rect_i, vec2i, vec2i, int, int);
-    vertex_buffer_handle *ogl_create_vertex_buffer(device_handle *, int, int, buffer_usage, const void *); void ogl_destroy_vertex_buffer(vertex_buffer_handle *);
-    int ogl_vertex_buffer_count(const vertex_buffer_handle *); int ogl_vertex_buffer_stride(const vertex_buffer_handle *); buffer_usage ogl_vertex_buffer_usage(const vertex_buffer_handle *);
-    bool ogl_vertex_buffer_lock(vertex_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void ogl_vertex_buffer_unlock(vertex_buffer_handle *, const buffer_lock_info &, bool);
-    index_buffer_handle *ogl_create_index_buffer(device_handle *, index_format, int, buffer_usage, const void *); void ogl_destroy_index_buffer(index_buffer_handle *);
-    int ogl_index_buffer_count(const index_buffer_handle *); buffer_usage ogl_index_buffer_usage(const index_buffer_handle *);
-    bool ogl_index_buffer_lock(index_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void ogl_index_buffer_unlock(index_buffer_handle *, const buffer_lock_info &, bool);
-    shader_program_handle *ogl_create_shader_program(device_handle *, const shader_program_desc &); void ogl_destroy_shader_program(shader_program_handle *);
-    shader_constant_slot ogl_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type, std::optional<shader_register>); void ogl_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
-    shader_sampler_slot ogl_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type, int); void ogl_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
+    vertex_buffer_handle *ogl_create_vertex_buffer(device_handle *, int, int, buffer_usage, const void *);
+    void ogl_destroy_vertex_buffer(vertex_buffer_handle *);
+    int ogl_vertex_buffer_count(const vertex_buffer_handle *);
+    int ogl_vertex_buffer_stride(const vertex_buffer_handle *);
+    buffer_usage ogl_vertex_buffer_usage(const vertex_buffer_handle *);
+    bool ogl_vertex_buffer_lock(vertex_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &);
+    void ogl_vertex_buffer_unlock(vertex_buffer_handle *, const buffer_lock_info &, bool);
+    index_buffer_handle *ogl_create_index_buffer(device_handle *, index_format, int, buffer_usage, const void *);
+    void ogl_destroy_index_buffer(index_buffer_handle *);
+    int ogl_index_buffer_count(const index_buffer_handle *);
+    buffer_usage ogl_index_buffer_usage(const index_buffer_handle *);
+    bool ogl_index_buffer_lock(index_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &);
+    void ogl_index_buffer_unlock(index_buffer_handle *, const buffer_lock_info &, bool);
+    shader_program_handle *ogl_create_shader_program(device_handle *, const shader_program_desc &);
+    void ogl_destroy_shader_program(shader_program_handle *);
+    shader_constant_slot
+    ogl_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type, std::optional<shader_register>);
+    void
+    ogl_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
+    shader_sampler_slot ogl_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type, int);
+    void ogl_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
     void ogl_apply_program_state(ogl_shader_program *);
-    swapchain_handle *ogl_create_swapchain(device_handle *, void *, vec2i, const swapchain_desc &); void ogl_destroy_swapchain(swapchain_handle *);
+    swapchain_handle *ogl_create_swapchain(device_handle *, void *, vec2i, const swapchain_desc &);
+    void ogl_destroy_swapchain(swapchain_handle *);
     framebuffer_properties ogl_swapchain_properties(const swapchain_handle *);
-    void ogl_swapchain_begin_frame(swapchain_handle *); void ogl_swapchain_end_frame(swapchain_handle *); void ogl_swapchain_present(swapchain_handle *); void ogl_swapchain_on_resize(swapchain_handle *, vec2i);
+    void ogl_swapchain_begin_frame(swapchain_handle *);
+    void ogl_swapchain_end_frame(swapchain_handle *);
+    void ogl_swapchain_present(swapchain_handle *);
+    void ogl_swapchain_on_resize(swapchain_handle *, vec2i);
     void ogl_set_render_state(device_handle *, const render_state &);
     void ogl_set_transforms(device_handle *, const transform_state &);
     void ogl_set_lighting(device_handle *, const lighting_state &);
@@ -162,11 +236,18 @@ namespace alia {
     void ogl_set_fog(device_handle *, const fog_state &);
     void ogl_upload_lights(ogl_device &);
     void ogl_apply_material(ogl_device &);
-    bool ogl_set_render_target(device_handle *, const render_target_info &); bool ogl_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void ogl_reset_frame_state(ogl_device &); void ogl_set_viewport(device_handle *, const render_viewport &);
-    void ogl_bind_vertex_buffer(device_handle *, vertex_buffer_handle *); void ogl_bind_index_buffer(device_handle *, index_buffer_handle *);
+    bool ogl_set_render_target(device_handle *, const render_target_info &);
+    bool ogl_clear(device_handle *, const std::optional<color> &, const std::optional<float> &);
+    void ogl_reset_frame_state(ogl_device &);
+    void ogl_set_viewport(device_handle *, const render_viewport &);
+    void ogl_bind_vertex_buffer(device_handle *, vertex_buffer_handle *);
+    void ogl_bind_index_buffer(device_handle *, index_buffer_handle *);
     void ogl_bind_instance_buffer(device_handle *, vertex_buffer_handle *);
-    void ogl_upload_transient_vertex_data(device_handle *, const void *, int); void ogl_upload_transient_index_data(device_handle *, const void *, int, index_format);
-    void ogl_bind_resources(device_handle *, const texture_sampler_binding &); void ogl_draw(device_handle *, primitive_topology, int, int); void ogl_draw_indexed(device_handle *, primitive_topology, int, int, int);
+    void ogl_upload_transient_vertex_data(device_handle *, const void *, int);
+    void ogl_upload_transient_index_data(device_handle *, const void *, int, index_format);
+    void ogl_bind_resources(device_handle *, const texture_sampler_binding &);
+    void ogl_draw(device_handle *, primitive_topology, int, int);
+    void ogl_draw_indexed(device_handle *, primitive_topology, int, int, int);
     void ogl_draw_instanced(device_handle *, primitive_topology, int, int, int, int);
     void ogl_draw_indexed_instanced(device_handle *, primitive_topology, int, int, int, int, int);
 
@@ -175,13 +256,46 @@ namespace alia {
     extern PFNGLDRAWELEMENTSINSTANCEDPROC ogl_s_glDrawElementsInstanced;
 
     extern PFNGLGENERATEMIPMAPPROC ogl_s_glGenerateMipmap;
-    extern PFNGLCREATESHADERPROC ogl_s_glCreateShader; extern PFNGLSHADERSOURCEPROC ogl_s_glShaderSource; extern PFNGLCOMPILESHADERPROC ogl_s_glCompileShader; extern PFNGLGETSHADERIVPROC ogl_s_glGetShaderiv; extern PFNGLGETSHADERINFOLOGPROC ogl_s_glGetShaderInfoLog; extern PFNGLDELETESHADERPROC ogl_s_glDeleteShader;
-    extern PFNGLCREATEPROGRAMPROC ogl_s_glCreateProgram; extern PFNGLATTACHSHADERPROC ogl_s_glAttachShader; extern PFNGLBINDATTRIBLOCATIONPROC ogl_s_glBindAttribLocation; extern PFNGLLINKPROGRAMPROC ogl_s_glLinkProgram; extern PFNGLGETPROGRAMIVPROC ogl_s_glGetProgramiv; extern PFNGLGETPROGRAMINFOLOGPROC ogl_s_glGetProgramInfoLog; extern PFNGLDELETEPROGRAMPROC ogl_s_glDeleteProgram; extern PFNGLUSEPROGRAMPROC ogl_s_glUseProgram;
-    extern PFNGLGETUNIFORMLOCATIONPROC ogl_s_glGetUniformLocation; extern PFNGLUNIFORM1FPROC ogl_s_glUniform1f; extern PFNGLUNIFORM2FPROC ogl_s_glUniform2f; extern PFNGLUNIFORM3FPROC ogl_s_glUniform3f; extern PFNGLUNIFORM4FPROC ogl_s_glUniform4f; extern PFNGLUNIFORM1IPROC ogl_s_glUniform1i; extern PFNGLUNIFORM2IPROC ogl_s_glUniform2i; extern PFNGLUNIFORM3IPROC ogl_s_glUniform3i; extern PFNGLUNIFORM4IPROC ogl_s_glUniform4i; extern PFNGLUNIFORMMATRIX4FVPROC ogl_s_glUniformMatrix4fv;
+    extern PFNGLCREATESHADERPROC ogl_s_glCreateShader;
+    extern PFNGLSHADERSOURCEPROC ogl_s_glShaderSource;
+    extern PFNGLCOMPILESHADERPROC ogl_s_glCompileShader;
+    extern PFNGLGETSHADERIVPROC ogl_s_glGetShaderiv;
+    extern PFNGLGETSHADERINFOLOGPROC ogl_s_glGetShaderInfoLog;
+    extern PFNGLDELETESHADERPROC ogl_s_glDeleteShader;
+    extern PFNGLCREATEPROGRAMPROC ogl_s_glCreateProgram;
+    extern PFNGLATTACHSHADERPROC ogl_s_glAttachShader;
+    extern PFNGLBINDATTRIBLOCATIONPROC ogl_s_glBindAttribLocation;
+    extern PFNGLLINKPROGRAMPROC ogl_s_glLinkProgram;
+    extern PFNGLGETPROGRAMIVPROC ogl_s_glGetProgramiv;
+    extern PFNGLGETPROGRAMINFOLOGPROC ogl_s_glGetProgramInfoLog;
+    extern PFNGLDELETEPROGRAMPROC ogl_s_glDeleteProgram;
+    extern PFNGLUSEPROGRAMPROC ogl_s_glUseProgram;
+    extern PFNGLGETUNIFORMLOCATIONPROC ogl_s_glGetUniformLocation;
+    extern PFNGLUNIFORM1FPROC ogl_s_glUniform1f;
+    extern PFNGLUNIFORM2FPROC ogl_s_glUniform2f;
+    extern PFNGLUNIFORM3FPROC ogl_s_glUniform3f;
+    extern PFNGLUNIFORM4FPROC ogl_s_glUniform4f;
+    extern PFNGLUNIFORM1IPROC ogl_s_glUniform1i;
+    extern PFNGLUNIFORM2IPROC ogl_s_glUniform2i;
+    extern PFNGLUNIFORM3IPROC ogl_s_glUniform3i;
+    extern PFNGLUNIFORM4IPROC ogl_s_glUniform4i;
+    extern PFNGLUNIFORMMATRIX4FVPROC ogl_s_glUniformMatrix4fv;
     extern PFNGLGETACTIVEUNIFORMPROC ogl_s_glGetActiveUniform;
-    extern PFNGLACTIVETEXTUREPROC ogl_s_glActiveTexture; extern PFNGLENABLEVERTEXATTRIBARRAYPROC ogl_s_glEnableVertexAttribArray; extern PFNGLDISABLEVERTEXATTRIBARRAYPROC ogl_s_glDisableVertexAttribArray; extern PFNGLVERTEXATTRIBPOINTERPROC ogl_s_glVertexAttribPointer;
-    extern PFNGLGENBUFFERSPROC ogl_s_glGenBuffers; extern PFNGLDELETEBUFFERSPROC ogl_s_glDeleteBuffers; extern PFNGLBINDBUFFERPROC ogl_s_glBindBuffer; extern PFNGLBUFFERDATAPROC ogl_s_glBufferData; extern PFNGLMAPBUFFERPROC ogl_s_glMapBuffer; extern PFNGLUNMAPBUFFERPROC ogl_s_glUnmapBuffer;
-    extern PFNGLGENFRAMEBUFFERSPROC ogl_s_glGenFramebuffers; extern PFNGLDELETEFRAMEBUFFERSPROC ogl_s_glDeleteFramebuffers; extern PFNGLBINDFRAMEBUFFERPROC ogl_s_glBindFramebuffer; extern PFNGLFRAMEBUFFERTEXTURE2DPROC ogl_s_glFramebufferTexture2D; extern PFNGLCHECKFRAMEBUFFERSTATUSPROC ogl_s_glCheckFramebufferStatus;
+    extern PFNGLACTIVETEXTUREPROC ogl_s_glActiveTexture;
+    extern PFNGLENABLEVERTEXATTRIBARRAYPROC ogl_s_glEnableVertexAttribArray;
+    extern PFNGLDISABLEVERTEXATTRIBARRAYPROC ogl_s_glDisableVertexAttribArray;
+    extern PFNGLVERTEXATTRIBPOINTERPROC ogl_s_glVertexAttribPointer;
+    extern PFNGLGENBUFFERSPROC ogl_s_glGenBuffers;
+    extern PFNGLDELETEBUFFERSPROC ogl_s_glDeleteBuffers;
+    extern PFNGLBINDBUFFERPROC ogl_s_glBindBuffer;
+    extern PFNGLBUFFERDATAPROC ogl_s_glBufferData;
+    extern PFNGLMAPBUFFERPROC ogl_s_glMapBuffer;
+    extern PFNGLUNMAPBUFFERPROC ogl_s_glUnmapBuffer;
+    extern PFNGLGENFRAMEBUFFERSPROC ogl_s_glGenFramebuffers;
+    extern PFNGLDELETEFRAMEBUFFERSPROC ogl_s_glDeleteFramebuffers;
+    extern PFNGLBINDFRAMEBUFFERPROC ogl_s_glBindFramebuffer;
+    extern PFNGLFRAMEBUFFERTEXTURE2DPROC ogl_s_glFramebufferTexture2D;
+    extern PFNGLCHECKFRAMEBUFFERSTATUSPROC ogl_s_glCheckFramebufferStatus;
 } // namespace alia
 #endif
 #endif

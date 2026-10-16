@@ -18,8 +18,7 @@ namespace alia {
     concept index_type = std::same_as<T, uint16_t> || std::same_as<T, uint32_t>;
 
     template <index_type T>
-    inline constexpr index_format index_format_of =
-        std::same_as<T, uint16_t> ? index_format::u16 : index_format::u32;
+    inline constexpr index_format index_format_of = std::same_as<T, uint16_t> ? index_format::u16 : index_format::u32;
 
     namespace detail {
 
@@ -52,8 +51,7 @@ namespace alia {
         }
 
         locked_vertex_buffer_view(locked_vertex_buffer_view &&other) noexcept
-            : impl_(std::move(other.impl_))
-            , view_(other.view_) {
+            : impl_(std::move(other.impl_)), view_(other.view_) {
             other.view_ = {};
         }
 
@@ -107,13 +105,15 @@ namespace alia {
         std::span<element_type> view_;
 
         explicit locked_vertex_buffer_view(std::unique_ptr<detail::vertex_buffer_lock_state> state) noexcept
-            : impl_(std::move(state))
-            , view_(impl_
-                ? std::span<element_type>(
-                    reinterpret_cast<element_type *>(impl_->info.data),
-                    static_cast<std::size_t>(impl_->info.size_bytes / static_cast<int>(sizeof(TVertex)))
-                )
-                : std::span<element_type>{}) {}
+            : impl_(std::move(state)),
+              view_(
+                  impl_ ? std::span<element_type>(
+                              reinterpret_cast<element_type *>(impl_->info.data),
+                              static_cast<std::size_t>(impl_->info.size_bytes / static_cast<int>(sizeof(TVertex)))
+                          )
+                        : std::span<element_type>{}
+              ) {
+        }
     };
 
     template <index_type TIndex, buffer_lock_mode Mode = buffer_lock_mode::read_write>
@@ -128,8 +128,7 @@ namespace alia {
         }
 
         locked_index_buffer_view(locked_index_buffer_view &&other) noexcept
-            : impl_(std::move(other.impl_))
-            , view_(other.view_) {
+            : impl_(std::move(other.impl_)), view_(other.view_) {
             other.view_ = {};
         }
 
@@ -183,13 +182,15 @@ namespace alia {
         std::span<element_type> view_;
 
         explicit locked_index_buffer_view(std::unique_ptr<detail::index_buffer_lock_state> state) noexcept
-            : impl_(std::move(state))
-            , view_(impl_
-                ? std::span<element_type>(
-                    reinterpret_cast<element_type *>(impl_->info.data),
-                    static_cast<std::size_t>(impl_->info.size_bytes / static_cast<int>(sizeof(TIndex)))
-                )
-                : std::span<element_type>{}) {}
+            : impl_(std::move(state)),
+              view_(
+                  impl_ ? std::span<element_type>(
+                              reinterpret_cast<element_type *>(impl_->info.data),
+                              static_cast<std::size_t>(impl_->info.size_bytes / static_cast<int>(sizeof(TIndex)))
+                          )
+                        : std::span<element_type>{}
+              ) {
+        }
     };
 
     template <class TVertex>
@@ -201,7 +202,9 @@ namespace alia {
             create(device, vertex_count, usage, nullptr);
         }
 
-        basic_vertex_storage(gfx_device &device, std::span<const TVertex> vertices, buffer_usage usage = buffer_usage::static_mesh) {
+        basic_vertex_storage(
+            gfx_device &device, std::span<const TVertex> vertices, buffer_usage usage = buffer_usage::static_mesh
+        ) {
             create(device, static_cast<int>(vertices.size()), usage, vertices.data());
         }
 
@@ -210,10 +213,9 @@ namespace alia {
         }
 
         basic_vertex_storage(basic_vertex_storage &&other) noexcept
-            : handle_(std::exchange(other.handle_, nullptr))
-            , backend_(std::exchange(other.backend_, nullptr))
-            , count_(std::exchange(other.count_, 0))
-            , usage_(std::exchange(other.usage_, buffer_usage::static_mesh)) {}
+            : handle_(std::exchange(other.handle_, nullptr)), backend_(std::exchange(other.backend_, nullptr)),
+              count_(std::exchange(other.count_, 0)), usage_(std::exchange(other.usage_, buffer_usage::static_mesh)) {
+        }
 
         basic_vertex_storage &operator=(basic_vertex_storage &&other) noexcept {
             if (this != &other) {
@@ -285,11 +287,7 @@ namespace alia {
 
             const auto *backend = device.backend();
             handle_ = backend->create_vertex_buffer.get_or_throw()(
-                device.device(),
-                static_cast<int>(sizeof(TVertex)),
-                vertex_count,
-                usage,
-                initial_data
+                device.device(), static_cast<int>(sizeof(TVertex)), vertex_count, usage, initial_data
             );
             if (handle_) {
                 backend_ = backend;
@@ -362,7 +360,9 @@ namespace alia {
             create(device, index_count, usage, nullptr);
         }
 
-        index_buffer(gfx_device &device, std::span<const TIndex> indices, buffer_usage usage = buffer_usage::static_mesh) {
+        index_buffer(
+            gfx_device &device, std::span<const TIndex> indices, buffer_usage usage = buffer_usage::static_mesh
+        ) {
             create(device, static_cast<int>(indices.size()), usage, indices.data());
         }
 
@@ -371,10 +371,9 @@ namespace alia {
         }
 
         index_buffer(index_buffer &&other) noexcept
-            : handle_(std::exchange(other.handle_, nullptr))
-            , backend_(std::exchange(other.backend_, nullptr))
-            , count_(std::exchange(other.count_, 0))
-            , usage_(std::exchange(other.usage_, buffer_usage::static_mesh)) {}
+            : handle_(std::exchange(other.handle_, nullptr)), backend_(std::exchange(other.backend_, nullptr)),
+              count_(std::exchange(other.count_, 0)), usage_(std::exchange(other.usage_, buffer_usage::static_mesh)) {
+        }
 
         index_buffer &operator=(index_buffer &&other) noexcept {
             if (this != &other) {
@@ -451,7 +450,8 @@ namespace alia {
 
             const auto *backend = device.backend();
             handle_ = backend->create_index_buffer.get_or_throw()(
-                device.device(), index_format_of<TIndex>, index_count, usage, initial_data);
+                device.device(), index_format_of<TIndex>, index_count, usage, initial_data
+            );
             if (handle_) {
                 backend_ = backend;
                 count_ = index_count;
@@ -499,7 +499,8 @@ namespace alia {
 
     template <std::ranges::contiguous_range R>
         requires std::ranges::sized_range<R> && index_type<std::ranges::range_value_t<R>>
-    index_buffer(gfx_device &, const R &, buffer_usage = buffer_usage::static_mesh) -> index_buffer<std::ranges::range_value_t<R>>;
+    index_buffer(gfx_device &, const R &, buffer_usage = buffer_usage::static_mesh)
+        -> index_buffer<std::ranges::range_value_t<R>>;
 
     index_buffer(gfx_device &, int, buffer_usage = buffer_usage::dynamic_mesh) -> index_buffer<uint32_t>;
 

@@ -13,9 +13,8 @@ namespace alia {
         // Probe hardware capabilities for conditional op support.
         D3DCAPS9 caps = raw->caps;
         const bool can_autogen_mipmaps = (caps.Caps2 & D3DCAPS2_CANAUTOGENMIPMAP) != 0;
-        const bool can_use_shaders =
-            D3DSHADER_VERSION_MAJOR(caps.VertexShaderVersion) >= 2 &&
-            D3DSHADER_VERSION_MAJOR(caps.PixelShaderVersion) >= 2;
+        const bool can_use_shaders = D3DSHADER_VERSION_MAJOR(caps.VertexShaderVersion) >= 2 &&
+                                     D3DSHADER_VERSION_MAJOR(caps.PixelShaderVersion) >= 2;
 
         // Example of how reason_unsupported is used for a future backend-level op:
         // .some_future_op = { nullptr, "D3D9 backend does not support <op>" }
@@ -24,140 +23,132 @@ namespace alia {
         iface.id = gfx_backend::d3d9;
         iface.pixel_center_offset = {-0.5f, -0.5f};
         iface.clip_depth = clip_depth_range::zero_to_one;
-        iface.caps.render = raw->device_type == D3DDEVTYPE_REF
-            ? render_method::software : render_method::hardware;
-        iface.caps.max_texture_size = static_cast<int>((std::min)(
-            raw->caps.MaxTextureWidth, raw->caps.MaxTextureHeight));
-        iface.caps.npot_textures =
-            (raw->caps.TextureCaps & D3DPTEXTURECAPS_POW2) == 0 ||
-            (raw->caps.TextureCaps & D3DPTEXTURECAPS_NONPOW2CONDITIONAL) != 0;
-        iface.caps.cube_textures =
-            (raw->caps.TextureCaps & D3DPTEXTURECAPS_CUBEMAP) != 0;
+        iface.caps.render = raw->device_type == D3DDEVTYPE_REF ? render_method::software : render_method::hardware;
+        iface.caps.max_texture_size =
+            static_cast<int>((std::min)(raw->caps.MaxTextureWidth, raw->caps.MaxTextureHeight));
+        iface.caps.npot_textures = (raw->caps.TextureCaps & D3DPTEXTURECAPS_POW2) == 0 ||
+                                   (raw->caps.TextureCaps & D3DPTEXTURECAPS_NONPOW2CONDITIONAL) != 0;
+        iface.caps.cube_textures = (raw->caps.TextureCaps & D3DPTEXTURECAPS_CUBEMAP) != 0;
         D3DDISPLAYMODE adapter_mode = {};
-        const bool have_adapter_mode = SUCCEEDED(
-            raw->d3d->GetAdapterDisplayMode(raw->adapter, &adapter_mode));
-        iface.caps.render_to_texture = have_adapter_mode && SUCCEEDED(
-            raw->d3d->CheckDeviceFormat(
-                raw->adapter, raw->device_type, adapter_mode.Format,
-                D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE, D3DFMT_A8R8G8B8));
-        iface.caps.separate_alpha_blend =
-            (raw->caps.PrimitiveMiscCaps & D3DPMISCCAPS_SEPARATEALPHABLEND) != 0;
+        const bool have_adapter_mode = SUCCEEDED(raw->d3d->GetAdapterDisplayMode(raw->adapter, &adapter_mode));
+        iface.caps.render_to_texture = have_adapter_mode && SUCCEEDED(raw->d3d->CheckDeviceFormat(
+                                                                raw->adapter,
+                                                                raw->device_type,
+                                                                adapter_mode.Format,
+                                                                D3DUSAGE_RENDERTARGET,
+                                                                D3DRTYPE_TEXTURE,
+                                                                D3DFMT_A8R8G8B8
+                                                            ));
+        iface.caps.separate_alpha_blend = (raw->caps.PrimitiveMiscCaps & D3DPMISCCAPS_SEPARATEALPHABLEND) != 0;
         iface.caps.index32 = caps.MaxVertexIndex > 0xFFFF;
-        iface.caps.instancing = can_use_shaders &&
-            D3DSHADER_VERSION_MAJOR(caps.VertexShaderVersion) >= 3 &&
-            (caps.DevCaps2 & D3DDEVCAPS2_STREAMOFFSET) != 0;
+        iface.caps.instancing = can_use_shaders && D3DSHADER_VERSION_MAJOR(caps.VertexShaderVersion) >= 3 &&
+                                (caps.DevCaps2 & D3DDEVCAPS2_STREAMOFFSET) != 0;
         iface.caps.spot_model = spot_light_model::inner_outer;
         const DWORD required_light_caps = D3DVTXPCAPS_DIRECTIONALLIGHTS | D3DVTXPCAPS_POSITIONALLIGHTS;
         const bool supports_light_types = (caps.VertexProcessingCaps & required_light_caps) == required_light_caps;
         iface.caps.max_lights = max_lights;
         if (raw->hardware_vertex_processing)
-            iface.caps.max_lights = supports_light_types
-                ? static_cast<int>((std::min)(static_cast<DWORD>(max_lights), caps.MaxActiveLights)) : 0;
+            iface.caps.max_lights =
+                supports_light_types
+                    ? static_cast<int>((std::min)(static_cast<DWORD>(max_lights), caps.MaxActiveLights))
+                    : 0;
         iface.caps.fog = (caps.RasterCaps & D3DPRASTERCAPS_FOGVERTEX) != 0;
-        iface.caps.fog_distance = (caps.RasterCaps & D3DPRASTERCAPS_FOGRANGE) != 0
-            ? fog_distance_model::radial : fog_distance_model::view_depth;
+        iface.caps.fog_distance = (caps.RasterCaps & D3DPRASTERCAPS_FOGRANGE) != 0 ? fog_distance_model::radial
+                                                                                   : fog_distance_model::view_depth;
         D3DADAPTER_IDENTIFIER9 identifier = {};
         if (SUCCEEDED(raw->d3d->GetAdapterIdentifier(raw->adapter, 0, &identifier)))
             iface.caps.renderer_name = identifier.Description;
 
-        iface.destroy_device      = {d3d9_destroy_device};
+        iface.destroy_device = {d3d9_destroy_device};
 
-        iface.create_texture              = {d3d9_create_texture};
-        iface.texture_format_supported    = {d3d9_texture_format_supported};
+        iface.create_texture = {d3d9_create_texture};
+        iface.texture_format_supported = {d3d9_texture_format_supported};
         if (iface.caps.cube_textures) {
             iface.create_cube_texture = {d3d9_create_cube_texture};
             iface.cube_texture_format_supported = {d3d9_cube_texture_format_supported};
         } else {
-            iface.create_cube_texture = {
-                nullptr, "device lacks D3DPTEXTURECAPS_CUBEMAP"};
-            iface.cube_texture_format_supported = {
-                nullptr, "device lacks D3DPTEXTURECAPS_CUBEMAP"};
+            iface.create_cube_texture = {nullptr, "device lacks D3DPTEXTURECAPS_CUBEMAP"};
+            iface.cube_texture_format_supported = {nullptr, "device lacks D3DPTEXTURECAPS_CUBEMAP"};
         }
-        iface.destroy_texture             = {d3d9_destroy_texture};
-        iface.texture_format              = {d3d9_texture_format};
-        iface.texture_width               = {d3d9_texture_width};
-        iface.texture_height              = {d3d9_texture_height};
-        iface.texture_mip_levels          = {d3d9_texture_mip_levels};
-        iface.texture_sampler             = {d3d9_texture_sampler};
-        iface.texture_set_sampler         = {d3d9_texture_set_sampler};
-        iface.texture_lock                = {d3d9_texture_lock};
-        iface.cube_texture_lock           = {d3d9_cube_texture_lock};
-        iface.texture_unlock              = {d3d9_texture_unlock};
-        iface.texture_clone               = {d3d9_texture_clone};
+        iface.destroy_texture = {d3d9_destroy_texture};
+        iface.texture_format = {d3d9_texture_format};
+        iface.texture_width = {d3d9_texture_width};
+        iface.texture_height = {d3d9_texture_height};
+        iface.texture_mip_levels = {d3d9_texture_mip_levels};
+        iface.texture_sampler = {d3d9_texture_sampler};
+        iface.texture_set_sampler = {d3d9_texture_set_sampler};
+        iface.texture_lock = {d3d9_texture_lock};
+        iface.cube_texture_lock = {d3d9_cube_texture_lock};
+        iface.texture_unlock = {d3d9_texture_unlock};
+        iface.texture_clone = {d3d9_texture_clone};
         iface.copy_render_target_to_texture = {d3d9_copy_render_target_to_texture};
 
         if (can_autogen_mipmaps) {
             iface.texture_generate_mipmaps = {d3d9_texture_generate_mipmaps};
         } else {
-            iface.texture_generate_mipmaps = {
-                nullptr,
-                "device lacks D3DCAPS2_CANAUTOGENMIPMAP"
-            };
+            iface.texture_generate_mipmaps = {nullptr, "device lacks D3DCAPS2_CANAUTOGENMIPMAP"};
         }
 
-        iface.create_vertex_buffer  = {d3d9_create_vertex_buffer};
+        iface.create_vertex_buffer = {d3d9_create_vertex_buffer};
         iface.destroy_vertex_buffer = {d3d9_destroy_vertex_buffer};
-        iface.vertex_buffer_count   = {d3d9_vertex_buffer_count};
-        iface.vertex_buffer_stride  = {d3d9_vertex_buffer_stride};
-        iface.vertex_buffer_usage   = {d3d9_vertex_buffer_usage};
-        iface.vertex_buffer_lock    = {d3d9_vertex_buffer_lock};
-        iface.vertex_buffer_unlock  = {d3d9_vertex_buffer_unlock};
-        iface.create_index_buffer   = {d3d9_create_index_buffer};
-        iface.destroy_index_buffer  = {d3d9_destroy_index_buffer};
-        iface.index_buffer_count    = {d3d9_index_buffer_count};
-        iface.index_buffer_usage    = {d3d9_index_buffer_usage};
-        iface.index_buffer_lock     = {d3d9_index_buffer_lock};
-        iface.index_buffer_unlock   = {d3d9_index_buffer_unlock};
+        iface.vertex_buffer_count = {d3d9_vertex_buffer_count};
+        iface.vertex_buffer_stride = {d3d9_vertex_buffer_stride};
+        iface.vertex_buffer_usage = {d3d9_vertex_buffer_usage};
+        iface.vertex_buffer_lock = {d3d9_vertex_buffer_lock};
+        iface.vertex_buffer_unlock = {d3d9_vertex_buffer_unlock};
+        iface.create_index_buffer = {d3d9_create_index_buffer};
+        iface.destroy_index_buffer = {d3d9_destroy_index_buffer};
+        iface.index_buffer_count = {d3d9_index_buffer_count};
+        iface.index_buffer_usage = {d3d9_index_buffer_usage};
+        iface.index_buffer_lock = {d3d9_index_buffer_lock};
+        iface.index_buffer_unlock = {d3d9_index_buffer_unlock};
 
         if (can_use_shaders) {
             iface.create_shader_program = {d3d9_create_shader_program};
         } else {
-            iface.create_shader_program = {
-                nullptr,
-                "device lacks D3D9 vertex/pixel shader model 2.0 support"
-            };
+            iface.create_shader_program = {nullptr, "device lacks D3D9 vertex/pixel shader model 2.0 support"};
         }
         iface.destroy_shader_program = {d3d9_destroy_shader_program};
         iface.shader_lookup_constant = {d3d9_shader_lookup_constant};
-        iface.shader_set_constant    = {d3d9_shader_set_constant};
-        iface.shader_lookup_sampler  = {d3d9_shader_lookup_sampler};
-        iface.shader_set_sampler     = {d3d9_shader_set_sampler};
+        iface.shader_set_constant = {d3d9_shader_set_constant};
+        iface.shader_lookup_sampler = {d3d9_shader_lookup_sampler};
+        iface.shader_set_sampler = {d3d9_shader_set_sampler};
 
-        iface.create_swapchain   = {d3d9_create_swapchain};
-        iface.destroy_swapchain  = {d3d9_destroy_swapchain};
+        iface.create_swapchain = {d3d9_create_swapchain};
+        iface.destroy_swapchain = {d3d9_destroy_swapchain};
         iface.swapchain_properties = {d3d9_swapchain_properties};
         iface.swapchain_begin_frame = {d3d9_swapchain_begin_frame};
-        iface.swapchain_end_frame   = {d3d9_swapchain_end_frame};
-        iface.swapchain_present     = {d3d9_swapchain_present};
+        iface.swapchain_end_frame = {d3d9_swapchain_end_frame};
+        iface.swapchain_present = {d3d9_swapchain_present};
         iface.swapchain_present_region = {d3d9_swapchain_present_region};
-        iface.swapchain_on_resize   = {d3d9_swapchain_on_resize};
+        iface.swapchain_on_resize = {d3d9_swapchain_on_resize};
 
-        iface.set_render_state            = {d3d9_set_render_state};
-        iface.set_transforms              = {d3d9_set_transforms};
+        iface.set_render_state = {d3d9_set_render_state};
+        iface.set_transforms = {d3d9_set_transforms};
         if (iface.caps.max_lights > 0) {
             iface.set_lighting = {d3d9_set_lighting};
             iface.set_material = {d3d9_set_material};
         } else {
             const char *reason = !supports_light_types
-                ? "hardware vertex processing lacks directional or positional lighting"
-                : "device reports zero active fixed-function lights";
+                                     ? "hardware vertex processing lacks directional or positional lighting"
+                                     : "device reports zero active fixed-function lights";
             iface.set_lighting = {nullptr, reason};
             iface.set_material = {nullptr, reason};
         }
-        iface.set_fog = iface.caps.fog
-            ? gfx_backend_op<void(device_handle *, const fog_state &)>{d3d9_set_fog}
-            : gfx_backend_op<void(device_handle *, const fog_state &)>{
-                nullptr, "device lacks D3DPRASTERCAPS_FOGVERTEX"};
-        iface.set_render_target           = {d3d9_set_render_target};
-        iface.clear                       = {d3d9_clear};
-        iface.set_viewport                = {d3d9_set_viewport};
-        iface.bind_vertex_buffer          = {d3d9_bind_vertex_buffer};
-        iface.bind_index_buffer           = {d3d9_bind_index_buffer};
+        iface.set_fog = iface.caps.fog ? gfx_backend_op<void(device_handle *, const fog_state &)>{d3d9_set_fog}
+                                       : gfx_backend_op<void(device_handle *, const fog_state &)>{
+                                             nullptr, "device lacks D3DPRASTERCAPS_FOGVERTEX"
+                                         };
+        iface.set_render_target = {d3d9_set_render_target};
+        iface.clear = {d3d9_clear};
+        iface.set_viewport = {d3d9_set_viewport};
+        iface.bind_vertex_buffer = {d3d9_bind_vertex_buffer};
+        iface.bind_index_buffer = {d3d9_bind_index_buffer};
         iface.upload_transient_vertex_data = {d3d9_upload_transient_vertex_data};
         iface.upload_transient_index_data = {d3d9_upload_transient_index_data};
-        iface.bind_resources              = {d3d9_bind_resources};
-        iface.draw                        = {d3d9_draw};
-        iface.draw_indexed                = {d3d9_draw_indexed};
+        iface.bind_resources = {d3d9_bind_resources};
+        iface.draw = {d3d9_draw};
+        iface.draw_indexed = {d3d9_draw_indexed};
         if (iface.caps.instancing) {
             iface.bind_instance_buffer = {d3d9_bind_instance_buffer};
             iface.draw_instanced = {d3d9_draw_instanced};

@@ -13,13 +13,17 @@ namespace alia {
         std::array<GLfloat, 4> native_color(color value) {
             return {value.r, value.g, value.b, value.a};
         }
+
         vec3f unit_direction(vec3f value) {
-            const double length = std::hypot(
-                static_cast<double>(value.x), static_cast<double>(value.y), static_cast<double>(value.z));
-            return {static_cast<float>(value.x / length), static_cast<float>(value.y / length),
-                static_cast<float>(value.z / length)};
+            const double length =
+                std::hypot(static_cast<double>(value.x), static_cast<double>(value.y), static_cast<double>(value.z));
+            return {
+                static_cast<float>(value.x / length),
+                static_cast<float>(value.y / length),
+                static_cast<float>(value.z / length)
+            };
         }
-    }
+    } // namespace
 
     void ogl_upload_lights(ogl_device &device) {
         const auto ambient = native_color(device.ambient);
@@ -35,36 +39,40 @@ namespace alia {
         const auto no_ambient = native_color(black);
         for (int index = 0; index != device.light_count; ++index) {
             const GLenum slot = GL_LIGHT0 + index;
-            std::visit([&](const auto &source) {
-                using source_type = std::decay_t<decltype(source)>;
-                const auto diffuse = native_color(source.diffuse);
-                const auto specular = native_color(source.specular);
-                glLightfv(slot, GL_AMBIENT, no_ambient.data());
-                glLightfv(slot, GL_DIFFUSE, diffuse.data());
-                glLightfv(slot, GL_SPECULAR, specular.data());
-                if constexpr (std::is_same_v<source_type, directional_light>) {
-                    const auto direction = unit_direction(source.direction);
-                    const GLfloat position[]{-direction.x, -direction.y, -direction.z, 0.0f};
-                    glLightfv(slot, GL_POSITION, position);
-                } else {
-                    const GLfloat position[]{source.position.x, source.position.y, source.position.z, 1.0f};
-                    glLightfv(slot, GL_POSITION, position);
-                    glLightf(slot, GL_CONSTANT_ATTENUATION, source.attenuation.constant);
-                    glLightf(slot, GL_LINEAR_ATTENUATION, source.attenuation.linear);
-                    glLightf(slot, GL_QUADRATIC_ATTENUATION, source.attenuation.quadratic);
-                }
-                if constexpr (std::is_same_v<source_type, spot_light>) {
-                    const auto direction = unit_direction(source.direction);
-                    const GLfloat components[]{direction.x, direction.y, direction.z};
-                    glLightfv(slot, GL_SPOT_DIRECTION, components);
-                    glLightf(slot, GL_SPOT_CUTOFF,
-                        source.cutoff_exponent.cutoff * (180.0f / std::numbers::pi_v<float>));
-                    glLightf(slot, GL_SPOT_EXPONENT, source.cutoff_exponent.exponent);
-                } else {
-                    glLightf(slot, GL_SPOT_CUTOFF, 180.0f);
-                    glLightf(slot, GL_SPOT_EXPONENT, 0.0f);
-                }
-            }, device.lights[index]);
+            std::visit(
+                [&](const auto &source) {
+                    using source_type = std::decay_t<decltype(source)>;
+                    const auto diffuse = native_color(source.diffuse);
+                    const auto specular = native_color(source.specular);
+                    glLightfv(slot, GL_AMBIENT, no_ambient.data());
+                    glLightfv(slot, GL_DIFFUSE, diffuse.data());
+                    glLightfv(slot, GL_SPECULAR, specular.data());
+                    if constexpr (std::is_same_v<source_type, directional_light>) {
+                        const auto direction = unit_direction(source.direction);
+                        const GLfloat position[]{-direction.x, -direction.y, -direction.z, 0.0f};
+                        glLightfv(slot, GL_POSITION, position);
+                    } else {
+                        const GLfloat position[]{source.position.x, source.position.y, source.position.z, 1.0f};
+                        glLightfv(slot, GL_POSITION, position);
+                        glLightf(slot, GL_CONSTANT_ATTENUATION, source.attenuation.constant);
+                        glLightf(slot, GL_LINEAR_ATTENUATION, source.attenuation.linear);
+                        glLightf(slot, GL_QUADRATIC_ATTENUATION, source.attenuation.quadratic);
+                    }
+                    if constexpr (std::is_same_v<source_type, spot_light>) {
+                        const auto direction = unit_direction(source.direction);
+                        const GLfloat components[]{direction.x, direction.y, direction.z};
+                        glLightfv(slot, GL_SPOT_DIRECTION, components);
+                        glLightf(
+                            slot, GL_SPOT_CUTOFF, source.cutoff_exponent.cutoff * (180.0f / std::numbers::pi_v<float>)
+                        );
+                        glLightf(slot, GL_SPOT_EXPONENT, source.cutoff_exponent.exponent);
+                    } else {
+                        glLightf(slot, GL_SPOT_CUTOFF, 180.0f);
+                        glLightf(slot, GL_SPOT_EXPONENT, 0.0f);
+                    }
+                },
+                device.lights[index]
+            );
             glEnable(slot);
         }
         const transform modelview = device.transforms.world * device.transforms.view;

@@ -14,14 +14,29 @@
 
 namespace alia {
     class frame;
+
     namespace detail {
         void frame_draw_transient(frame &, const void *, int, const vertex_definition_view &, primitive_topology);
-        void frame_draw_buffered(frame &, vertex_buffer_handle *, int, int, const vertex_definition_view &, primitive_topology);
-        void frame_draw_indexed_transient(frame &, const void *, int, const void *, int, index_format, const vertex_definition_view &, primitive_topology);
-        void frame_draw_indexed_buffered(frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, const vertex_definition_view &, primitive_topology);
-        void frame_draw_instanced_buffered(frame &, vertex_buffer_handle *, int, int, int, vertex_buffer_handle *, int, int, int, const vertex_definition_view &, const instance_definition_view &, primitive_topology);
-        void frame_draw_indexed_instanced_buffered(frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, vertex_buffer_handle *, int, int, int, const vertex_definition_view &, const instance_definition_view &, primitive_topology);
-    }
+        void frame_draw_buffered(
+            frame &, vertex_buffer_handle *, int, int, const vertex_definition_view &, primitive_topology
+        );
+        void frame_draw_indexed_transient(
+            frame &, const void *, int, const void *, int, index_format, const vertex_definition_view &,
+            primitive_topology
+        );
+        void frame_draw_indexed_buffered(
+            frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int,
+            const vertex_definition_view &, primitive_topology
+        );
+        void frame_draw_instanced_buffered(
+            frame &, vertex_buffer_handle *, int, int, int, vertex_buffer_handle *, int, int, int,
+            const vertex_definition_view &, const instance_definition_view &, primitive_topology
+        );
+        void frame_draw_indexed_instanced_buffered(
+            frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, vertex_buffer_handle *,
+            int, int, int, const vertex_definition_view &, const instance_definition_view &, primitive_topology
+        );
+    } // namespace detail
 
     // A frame owns all drawing state for one swapchain update. It starts on
     // the backbuffer with no implicit clear; targets and clears are commands.
@@ -97,9 +112,19 @@ namespace alia {
         void set_world(const transform &);
         void set_view(const transform &);
         void set_projection(const transform &);
-        [[nodiscard]] const transform &world() const noexcept { return transforms_.world; }
-        [[nodiscard]] const transform &view() const noexcept { return transforms_.view; }
-        [[nodiscard]] const transform &projection() const noexcept { return transforms_.projection; }
+
+        [[nodiscard]] const transform &world() const noexcept {
+            return transforms_.world;
+        }
+
+        [[nodiscard]] const transform &view() const noexcept {
+            return transforms_.view;
+        }
+
+        [[nodiscard]] const transform &projection() const noexcept {
+            return transforms_.projection;
+        }
+
         [[nodiscard]] transform ui_projection() const;
         [[nodiscard]] state_scope save_state();
         // Saves the full render state, then sets world to local * world().
@@ -136,39 +161,102 @@ namespace alia {
         void set_texture(int slot, cube_texture &tex);
         void set_texture(int slot, cube_texture &tex, const sampler_state &sampler);
         void set_viewport(const render_viewport &vp);
-        [[nodiscard]] vec2i target_size() const noexcept { return target_size_; }
+
+        [[nodiscard]] vec2i target_size() const noexcept {
+            return target_size_;
+        }
 
         template <vertex_type TVertex>
         void draw(std::span<const TVertex> vertices, primitive_topology topology = primitive_topology::triangle_list) {
-            detail::frame_draw_transient(*this, vertices.data(), static_cast<int>(vertices.size()), detail::vertex_definition_of<TVertex>(), topology);
+            detail::frame_draw_transient(
+                *this,
+                vertices.data(),
+                static_cast<int>(vertices.size()),
+                detail::vertex_definition_of<TVertex>(),
+                topology
+            );
         }
+
         template <vertex_type TVertex>
-        void draw(vertex_buffer<TVertex> &vertices, int first_vertex = 0, int vertex_count = -1,
-                  primitive_topology topology = primitive_topology::triangle_list) {
+        void draw(
+            vertex_buffer<TVertex> &vertices, int first_vertex = 0, int vertex_count = -1,
+            primitive_topology topology = primitive_topology::triangle_list
+        ) {
             const int count = vertex_count < 0 ? vertices.count() - first_vertex : vertex_count;
-            detail::frame_draw_buffered(*this, vertices.impl(), count, first_vertex, detail::vertex_definition_of<TVertex>(), topology);
+            detail::frame_draw_buffered(
+                *this, vertices.impl(), count, first_vertex, detail::vertex_definition_of<TVertex>(), topology
+            );
         }
+
         // 32-bit indices throw unsupported_operation_exception when caps().index32 is false.
         template <vertex_type TVertex, index_type TIndex>
-        void draw_indexed(std::span<const TVertex> vertices, std::span<const TIndex> indices,
-                          primitive_topology topology = primitive_topology::triangle_list) {
-            detail::frame_draw_indexed_transient(*this, vertices.data(), static_cast<int>(vertices.size()), indices.data(), static_cast<int>(indices.size()), index_format_of<TIndex>, detail::vertex_definition_of<TVertex>(), topology);
+        void draw_indexed(
+            std::span<const TVertex> vertices, std::span<const TIndex> indices,
+            primitive_topology topology = primitive_topology::triangle_list
+        ) {
+            detail::frame_draw_indexed_transient(
+                *this,
+                vertices.data(),
+                static_cast<int>(vertices.size()),
+                indices.data(),
+                static_cast<int>(indices.size()),
+                index_format_of<TIndex>,
+                detail::vertex_definition_of<TVertex>(),
+                topology
+            );
         }
+
         template <vertex_type TVertex>
-        void draw_indexed(std::span<const TVertex> vertices, std::span<const uint16_t> indices,
-                          primitive_topology topology = primitive_topology::triangle_list) {
-            detail::frame_draw_indexed_transient(*this, vertices.data(), static_cast<int>(vertices.size()), indices.data(), static_cast<int>(indices.size()), index_format::u16, detail::vertex_definition_of<TVertex>(), topology);
+        void draw_indexed(
+            std::span<const TVertex> vertices, std::span<const uint16_t> indices,
+            primitive_topology topology = primitive_topology::triangle_list
+        ) {
+            detail::frame_draw_indexed_transient(
+                *this,
+                vertices.data(),
+                static_cast<int>(vertices.size()),
+                indices.data(),
+                static_cast<int>(indices.size()),
+                index_format::u16,
+                detail::vertex_definition_of<TVertex>(),
+                topology
+            );
         }
+
         template <vertex_type TVertex>
-        void draw_indexed(std::span<const TVertex> vertices, std::span<const uint32_t> indices,
-                          primitive_topology topology = primitive_topology::triangle_list) {
-            detail::frame_draw_indexed_transient(*this, vertices.data(), static_cast<int>(vertices.size()), indices.data(), static_cast<int>(indices.size()), index_format::u32, detail::vertex_definition_of<TVertex>(), topology);
+        void draw_indexed(
+            std::span<const TVertex> vertices, std::span<const uint32_t> indices,
+            primitive_topology topology = primitive_topology::triangle_list
+        ) {
+            detail::frame_draw_indexed_transient(
+                *this,
+                vertices.data(),
+                static_cast<int>(vertices.size()),
+                indices.data(),
+                static_cast<int>(indices.size()),
+                index_format::u32,
+                detail::vertex_definition_of<TVertex>(),
+                topology
+            );
         }
+
         template <vertex_type TVertex, index_type TIndex>
-        void draw_indexed(vertex_buffer<TVertex> &vertices, index_buffer<TIndex> &indices,
-                          int first_index = 0, int index_count = -1, int base_vertex = 0,
-                          primitive_topology topology = primitive_topology::triangle_list) {
-            detail::frame_draw_indexed_buffered(*this, vertices.impl(), vertices.count(), indices.impl(), indices.count(), first_index, index_count, base_vertex, detail::vertex_definition_of<TVertex>(), topology);
+        void draw_indexed(
+            vertex_buffer<TVertex> &vertices, index_buffer<TIndex> &indices, int first_index = 0, int index_count = -1,
+            int base_vertex = 0, primitive_topology topology = primitive_topology::triangle_list
+        ) {
+            detail::frame_draw_indexed_buffered(
+                *this,
+                vertices.impl(),
+                vertices.count(),
+                indices.impl(),
+                indices.count(),
+                first_index,
+                index_count,
+                base_vertex,
+                detail::vertex_definition_of<TVertex>(),
+                topology
+            );
         }
 
         // Instanced draws require caps().instancing and a selected shader. Unsupported
@@ -180,52 +268,97 @@ namespace alia {
         // first_instance offsets the input stream; shaders receive slots described
         // by TInstance::instance_elements(). Later ordinary draws use no instance stream.
         template <vertex_type TVertex, instance_type TInstance>
-        void draw_instanced(vertex_buffer<TVertex> &vertices, instance_buffer<TInstance> &instances,
-                            int first_vertex = 0, int vertex_count = -1,
-                            int first_instance = 0, int instance_count = -1,
-                            primitive_topology topology = primitive_topology::triangle_list) {
-            detail::frame_draw_instanced_buffered(*this, vertices.impl(), vertices.count(), first_vertex, vertex_count,
-                instances.impl(), instances.count(), first_instance, instance_count,
-                detail::vertex_definition_of<TVertex>(), detail::instance_definition_of<TInstance>(), topology);
+        void draw_instanced(
+            vertex_buffer<TVertex> &vertices, instance_buffer<TInstance> &instances, int first_vertex = 0,
+            int vertex_count = -1, int first_instance = 0, int instance_count = -1,
+            primitive_topology topology = primitive_topology::triangle_list
+        ) {
+            detail::frame_draw_instanced_buffered(
+                *this,
+                vertices.impl(),
+                vertices.count(),
+                first_vertex,
+                vertex_count,
+                instances.impl(),
+                instances.count(),
+                first_instance,
+                instance_count,
+                detail::vertex_definition_of<TVertex>(),
+                detail::instance_definition_of<TInstance>(),
+                topology
+            );
         }
+
         template <vertex_type TVertex, index_type TIndex, instance_type TInstance>
-        void draw_indexed_instanced(vertex_buffer<TVertex> &vertices, index_buffer<TIndex> &indices, instance_buffer<TInstance> &instances,
-                                    int first_index = 0, int index_count = -1, int base_vertex = 0,
-                                    int first_instance = 0, int instance_count = -1,
-                                    primitive_topology topology = primitive_topology::triangle_list) {
-            detail::frame_draw_indexed_instanced_buffered(*this, vertices.impl(), vertices.count(),
-                indices.impl(), indices.count(), first_index, index_count, base_vertex,
-                instances.impl(), instances.count(), first_instance, instance_count,
-                detail::vertex_definition_of<TVertex>(), detail::instance_definition_of<TInstance>(), topology);
+        void draw_indexed_instanced(
+            vertex_buffer<TVertex> &vertices, index_buffer<TIndex> &indices, instance_buffer<TInstance> &instances,
+            int first_index = 0, int index_count = -1, int base_vertex = 0, int first_instance = 0,
+            int instance_count = -1, primitive_topology topology = primitive_topology::triangle_list
+        ) {
+            detail::frame_draw_indexed_instanced_buffered(
+                *this,
+                vertices.impl(),
+                vertices.count(),
+                indices.impl(),
+                indices.count(),
+                first_index,
+                index_count,
+                base_vertex,
+                instances.impl(),
+                instances.count(),
+                first_instance,
+                instance_count,
+                detail::vertex_definition_of<TVertex>(),
+                detail::instance_definition_of<TInstance>(),
+                topology
+            );
         }
 
         void copy_to_texture(texture &dst, rect_i src_rect, vec2i dst_pos = {}, int dst_level = 0);
-        void copy_to_texture(
-            cube_texture &dst,
-            cube_face face,
-            rect_i src_rect,
-            vec2i dst_pos = {},
-            int dst_level = 0
-        );
+        void copy_to_texture(cube_texture &dst, cube_face face, rect_i src_rect, vec2i dst_pos = {}, int dst_level = 0);
         void present();
         void present(rect_i region);
-        [[nodiscard]] bool valid() const noexcept { return active_; }
+
+        [[nodiscard]] bool valid() const noexcept {
+            return active_;
+        }
 
     private:
         friend class swapchain;
-        friend void detail::frame_draw_transient(frame &, const void *, int, const vertex_definition_view &, primitive_topology);
-        friend void detail::frame_draw_buffered(frame &, vertex_buffer_handle *, int, int, const vertex_definition_view &, primitive_topology);
-        friend void detail::frame_draw_indexed_transient(frame &, const void *, int, const void *, int, index_format, const vertex_definition_view &, primitive_topology);
-        friend void detail::frame_draw_indexed_buffered(frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, const vertex_definition_view &, primitive_topology);
-        friend void detail::frame_draw_instanced_buffered(frame &, vertex_buffer_handle *, int, int, int, vertex_buffer_handle *, int, int, int, const vertex_definition_view &, const instance_definition_view &, primitive_topology);
-        friend void detail::frame_draw_indexed_instanced_buffered(frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, vertex_buffer_handle *, int, int, int, const vertex_definition_view &, const instance_definition_view &, primitive_topology);
+        friend void
+        detail::frame_draw_transient(frame &, const void *, int, const vertex_definition_view &, primitive_topology);
+        friend void detail::frame_draw_buffered(
+            frame &, vertex_buffer_handle *, int, int, const vertex_definition_view &, primitive_topology
+        );
+        friend void detail::frame_draw_indexed_transient(
+            frame &, const void *, int, const void *, int, index_format, const vertex_definition_view &,
+            primitive_topology
+        );
+        friend void detail::frame_draw_indexed_buffered(
+            frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int,
+            const vertex_definition_view &, primitive_topology
+        );
+        friend void detail::frame_draw_instanced_buffered(
+            frame &, vertex_buffer_handle *, int, int, int, vertex_buffer_handle *, int, int, int,
+            const vertex_definition_view &, const instance_definition_view &, primitive_topology
+        );
+        friend void detail::frame_draw_indexed_instanced_buffered(
+            frame &, vertex_buffer_handle *, int, index_buffer_handle *, int, int, int, int, vertex_buffer_handle *,
+            int, int, int, const vertex_definition_view &, const instance_definition_view &, primitive_topology
+        );
         explicit frame(swapchain &);
         void finish_without_present() noexcept;
         void ensure_active() const;
         void prepare_draw(const vertex_definition_view &, const instance_definition_view & = {});
         void unbind_render_target_source(texture_handle *);
-        [[nodiscard]] const graphics_backend_interface *backend() const noexcept { return swapchain_->backend_; }
-        [[nodiscard]] device_handle *device() const noexcept { return swapchain_->device_; }
+
+        [[nodiscard]] const graphics_backend_interface *backend() const noexcept {
+            return swapchain_->backend_;
+        }
+
+        [[nodiscard]] device_handle *device() const noexcept {
+            return swapchain_->device_;
+        }
 
         swapchain *swapchain_ = nullptr;
         shader_program *shader_ = nullptr;
@@ -246,7 +379,12 @@ namespace alia {
         bool lighting_dirty_ = true;
         bool material_dirty_ = true;
         bool fog_dirty_ = true;
-        enum class slot0_kind { none, color, alpha_mask, cube };
+        enum class slot0_kind {
+            none,
+            color,
+            alpha_mask,
+            cube
+        };
         slot0_kind slot0_kind_ = slot0_kind::none;
         vec2i target_size_ = {};
         bool target_has_depth_ = false;

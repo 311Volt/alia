@@ -9,25 +9,34 @@
 namespace alia {
     inline constexpr int max_lights = 8;
 
-    enum class spot_light_model { inner_outer, cutoff_exponent };
+    enum class spot_light_model {
+        inner_outer,
+        cutoff_exponent
+    };
 
     // D3D9 full cone angles, in radians: 0 <= inner <= outer <= pi.
     // Both spot parameter sets are required and validated by frame::set_lights.
     struct spot_inner_outer {
         float inner, outer;
         spot_inner_outer() = delete;
-        constexpr spot_inner_outer(float inner, float outer) noexcept
-            : inner(inner), outer(outer) {}
+
+        constexpr spot_inner_outer(float inner, float outer) noexcept : inner(inner), outer(outer) {
+        }
+
         bool operator==(const spot_inner_outer &) const = default;
     };
+
     // OpenGL half-angle in radians, [0, pi/2], and exponent in [0, 128].
     struct spot_cutoff_exponent {
         float cutoff, exponent;
         spot_cutoff_exponent() = delete;
-        constexpr spot_cutoff_exponent(float cutoff, float exponent) noexcept
-            : cutoff(cutoff), exponent(exponent) {}
+
+        constexpr spot_cutoff_exponent(float cutoff, float exponent) noexcept : cutoff(cutoff), exponent(exponent) {
+        }
+
         bool operator==(const spot_cutoff_exponent &) const = default;
     };
+
     // Terms in the distance denominator constant + linear*d + quadratic*d*d.
     // All must be finite and nonnegative, and at least one must be positive.
     struct light_attenuation {
@@ -43,12 +52,14 @@ namespace alia {
         color diffuse = white, specular = white;
         bool operator==(const directional_light &) const = default;
     };
+
     struct point_light {
         vec3f position;
         light_attenuation attenuation = {};
         color diffuse = white, specular = white;
         bool operator==(const point_light &) const = default;
     };
+
     struct spot_light {
         vec3f position;
         vec3f direction;
@@ -58,6 +69,7 @@ namespace alia {
         color diffuse = white, specular = white;
         bool operator==(const spot_light &) const = default;
     };
+
     using light = std::variant<directional_light, point_light, spot_light>;
 
     struct material {
@@ -68,9 +80,17 @@ namespace alia {
         bool operator==(const material &) const = default;
     };
 
-    enum class fog_mode { none, linear, exp, exp2 };
+    enum class fog_mode {
+        none,
+        linear,
+        exp,
+        exp2
+    };
     // Radial uses distance from the eye; view_depth uses absolute camera-space Z.
-    enum class fog_distance_model { radial, view_depth };
+    enum class fog_distance_model {
+        radial,
+        view_depth
+    };
 
     // Fixed-function fog blends RGB towards col, leaving alpha unchanged.
     // Distances use caps().fog_distance, in the same units as the view transform.
@@ -78,7 +98,7 @@ namespace alia {
         fog_mode mode = fog_mode::none;
         color col = black;
         float start = 0.0f, end = 1.0f; // Linear distances; must differ in linear mode.
-        float density = 1.0f; // Nonnegative; used by exp and exp2.
+        float density = 1.0f;           // Nonnegative; used by exp and exp2.
         bool operator==(const fog_state &) const = default;
     };
 } // namespace alia

@@ -28,60 +28,60 @@ namespace alia {
         key vk_to_key(WPARAM vk, LPARAM lp) {
             const bool extended = ((lp >> 24) & 1) != 0;
             switch (vk) {
-            case VK_BACK: return key::backspace;
-            case VK_TAB: return key::tab;
-            case VK_RETURN: return extended ? key::numpad_enter : key::enter;
-            case VK_ESCAPE: return key::escape;
-            case VK_SPACE: return key::space;
-            case VK_PRIOR: return extended ? key::page_up : key::numpad9;
-            case VK_NEXT: return extended ? key::page_down : key::numpad3;
-            case VK_END: return extended ? key::end : key::numpad1;
-            case VK_HOME: return extended ? key::home : key::numpad7;
-            case VK_LEFT: return extended ? key::left : key::numpad4;
-            case VK_UP: return extended ? key::up : key::numpad8;
-            case VK_RIGHT: return extended ? key::right : key::numpad6;
-            case VK_DOWN: return extended ? key::down : key::numpad2;
-            case VK_INSERT: return extended ? key::insert : key::numpad0;
-            case VK_DELETE: return extended ? key::del : key::numpad_decimal;
-            case VK_CLEAR: return key::numpad5;
-            case VK_LWIN: return key::lsuper;
-            case VK_RWIN: return key::rsuper;
-            case VK_APPS: return key::menu;
-            case VK_MULTIPLY: return key::numpad_multiply;
-            case VK_ADD: return key::numpad_add;
-            case VK_SUBTRACT: return key::numpad_subtract;
-            case VK_DECIMAL: return key::numpad_decimal;
-            case VK_DIVIDE: return key::numpad_divide;
+            case VK_BACK:          return key::backspace;
+            case VK_TAB:           return key::tab;
+            case VK_RETURN:        return extended ? key::numpad_enter : key::enter;
+            case VK_ESCAPE:        return key::escape;
+            case VK_SPACE:         return key::space;
+            case VK_PRIOR:         return extended ? key::page_up : key::numpad9;
+            case VK_NEXT:          return extended ? key::page_down : key::numpad3;
+            case VK_END:           return extended ? key::end : key::numpad1;
+            case VK_HOME:          return extended ? key::home : key::numpad7;
+            case VK_LEFT:          return extended ? key::left : key::numpad4;
+            case VK_UP:            return extended ? key::up : key::numpad8;
+            case VK_RIGHT:         return extended ? key::right : key::numpad6;
+            case VK_DOWN:          return extended ? key::down : key::numpad2;
+            case VK_INSERT:        return extended ? key::insert : key::numpad0;
+            case VK_DELETE:        return extended ? key::del : key::numpad_decimal;
+            case VK_CLEAR:         return key::numpad5;
+            case VK_LWIN:          return key::lsuper;
+            case VK_RWIN:          return key::rsuper;
+            case VK_APPS:          return key::menu;
+            case VK_MULTIPLY:      return key::numpad_multiply;
+            case VK_ADD:           return key::numpad_add;
+            case VK_SUBTRACT:      return key::numpad_subtract;
+            case VK_DECIMAL:       return key::numpad_decimal;
+            case VK_DIVIDE:        return key::numpad_divide;
             case VK_OEM_NEC_EQUAL: return key::numpad_equals;
-            case VK_NUMLOCK: return key::num_lock;
-            case VK_SCROLL: return key::scroll_lock;
+            case VK_NUMLOCK:       return key::num_lock;
+            case VK_SCROLL:        return key::scroll_lock;
             case VK_SHIFT:
-                return MapVirtualKeyW(
-                    static_cast<UINT>((lp >> 16) & 0xff), MAPVK_VSC_TO_VK_EX) == VK_RSHIFT
-                    ? key::rshift : key::lshift;
-            case VK_CONTROL: return extended ? key::rctrl : key::lctrl;
-            case VK_MENU: return extended ? key::ralt : key::lalt;
-            case VK_LSHIFT: return key::lshift;
-            case VK_RSHIFT: return key::rshift;
-            case VK_LCONTROL: return key::lctrl;
-            case VK_RCONTROL: return key::rctrl;
-            case VK_LMENU: return key::lalt;
-            case VK_RMENU: return key::ralt;
-            case VK_CAPITAL: return key::caps_lock;
-            case VK_SNAPSHOT: return key::print_screen;
-            case VK_PAUSE: return key::pause;
-            case VK_OEM_MINUS: return key::minus;
-            case VK_OEM_PLUS: return key::equals;
-            case VK_OEM_4: return key::left_bracket;
-            case VK_OEM_6: return key::right_bracket;
-            case VK_OEM_5: return key::backslash;
-            case VK_OEM_1: return key::semicolon;
-            case VK_OEM_7: return key::apostrophe;
-            case VK_OEM_3: return key::grave;
-            case VK_OEM_COMMA: return key::comma;
+                return MapVirtualKeyW(static_cast<UINT>((lp >> 16) & 0xff), MAPVK_VSC_TO_VK_EX) == VK_RSHIFT
+                           ? key::rshift
+                           : key::lshift;
+            case VK_CONTROL:    return extended ? key::rctrl : key::lctrl;
+            case VK_MENU:       return extended ? key::ralt : key::lalt;
+            case VK_LSHIFT:     return key::lshift;
+            case VK_RSHIFT:     return key::rshift;
+            case VK_LCONTROL:   return key::lctrl;
+            case VK_RCONTROL:   return key::rctrl;
+            case VK_LMENU:      return key::lalt;
+            case VK_RMENU:      return key::ralt;
+            case VK_CAPITAL:    return key::caps_lock;
+            case VK_SNAPSHOT:   return key::print_screen;
+            case VK_PAUSE:      return key::pause;
+            case VK_OEM_MINUS:  return key::minus;
+            case VK_OEM_PLUS:   return key::equals;
+            case VK_OEM_4:      return key::left_bracket;
+            case VK_OEM_6:      return key::right_bracket;
+            case VK_OEM_5:      return key::backslash;
+            case VK_OEM_1:      return key::semicolon;
+            case VK_OEM_7:      return key::apostrophe;
+            case VK_OEM_3:      return key::grave;
+            case VK_OEM_COMMA:  return key::comma;
             case VK_OEM_PERIOD: return key::period;
-            case VK_OEM_2: return key::slash;
-            case VK_OEM_102: return key::oem_102;
+            case VK_OEM_2:      return key::slash;
+            case VK_OEM_102:    return key::oem_102;
             default:
                 if (vk >= '0' && vk <= '9')
                     return static_cast<key>(static_cast<int>(key::num0) + static_cast<int>(vk - '0'));
@@ -97,60 +97,60 @@ namespace alia {
 
         key_mod get_lock_modifiers() {
             key_mod modifiers = key_mod::none;
-            if (GetKeyState(VK_CAPITAL) & 0x0001) modifiers |= key_mod::caps_lock;
-            if (GetKeyState(VK_NUMLOCK) & 0x0001) modifiers |= key_mod::num_lock;
-            if (GetKeyState(VK_SCROLL) & 0x0001) modifiers |= key_mod::scroll_lock;
+            if (GetKeyState(VK_CAPITAL) & 0x0001)
+                modifiers |= key_mod::caps_lock;
+            if (GetKeyState(VK_NUMLOCK) & 0x0001)
+                modifiers |= key_mod::num_lock;
+            if (GetKeyState(VK_SCROLL) & 0x0001)
+                modifiers |= key_mod::scroll_lock;
             return modifiers;
         }
 
         key_mod get_modifiers() {
             const keyboard_state state = get_keyboard_state();
             key_mod modifiers = get_lock_modifiers();
-            if (state.shift()) modifiers |= key_mod::shift;
-            if (state.ctrl()) modifiers |= key_mod::ctrl;
-            if (state.alt()) modifiers |= key_mod::alt;
-            if (state.alt_gr()) modifiers |= key_mod::alt_gr;
-            if (state.super()) modifiers |= key_mod::super;
+            if (state.shift())
+                modifiers |= key_mod::shift;
+            if (state.ctrl())
+                modifiers |= key_mod::ctrl;
+            if (state.alt())
+                modifiers |= key_mod::alt;
+            if (state.alt_gr())
+                modifiers |= key_mod::alt_gr;
+            if (state.super())
+                modifiers |= key_mod::super;
             return modifiers;
         }
 
-        bool is_altgr_control_message(
-            HWND hwnd, UINT message, WPARAM virtual_key, LPARAM message_data) {
+        bool is_altgr_control_message(HWND hwnd, UINT message, WPARAM virtual_key, LPARAM message_data) {
             if ((message != WM_KEYDOWN && message != WM_SYSKEYDOWN) ||
-                (virtual_key != VK_CONTROL && virtual_key != VK_LCONTROL) ||
-                ((message_data >> 24) & 1) != 0)
+                (virtual_key != VK_CONTROL && virtual_key != VK_LCONTROL) || ((message_data >> 24) & 1) != 0)
                 return false;
 
             MSG next{};
             if (!PeekMessageW(&next, nullptr, 0, 0, PM_NOREMOVE))
                 return false;
-            return next.hwnd == hwnd &&
-                   (next.message == WM_KEYDOWN || next.message == WM_SYSKEYDOWN) &&
-                   (next.wParam == VK_MENU || next.wParam == VK_RMENU) &&
-                   ((next.lParam >> 24) & 1) != 0 &&
+            return next.hwnd == hwnd && (next.message == WM_KEYDOWN || next.message == WM_SYSKEYDOWN) &&
+                   (next.wParam == VK_MENU || next.wParam == VK_RMENU) && ((next.lParam >> 24) & 1) != 0 &&
                    next.time == static_cast<DWORD>(GetMessageTime());
         }
 
         std::wstring utf8_to_wide(std::string_view text) {
-            if (text.empty()) return {};
-            const int length = MultiByteToWideChar(
-                CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+            if (text.empty())
+                return {};
+            const int length = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
             std::wstring result(static_cast<std::size_t>(length), L'\0');
-            MultiByteToWideChar(
-                CP_UTF8, 0, text.data(), static_cast<int>(text.size()),
-                result.data(), length);
+            MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), result.data(), length);
             return result;
         }
 
         bool constraints_present(window_size_constraints value) {
-            return value.min.x > 0 || value.min.y > 0 ||
-                   value.max.x > 0 || value.max.y > 0;
+            return value.min.x > 0 || value.min.y > 0 || value.max.x > 0 || value.max.y > 0;
         }
 
         RECT monitor_rect(int index) {
             MONITORINFO info{sizeof(info)};
-            if (!GetMonitorInfoW(
-                    static_cast<HMONITOR>(detail::win32_monitor_handle(index)), &info))
+            if (!GetMonitorInfoW(static_cast<HMONITOR>(detail::win32_monitor_handle(index)), &info))
                 throw std::runtime_error("window: GetMonitorInfoW failed");
             return info.rcMonitor;
         }
@@ -160,16 +160,15 @@ namespace alia {
                 return nullptr;
             bitmap converted(source.size(), px_bgra8888{});
             converting_blit_lossy(converted.view(), source);
-            HBITMAP color = CreateBitmap(
-                source.width(), source.height(), 1, 32, converted.line(0));
+            HBITMAP color = CreateBitmap(source.width(), source.height(), 1, 32, converted.line(0));
             const int mask_stride = ((source.width() + 15) / 16) * 2;
-            const std::vector<unsigned char> mask_bits(
-                static_cast<std::size_t>(mask_stride * source.height()), 0);
-            HBITMAP mask = CreateBitmap(
-                source.width(), source.height(), 1, 1, mask_bits.data());
+            const std::vector<unsigned char> mask_bits(static_cast<std::size_t>(mask_stride * source.height()), 0);
+            HBITMAP mask = CreateBitmap(source.width(), source.height(), 1, 1, mask_bits.data());
             if (!color || !mask) {
-                if (color) DeleteObject(color);
-                if (mask) DeleteObject(mask);
+                if (color)
+                    DeleteObject(color);
+                if (mask)
+                    DeleteObject(mask);
                 return nullptr;
             }
             ICONINFO info{};
@@ -182,9 +181,9 @@ namespace alia {
             return result;
         }
 
-        const any_bitmap_view *closest_icon(
-            std::span<const any_bitmap_view> icons, int width, int height) {
-            if (icons.empty()) return nullptr;
+        const any_bitmap_view *closest_icon(std::span<const any_bitmap_view> icons, int width, int height) {
+            if (icons.empty())
+                return nullptr;
             return &*std::min_element(icons.begin(), icons.end(), [&](const auto &a, const auto &b) {
                 const int a_delta = std::abs(a.width() - width) + std::abs(a.height() - height);
                 const int b_delta = std::abs(b.width() - width) + std::abs(b.height() - height);
@@ -196,38 +195,41 @@ namespace alia {
 
         LPCTSTR system_cursor_id(system_mouse_cursor cursor) {
             switch (cursor) {
-            case system_mouse_cursor::busy: return IDC_WAIT;
-            case system_mouse_cursor::question: return IDC_HELP;
-            case system_mouse_cursor::edit: return IDC_IBEAM;
-            case system_mouse_cursor::move: return IDC_SIZEALL;
+            case system_mouse_cursor::busy:                return IDC_WAIT;
+            case system_mouse_cursor::question:            return IDC_HELP;
+            case system_mouse_cursor::edit:                return IDC_IBEAM;
+            case system_mouse_cursor::move:                return IDC_SIZEALL;
             case system_mouse_cursor::resize_north:
-            case system_mouse_cursor::resize_south: return IDC_SIZENS;
+            case system_mouse_cursor::resize_south:        return IDC_SIZENS;
             case system_mouse_cursor::resize_east:
-            case system_mouse_cursor::resize_west: return IDC_SIZEWE;
+            case system_mouse_cursor::resize_west:         return IDC_SIZEWE;
             case system_mouse_cursor::resize_northeast:
-            case system_mouse_cursor::resize_southwest: return IDC_SIZENESW;
+            case system_mouse_cursor::resize_southwest:    return IDC_SIZENESW;
             case system_mouse_cursor::resize_northwest:
-            case system_mouse_cursor::resize_southeast: return IDC_SIZENWSE;
-            case system_mouse_cursor::progress: return IDC_APPSTARTING;
-            case system_mouse_cursor::precision: return IDC_CROSS;
-            case system_mouse_cursor::link: return IDC_HAND;
+            case system_mouse_cursor::resize_southeast:    return IDC_SIZENWSE;
+            case system_mouse_cursor::progress:            return IDC_APPSTARTING;
+            case system_mouse_cursor::precision:           return IDC_CROSS;
+            case system_mouse_cursor::link:                return IDC_HAND;
             case system_mouse_cursor::alternate_selection: return IDC_UPARROW;
-            case system_mouse_cursor::unavailable: return IDC_NO;
-            default: return IDC_ARROW;
+            case system_mouse_cursor::unavailable:         return IDC_NO;
+            default:                                       return IDC_ARROW;
             }
         }
 
         constexpr std::uint32_t mouse_button_bit(mouse_button button) {
             return std::uint32_t{1} << (static_cast<unsigned>(button) - 1);
         }
-    }
+    } // namespace
 
     win32_window::~win32_window() {
         detail::win32_platform_mouse_window_destroyed(this);
         restore_display_mode();
-        if (hwnd) DestroyWindow(hwnd);
-        if (big_icon_) DestroyIcon(big_icon_);
-        if (small_icon_) DestroyIcon(small_icon_);
+        if (hwnd)
+            DestroyWindow(hwnd);
+        if (big_icon_)
+            DestroyIcon(big_icon_);
+        if (small_icon_)
+            DestroyIcon(small_icon_);
     }
 
     void win32_window::set_owner(window *value) noexcept {
@@ -238,90 +240,121 @@ namespace alia {
             detail::set_current_window(owner);
     }
 
-    vec2i win32_window::size() const { return client_size; }
+    vec2i win32_window::size() const {
+        return client_size;
+    }
 
-    cstring_view win32_window::title() const { return cstring_view(title_utf8.c_str()); }
+    cstring_view win32_window::title() const {
+        return cstring_view(title_utf8.c_str());
+    }
 
     vec2i win32_window::position() const {
-        if (!hwnd) return {};
+        if (!hwnd)
+            return {};
         POINT point{0, 0};
         ClientToScreen(hwnd, &point);
         return {point.x, point.y};
     }
 
-    bool win32_window::is_focused() const { return hwnd && GetForegroundWindow() == hwnd; }
+    bool win32_window::is_focused() const {
+        return hwnd && GetForegroundWindow() == hwnd;
+    }
 
-    bool win32_window::is_minimized() const { return hwnd && IsIconic(hwnd); }
+    bool win32_window::is_minimized() const {
+        return hwnd && IsIconic(hwnd);
+    }
 
-    bool win32_window::is_maximized() const { return hwnd && IsZoomed(hwnd); }
+    bool win32_window::is_maximized() const {
+        return hwnd && IsZoomed(hwnd);
+    }
 
-    window_fullscreen_mode win32_window::fullscreen_mode() const { return mode_; }
+    window_fullscreen_mode win32_window::fullscreen_mode() const {
+        return mode_;
+    }
 
-    bool win32_window::is_resizable() const { return resizable_; }
+    bool win32_window::is_resizable() const {
+        return resizable_;
+    }
 
-    bool win32_window::is_borderless() const { return borderless_; }
+    bool win32_window::is_borderless() const {
+        return borderless_;
+    }
 
-    bool win32_window::generates_expose_events() const { return expose_; }
+    bool win32_window::generates_expose_events() const {
+        return expose_;
+    }
 
     int win32_window::refresh_rate() const {
         if (mode_ == window_fullscreen_mode::fullscreen)
             return active_mode_.refresh_rate;
-        try { return win32_desktop_mode(nullptr, monitor()).refresh_rate; }
-        catch (...) { return 0; }
+        try {
+            return win32_desktop_mode(nullptr, monitor()).refresh_rate;
+        } catch (...) {
+            return 0;
+        }
     }
 
     int win32_window::monitor() const {
         if (!hwnd)
             return monitor_opt_ >= 0 ? monitor_opt_ : 0;
-        const int index = detail::win32_monitor_index(
-            MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY));
+        const int index = detail::win32_monitor_index(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY));
         return index >= 0 ? index : 0;
     }
 
-    window_size_constraints win32_window::size_constraints() const { return constraints_; }
+    window_size_constraints win32_window::size_constraints() const {
+        return constraints_;
+    }
 
     void win32_window::set_title(cstring_view value) {
         title_utf8 = value.data();
-        if (hwnd) SetWindowTextW(hwnd, utf8_to_wide(title_utf8).c_str());
+        if (hwnd)
+            SetWindowTextW(hwnd, utf8_to_wide(title_utf8).c_str());
     }
 
     void win32_window::set_position(vec2i value) {
-        if (hwnd) SetWindowPos(
-            hwnd, nullptr, value.x, value.y, 0, 0,
-            SWP_NOSIZE | SWP_NOZORDER);
+        if (hwnd)
+            SetWindowPos(hwnd, nullptr, value.x, value.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         detail::win32_platform_refresh_mouse_bounds(this);
     }
 
     void win32_window::resize(vec2i value) {
-        if (!hwnd) return;
+        if (!hwnd)
+            return;
         RECT rect{0, 0, value.x, value.y};
         AdjustWindowRectEx(
-            &rect, static_cast<DWORD>(GetWindowLongW(hwnd, GWL_STYLE)),
-            FALSE, static_cast<DWORD>(GetWindowLongW(hwnd, GWL_EXSTYLE)));
-        SetWindowPos(
-            hwnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top,
-            SWP_NOMOVE | SWP_NOZORDER);
+            &rect,
+            static_cast<DWORD>(GetWindowLongW(hwnd, GWL_STYLE)),
+            FALSE,
+            static_cast<DWORD>(GetWindowLongW(hwnd, GWL_EXSTYLE))
+        );
+        SetWindowPos(hwnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE | SWP_NOZORDER);
         detail::win32_platform_refresh_mouse_bounds(this);
     }
 
-    void win32_window::minimize() { if (hwnd) ShowWindow(hwnd, SW_MINIMIZE); }
+    void win32_window::minimize() {
+        if (hwnd)
+            ShowWindow(hwnd, SW_MINIMIZE);
+    }
 
-    void win32_window::maximize() { if (hwnd) ShowWindow(hwnd, SW_MAXIMIZE); }
+    void win32_window::maximize() {
+        if (hwnd)
+            ShowWindow(hwnd, SW_MAXIMIZE);
+    }
 
-    void win32_window::restore() { if (hwnd) ShowWindow(hwnd, SW_RESTORE); }
+    void win32_window::restore() {
+        if (hwnd)
+            ShowWindow(hwnd, SW_RESTORE);
+    }
 
-    void win32_window::set_fullscreen_mode(
-        window_fullscreen_mode requested,
-        const display_mode *exclusive_mode) {
-        if (!hwnd) return;
+    void win32_window::set_fullscreen_mode(window_fullscreen_mode requested, const display_mode *exclusive_mode) {
+        if (!hwnd)
+            return;
         if (requested == mode_ &&
-            (requested != window_fullscreen_mode::fullscreen ||
-             !exclusive_mode || *exclusive_mode == active_mode_))
+            (requested != window_fullscreen_mode::fullscreen || !exclusive_mode || *exclusive_mode == active_mode_))
             return;
 
         const window_fullscreen_mode previous = mode_;
-        if (previous == window_fullscreen_mode::windowed &&
-            requested != window_fullscreen_mode::windowed) {
+        if (previous == window_fullscreen_mode::windowed && requested != window_fullscreen_mode::windowed) {
             saved_placement_.length = sizeof(saved_placement_);
             GetWindowPlacement(hwnd, &saved_placement_);
         }
@@ -354,21 +387,28 @@ namespace alia {
         SetWindowLongW(hwnd, GWL_STYLE, static_cast<LONG>(style_with_runtime(WS_POPUP)));
         const RECT bounds = monitor_rect(target_monitor);
         SetWindowPos(
-            hwnd, HWND_TOP, bounds.left, bounds.top,
-            bounds.right - bounds.left, bounds.bottom - bounds.top,
-            SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            hwnd,
+            HWND_TOP,
+            bounds.left,
+            bounds.top,
+            bounds.right - bounds.left,
+            bounds.bottom - bounds.top,
+            SWP_NOOWNERZORDER | SWP_FRAMECHANGED
+        );
         detail::win32_platform_refresh_mouse_bounds(this);
     }
 
     void win32_window::set_resizable(bool value) {
-        if (resizable_ == value) return;
+        if (resizable_ == value)
+            return;
         resizable_ = value;
         if (mode_ == window_fullscreen_mode::windowed)
             apply_windowed_style_preserving_client();
     }
 
     void win32_window::set_borderless(bool value) {
-        if (borderless_ == value) return;
+        if (borderless_ == value)
+            return;
         borderless_ = value;
         if (mode_ == window_fullscreen_mode::windowed)
             apply_windowed_style_preserving_client();
@@ -385,10 +425,14 @@ namespace alia {
         if (!constraints_enabled_ || mode_ != window_fullscreen_mode::windowed)
             return;
         vec2i clamped = client_size;
-        if (constraints_.min.x > 0) clamped.x = (std::max)(clamped.x, constraints_.min.x);
-        if (constraints_.min.y > 0) clamped.y = (std::max)(clamped.y, constraints_.min.y);
-        if (constraints_.max.x > 0) clamped.x = (std::min)(clamped.x, constraints_.max.x);
-        if (constraints_.max.y > 0) clamped.y = (std::min)(clamped.y, constraints_.max.y);
+        if (constraints_.min.x > 0)
+            clamped.x = (std::max)(clamped.x, constraints_.min.x);
+        if (constraints_.min.y > 0)
+            clamped.y = (std::max)(clamped.y, constraints_.min.y);
+        if (constraints_.max.x > 0)
+            clamped.x = (std::min)(clamped.x, constraints_.max.x);
+        if (constraints_.max.y > 0)
+            clamped.y = (std::min)(clamped.y, constraints_.max.y);
         if (clamped != client_size)
             resize(clamped);
     }
@@ -396,18 +440,18 @@ namespace alia {
     void win32_window::set_icons(std::span<const any_bitmap_view> icons) {
         HICON next_big = nullptr;
         HICON next_small = nullptr;
-        if (const auto *view = closest_icon(
-                icons, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON)))
+        if (const auto *view = closest_icon(icons, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON)))
             next_big = create_icon(*view);
-        if (const auto *view = closest_icon(
-                icons, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON)))
+        if (const auto *view = closest_icon(icons, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON)))
             next_small = create_icon(*view);
         if (hwnd) {
             SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(next_big));
             SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(next_small));
         }
-        if (big_icon_) DestroyIcon(big_icon_);
-        if (small_icon_) DestroyIcon(small_icon_);
+        if (big_icon_)
+            DestroyIcon(big_icon_);
+        if (small_icon_)
+            DestroyIcon(small_icon_);
         big_icon_ = next_big;
         small_icon_ = next_small;
     }
@@ -427,8 +471,7 @@ namespace alia {
         return true;
     }
 
-    bool win32_window::set_cursor(
-        std::shared_ptr<const detail::mouse_cursor_impl> value) {
+    bool win32_window::set_cursor(std::shared_ptr<const detail::mouse_cursor_impl> value) {
         if (!value || !value->native_handle())
             return false;
         custom_cursor_ = std::move(value);
@@ -437,14 +480,12 @@ namespace alia {
     }
 
     bool win32_window::set_cursor_position(vec2i value) {
-        if (!hwnd ||
-            GetWindowThreadProcessId(hwnd, nullptr) != GetCurrentThreadId())
+        if (!hwnd || GetWindowThreadProcessId(hwnd, nullptr) != GetCurrentThreadId())
             return false;
 
         // Preserve physical motion already waiting ahead of this warp.
         MSG pending{};
-        while (PeekMessageW(
-                   &pending, hwnd, WM_MOUSEMOVE, WM_MOUSEMOVE, PM_REMOVE)) {
+        while (PeekMessageW(&pending, hwnd, WM_MOUSEMOVE, WM_MOUSEMOVE, PM_REMOVE)) {
             TranslateMessage(&pending);
             DispatchMessageW(&pending);
         }
@@ -462,24 +503,25 @@ namespace alia {
         return true;
     }
 
-    bool win32_window::is_cursor_visible() const { return cursor_visible; }
+    bool win32_window::is_cursor_visible() const {
+        return cursor_visible;
+    }
 
     bool win32_window::set_mouse_mode(mouse_mode mode) {
-        return detail::win32_platform_set_mouse_mode(
-            this, static_cast<void *>(hwnd), source, mode);
+        return detail::win32_platform_set_mouse_mode(this, static_cast<void *>(hwnd), source, mode);
     }
 
     mouse_mode win32_window::requested_mouse_mode() const {
-        return detail::win32_platform_requested_mouse_mode(
-            const_cast<win32_window *>(this));
+        return detail::win32_platform_requested_mouse_mode(const_cast<win32_window *>(this));
     }
 
     mouse_mode win32_window::active_mouse_mode() const {
-        return detail::win32_platform_active_mouse_mode(
-            const_cast<win32_window *>(this));
+        return detail::win32_platform_active_mouse_mode(const_cast<win32_window *>(this));
     }
 
-    void *win32_window::native_handle() const { return static_cast<void *>(hwnd); }
+    void *win32_window::native_handle() const {
+        return static_cast<void *>(hwnd);
+    }
 
     HCURSOR win32_window::selected_cursor() const {
         if (custom_cursor_)
@@ -491,8 +533,7 @@ namespace alia {
         if (!hwnd)
             return;
         const bool relative =
-            detail::win32_platform_active_mouse_mode(
-                const_cast<win32_window *>(this)) == mouse_mode::relative;
+            detail::win32_platform_active_mouse_mode(const_cast<win32_window *>(this)) == mouse_mode::relative;
         SetCursor(cursor_visible && !relative ? selected_cursor() : nullptr);
     }
 
@@ -513,8 +554,7 @@ namespace alia {
         return pending_warps_.should_suppress(position);
     }
 
-    void win32_window::handle_mouse_button(
-        mouse_button button, bool down, vec2i position) {
+    void win32_window::handle_mouse_button(mouse_button button, bool down, vec2i position) {
         begin_mouse_tracking(position);
         last_mouse_position_ = position;
         const auto bit = mouse_button_bit(button);
@@ -526,8 +566,7 @@ namespace alia {
         } else {
             pressed_mouse_buttons_ &= ~bit;
         }
-        detail::mouse_handle_button(
-            owner, source, button, down, position);
+        detail::mouse_handle_button(owner, source, button, down, position);
         if (!down && pressed_mouse_buttons_ == 0 && GetCapture() == hwnd)
             ReleaseCapture();
     }
@@ -538,15 +577,15 @@ namespace alia {
         for (unsigned index = 1; index <= 5; ++index) {
             const auto button = static_cast<mouse_button>(index);
             if ((pressed & mouse_button_bit(button)) != 0)
-                detail::mouse_handle_button(
-                    owner, source, button, false, last_mouse_position_);
+                detail::mouse_handle_button(owner, source, button, false, last_mouse_position_);
         }
         if (GetCapture() == hwnd)
             ReleaseCapture();
     }
 
     DWORD win32_window::windowed_style() const {
-        if (borderless_) return WS_POPUP;
+        if (borderless_)
+            return WS_POPUP;
         DWORD style = WS_OVERLAPPEDWINDOW;
         if (!resizable_)
             style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
@@ -554,14 +593,15 @@ namespace alia {
     }
 
     DWORD win32_window::style_with_runtime(DWORD base) const {
-        if (!hwnd) return base;
-        constexpr DWORD preserved =
-            WS_VISIBLE | WS_DISABLED | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+        if (!hwnd)
+            return base;
+        constexpr DWORD preserved = WS_VISIBLE | WS_DISABLED | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
         return base | (static_cast<DWORD>(GetWindowLongW(hwnd, GWL_STYLE)) & preserved);
     }
 
     void win32_window::apply_windowed_style_preserving_client() {
-        if (!hwnd) return;
+        if (!hwnd)
+            return;
         POINT client_origin{0, 0};
         ClientToScreen(hwnd, &client_origin);
         RECT adjusted{0, 0, client_size.x, client_size.y};
@@ -570,25 +610,25 @@ namespace alia {
         AdjustWindowRectEx(&adjusted, style, FALSE, ex_style);
         SetWindowLongW(hwnd, GWL_STYLE, static_cast<LONG>(style_with_runtime(style)));
         SetWindowPos(
-            hwnd, nullptr,
+            hwnd,
+            nullptr,
             client_origin.x + adjusted.left,
             client_origin.y + adjusted.top,
             adjusted.right - adjusted.left,
             adjusted.bottom - adjusted.top,
-            SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED
+        );
     }
 
     void win32_window::restore_windowed_placement() {
-        if (!hwnd) return;
-        SetWindowLongW(
-            hwnd, GWL_STYLE,
-            static_cast<LONG>(style_with_runtime(windowed_style())));
+        if (!hwnd)
+            return;
+        SetWindowLongW(hwnd, GWL_STYLE, static_cast<LONG>(style_with_runtime(windowed_style())));
         saved_placement_.length = sizeof(saved_placement_);
         SetWindowPlacement(hwnd, &saved_placement_);
         SetWindowPos(
-            hwnd, nullptr, 0, 0, 0, 0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-            SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED
+        );
     }
 
     void win32_window::apply_display_mode(int monitor_index, const display_mode &mode) {
@@ -606,20 +646,19 @@ namespace alia {
             native.dmDisplayFrequency = static_cast<DWORD>(mode.refresh_rate);
             native.dmFields |= DM_DISPLAYFREQUENCY;
         }
-        const LONG result = ChangeDisplaySettingsExW(
-            mode_device_.c_str(), &native, nullptr, CDS_FULLSCREEN, nullptr);
+        const LONG result = ChangeDisplaySettingsExW(mode_device_.c_str(), &native, nullptr, CDS_FULLSCREEN, nullptr);
         if (result != DISP_CHANGE_SUCCESSFUL)
             throw std::runtime_error(
-                "window::set_fullscreen: ChangeDisplaySettingsExW failed (" +
-                std::to_string(result) + ")");
+                "window::set_fullscreen: ChangeDisplaySettingsExW failed (" + std::to_string(result) + ")"
+            );
         active_mode_ = mode;
         mode_applied_ = true;
     }
 
     void win32_window::restore_display_mode() noexcept {
-        if (!mode_applied_) return;
-        ChangeDisplaySettingsExW(
-            mode_device_.c_str(), nullptr, nullptr, 0, nullptr);
+        if (!mode_applied_)
+            return;
+        ChangeDisplaySettingsExW(mode_device_.c_str(), nullptr, nullptr, 0, nullptr);
         mode_applied_ = false;
     }
 
@@ -649,8 +688,7 @@ namespace alia {
         return ok;
     }
 
-    LRESULT CALLBACK win32_window::wnd_proc(
-        HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    LRESULT CALLBACK win32_window::wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (msg == WM_NCCREATE) {
             auto *create = reinterpret_cast<CREATESTRUCTW *>(lp);
             auto *impl = reinterpret_cast<win32_window *>(create->lpCreateParams);
@@ -658,14 +696,12 @@ namespace alia {
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(impl));
             return DefWindowProcW(hwnd, msg, wp, lp);
         }
-        auto *impl = reinterpret_cast<win32_window *>(
-            GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-        if (!impl) return DefWindowProcW(hwnd, msg, wp, lp);
+        auto *impl = reinterpret_cast<win32_window *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+        if (!impl)
+            return DefWindowProcW(hwnd, msg, wp, lp);
 
         switch (msg) {
-        case WM_CLOSE:
-            impl->source.emit(window_close_event{});
-            return 0;
+        case WM_CLOSE: impl->source.emit(window_close_event{}); return 0;
         case WM_DESTROY:
             impl->release_mouse_buttons();
             detail::win32_platform_mouse_window_destroyed(impl);
@@ -679,22 +715,18 @@ namespace alia {
             impl->client_size = {width, height};
             if (wp != SIZE_MINIMIZED)
                 impl->source.emit(window_resize_event{{width, height}});
-            detail::win32_platform_mouse_window_focus_changed(
-                impl, impl->is_focused(), wp == SIZE_MINIMIZED);
+            detail::win32_platform_mouse_window_focus_changed(impl, impl->is_focused(), wp == SIZE_MINIMIZED);
             detail::win32_platform_refresh_mouse_bounds(impl);
             return 0;
         }
         case WM_MOVE:
         case WM_WINDOWPOSCHANGED:
-        case WM_DPICHANGED:
-            detail::win32_platform_refresh_mouse_bounds(impl);
-            break;
+        case WM_DPICHANGED:       detail::win32_platform_refresh_mouse_bounds(impl); break;
         case WM_PAINT:
             if (impl->expose_) {
                 RECT update{};
                 if (GetUpdateRect(hwnd, &update, FALSE))
-                    impl->source.emit(window_expose_event{{
-                        {update.left, update.top}, {update.right, update.bottom}}});
+                    impl->source.emit(window_expose_event{{{update.left, update.top}, {update.right, update.bottom}}});
                 ValidateRect(hwnd, nullptr);
                 return 0;
             }
@@ -724,8 +756,7 @@ namespace alia {
             }
             break;
         case WM_ACTIVATE:
-            if (!impl->activation_transition_ &&
-                impl->mode_ == window_fullscreen_mode::fullscreen) {
+            if (!impl->activation_transition_ && impl->mode_ == window_fullscreen_mode::fullscreen) {
                 impl->activation_transition_ = true;
                 if (LOWORD(wp) == WA_INACTIVE && impl->mode_applied_) {
                     impl->restore_display_mode();
@@ -740,8 +771,8 @@ namespace alia {
                 impl->activation_transition_ = false;
             }
             detail::win32_platform_mouse_window_focus_changed(
-                impl, LOWORD(wp) != WA_INACTIVE,
-                HIWORD(wp) != 0 || impl->is_minimized());
+                impl, LOWORD(wp) != WA_INACTIVE, HIWORD(wp) != 0 || impl->is_minimized()
+            );
             break;
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN: {
@@ -750,17 +781,14 @@ namespace alia {
                 return 0;
             }
             impl->last_key_down = vk_to_key(wp, lp);
-            detail::update_keyboard_state(
-                impl->last_key_down, true, get_modifiers());
+            detail::update_keyboard_state(impl->last_key_down, true, get_modifiers());
             impl->source.emit(window_key_down_event{impl->last_key_down});
             return 0;
         }
         case WM_KEYUP:
         case WM_SYSKEYUP: {
             const key released = vk_to_key(wp, lp);
-            if (released == key::lctrl &&
-                impl->suppress_altgr_control_up &&
-                !is_key_down(key::lctrl)) {
+            if (released == key::lctrl && impl->suppress_altgr_control_up && !is_key_down(key::lctrl)) {
                 impl->suppress_altgr_control_up = false;
                 return 0;
             }
@@ -778,14 +806,11 @@ namespace alia {
             }
             char32_t codepoint = value;
             if (value >= 0xDC00 && value <= 0xDFFF && impl->high_surrogate)
-                codepoint = 0x10000u +
-                    ((impl->high_surrogate - 0xD800u) << 10) +
-                    (value - 0xDC00u);
+                codepoint = 0x10000u + ((impl->high_surrogate - 0xD800u) << 10) + (value - 0xDC00u);
             impl->high_surrogate = 0;
             const key_mod modifiers = get_modifiers();
             detail::refresh_keyboard_modifiers(modifiers);
-            impl->source.emit(window_key_char_event{
-                impl->last_key_down, codepoint, modifiers, repeat});
+            impl->source.emit(window_key_char_event{impl->last_key_down, codepoint, modifiers, repeat});
             return 0;
         }
         case WM_MOUSEMOVE: {
@@ -800,8 +825,7 @@ namespace alia {
                 return 0;
             }
             if (!entered)
-                detail::mouse_handle_axes(
-                    impl->owner, impl->source, position);
+                detail::mouse_handle_axes(impl->owner, impl->source, position);
             return 0;
         }
         case WM_MOUSELEAVE: {
@@ -811,8 +835,7 @@ namespace alia {
             if (GetCursorPos(&point) && ScreenToClient(hwnd, &point))
                 position = {point.x, point.y};
             impl->last_mouse_position_ = position;
-            detail::mouse_handle_leave(
-                impl->owner, impl->source, position);
+            detail::mouse_handle_leave(impl->owner, impl->source, position);
             return 0;
         }
         case WM_MOUSEWHEEL:
@@ -823,48 +846,42 @@ namespace alia {
             impl->last_mouse_position_ = position;
             const int wheel_delta = GET_WHEEL_DELTA_WPARAM(wp);
             detail::mouse_handle_wheel(
-                impl->owner, impl->source, position,
+                impl->owner,
+                impl->source,
+                position,
                 msg == WM_MOUSEWHEEL ? wheel_delta : 0,
-                msg == WM_MOUSEHWHEEL ? wheel_delta : 0);
+                msg == WM_MOUSEHWHEEL ? wheel_delta : 0
+            );
             return 0;
         }
         case WM_LBUTTONDOWN:
         case WM_LBUTTONUP:
-            impl->handle_mouse_button(
-                mouse_button::left, msg == WM_LBUTTONDOWN,
-                {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)});
+            impl->handle_mouse_button(mouse_button::left, msg == WM_LBUTTONDOWN, {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)});
             return 0;
         case WM_RBUTTONDOWN:
         case WM_RBUTTONUP:
-            impl->handle_mouse_button(
-                mouse_button::right, msg == WM_RBUTTONDOWN,
-                {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)});
+            impl->handle_mouse_button(mouse_button::right, msg == WM_RBUTTONDOWN, {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)});
             return 0;
         case WM_MBUTTONDOWN:
         case WM_MBUTTONUP:
             impl->handle_mouse_button(
-                mouse_button::middle, msg == WM_MBUTTONDOWN,
-                {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)});
+                mouse_button::middle, msg == WM_MBUTTONDOWN, {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)}
+            );
             return 0;
         case WM_XBUTTONDOWN:
         case WM_XBUTTONUP:
             impl->handle_mouse_button(
-                GET_XBUTTON_WPARAM(wp) == XBUTTON1
-                    ? mouse_button::x1 : mouse_button::x2,
+                GET_XBUTTON_WPARAM(wp) == XBUTTON1 ? mouse_button::x1 : mouse_button::x2,
                 msg == WM_XBUTTONDOWN,
-                {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)});
+                {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)}
+            );
             return TRUE;
         case WM_CAPTURECHANGED:
             if (reinterpret_cast<HWND>(lp) != hwnd)
                 impl->release_mouse_buttons();
             return 0;
-        case WM_CANCELMODE:
-            impl->release_mouse_buttons();
-            break;
-        case WM_INPUT:
-            detail::win32_platform_mouse_handle_raw_input(
-                impl, reinterpret_cast<void *>(lp));
-            break;
+        case WM_CANCELMODE: impl->release_mouse_buttons(); break;
+        case WM_INPUT:      detail::win32_platform_mouse_handle_raw_input(impl, reinterpret_cast<void *>(lp)); break;
         case WM_SETCURSOR:
             if (LOWORD(lp) == HTCLIENT) {
                 impl->apply_cursor();
@@ -874,8 +891,7 @@ namespace alia {
         case WM_SETFOCUS:
             detail::refresh_keyboard_modifiers(get_lock_modifiers());
             detail::set_current_window(impl->owner);
-            detail::win32_platform_mouse_window_focus_changed(
-                impl, true, impl->is_minimized());
+            detail::win32_platform_mouse_window_focus_changed(impl, true, impl->is_minimized());
             break;
         case WM_KILLFOCUS: {
             impl->release_mouse_buttons();
@@ -887,22 +903,19 @@ namespace alia {
             impl->last_key_down = key::unknown;
             impl->high_surrogate = 0;
             impl->suppress_altgr_control_up = false;
-            for (int value = static_cast<int>(key::unknown) + 1;
-                 value < static_cast<int>(key::key_count); ++value) {
+            for (int value = static_cast<int>(key::unknown) + 1; value < static_cast<int>(key::key_count); ++value) {
                 const auto released = static_cast<key>(value);
                 if (state.is_key_down(released))
                     impl->source.emit(window_key_up_event{released});
             }
             break;
         }
-        default:
-            break;
+        default: break;
         }
         return DefWindowProcW(hwnd, msg, wp, lp);
     }
 
-    os_window_handle *win32_create_window(os_context_handle *,
-        vec2i size, const window_options &options) {
+    os_window_handle *win32_create_window(os_context_handle *, vec2i size, const window_options &options) {
         if (!win32_window::ensure_class_registered())
             return nullptr;
 
@@ -930,10 +943,8 @@ namespace alia {
         AdjustWindowRectEx(&adjusted, style, FALSE, ex_style);
         const int window_width = adjusted.right - adjusted.left;
         const int window_height = adjusted.bottom - adjusted.top;
-        int position_x = bounds.left +
-            ((bounds.right - bounds.left) - window_width) / 2;
-        int position_y = bounds.top +
-            ((bounds.bottom - bounds.top) - window_height) / 2;
+        int position_x = bounds.left + ((bounds.right - bounds.left) - window_width) / 2;
+        int position_y = bounds.top + ((bounds.bottom - bounds.top) - window_height) / 2;
         if (const auto *point = std::get_if<vec2i>(&options.position)) {
             position_x = point->x;
             position_y = point->y;
@@ -942,44 +953,53 @@ namespace alia {
         impl->saved_placement_.length = sizeof(impl->saved_placement_);
         impl->saved_placement_.showCmd = SW_SHOWNORMAL;
         impl->saved_placement_.rcNormalPosition = {
-            position_x, position_y,
-            position_x + window_width, position_y + window_height};
+            position_x, position_y, position_x + window_width, position_y + window_height
+        };
 
         if (impl->mode_ != window_fullscreen_mode::windowed) {
             style = WS_POPUP;
             position_x = bounds.left;
             position_y = bounds.top;
         }
-        const int create_width = impl->mode_ == window_fullscreen_mode::windowed
-            ? window_width : bounds.right - bounds.left;
-        const int create_height = impl->mode_ == window_fullscreen_mode::windowed
-            ? window_height : bounds.bottom - bounds.top;
+        const int create_width =
+            impl->mode_ == window_fullscreen_mode::windowed ? window_width : bounds.right - bounds.left;
+        const int create_height =
+            impl->mode_ == window_fullscreen_mode::windowed ? window_height : bounds.bottom - bounds.top;
         const std::wstring title = utf8_to_wide(impl->title_utf8);
         HWND hwnd = CreateWindowExW(
-            ex_style, window_class_name, title.c_str(), style,
-            position_x, position_y, create_width, create_height,
-            nullptr, nullptr, GetModuleHandleW(nullptr), impl.get());
+            ex_style,
+            window_class_name,
+            title.c_str(),
+            style,
+            position_x,
+            position_y,
+            create_width,
+            create_height,
+            nullptr,
+            nullptr,
+            GetModuleHandleW(nullptr),
+            impl.get()
+        );
         if (!hwnd)
             return nullptr;
         impl->hwnd = hwnd;
 
-        const int show = impl->mode_ != window_fullscreen_mode::windowed
-            ? SW_SHOW
-            : options.minimized ? SW_MINIMIZE
-            : options.maximized ? SW_MAXIMIZE : SW_SHOW;
+        const int show = impl->mode_ != window_fullscreen_mode::windowed ? SW_SHOW
+                         : options.minimized                             ? SW_MINIMIZE
+                         : options.maximized                             ? SW_MAXIMIZE
+                                                                         : SW_SHOW;
         ShowWindow(hwnd, show);
         UpdateWindow(hwnd);
         if (impl->constraints_enabled_)
             impl->apply_size_constraints(true);
-        if (options.mouse_mode != mouse_mode::normal &&
-            !impl->set_mouse_mode(options.mouse_mode))
+        if (options.mouse_mode != mouse_mode::normal && !impl->set_mouse_mode(options.mouse_mode))
             return nullptr;
         return impl.release();
     }
 
     bool win32_inhibit_screensaver(os_context_handle *, bool inhibit) {
-        const EXECUTION_STATE state = SetThreadExecutionState(
-            inhibit ? ES_CONTINUOUS | ES_DISPLAY_REQUIRED : ES_CONTINUOUS);
+        const EXECUTION_STATE state =
+            SetThreadExecutionState(inhibit ? ES_CONTINUOUS | ES_DISPLAY_REQUIRED : ES_CONTINUOUS);
         return state != 0;
     }
 } // namespace alia

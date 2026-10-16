@@ -55,11 +55,7 @@ namespace alia {
         // of it fits. Newlines start a fresh line, so multi-line text is cut
         // where any line first overflows. A negative max_width returns 0; NaN
         // throws std::invalid_argument.
-        [[nodiscard]] std::size_t cutoff_point(
-            std::string_view text,
-            float max_width,
-            bool use_kerning = true
-        );
+        [[nodiscard]] std::size_t cutoff_point(std::string_view text, float max_width, bool use_kerning = true);
     };
 
     namespace detail {
@@ -149,23 +145,14 @@ namespace alia {
     // {widest line, line_height * line_count}. Its top-left is the layout origin.
     [[nodiscard]] vec2f measure_text(font &source, std::string_view text, bool kerning = true);
 
-    [[nodiscard]] text_bitmap create_text_bitmap(
-        font &source,
-        std::string_view value,
-        const text_raster_options &options = {}
-    );
+    [[nodiscard]] text_bitmap
+    create_text_bitmap(font &source, std::string_view value, const text_raster_options &options = {});
+
+    [[nodiscard]] text_texture
+    create_text_texture(gfx_device &device, const text_bitmap &source, texture_filter filter = texture_filter::linear);
 
     [[nodiscard]] text_texture create_text_texture(
-        gfx_device &device,
-        const text_bitmap &source,
-        texture_filter filter = texture_filter::linear
-    );
-
-    [[nodiscard]] text_texture create_text_texture(
-        gfx_device &device,
-        font &source,
-        std::string_view value,
-        const text_raster_options &options = {}
+        gfx_device &device, font &source, std::string_view value, const text_raster_options &options = {}
     );
 
     struct draw_text_params {

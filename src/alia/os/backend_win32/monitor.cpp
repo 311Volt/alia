@@ -21,23 +21,18 @@ namespace alia {
             MONITORINFOEXW info = {};
         };
 
-        BOOL CALLBACK collect_monitor(
-            HMONITOR handle, HDC, LPRECT, LPARAM data) {
+        BOOL CALLBACK collect_monitor(HMONITOR handle, HDC, LPRECT, LPARAM data) {
             native_monitor monitor;
             monitor.handle = handle;
             monitor.info.cbSize = sizeof(monitor.info);
-            if (GetMonitorInfoW(
-                    handle,
-                    reinterpret_cast<MONITORINFO *>(&monitor.info)))
+            if (GetMonitorInfoW(handle, reinterpret_cast<MONITORINFO *>(&monitor.info)))
                 reinterpret_cast<std::vector<native_monitor> *>(data)->push_back(monitor);
             return TRUE;
         }
 
         std::vector<native_monitor> enumerate_native_monitors() {
             std::vector<native_monitor> result;
-            EnumDisplayMonitors(
-                nullptr, nullptr, collect_monitor,
-                reinterpret_cast<LPARAM>(&result));
+            EnumDisplayMonitors(nullptr, nullptr, collect_monitor, reinterpret_cast<LPARAM>(&result));
             std::stable_sort(result.begin(), result.end(), [](const native_monitor &a, const native_monitor &b) {
                 const bool a_primary = (a.info.dwFlags & MONITORINFOF_PRIMARY) != 0;
                 const bool b_primary = (b.info.dwFlags & MONITORINFOF_PRIMARY) != 0;
@@ -47,17 +42,18 @@ namespace alia {
             return result;
         }
 
-        const native_monitor &checked_monitor(
-            const std::vector<native_monitor> &monitors, int index) {
+        const native_monitor &checked_monitor(const std::vector<native_monitor> &monitors, int index) {
             if (index < 0 || index >= static_cast<int>(monitors.size()))
                 throw std::out_of_range("monitor index is out of range");
             return monitors[static_cast<std::size_t>(index)];
         }
 
         display_mode mode_from_devmode(const DEVMODEW &mode) {
-            return {{static_cast<int>(mode.dmPelsWidth), static_cast<int>(mode.dmPelsHeight)},
-                    static_cast<int>(mode.dmDisplayFrequency),
-                    static_cast<int>(mode.dmBitsPerPel)};
+            return {
+                {static_cast<int>(mode.dmPelsWidth), static_cast<int>(mode.dmPelsHeight)},
+                static_cast<int>(mode.dmDisplayFrequency),
+                static_cast<int>(mode.dmBitsPerPel)
+            };
         }
 
         vec2i physical_size_mm(const wchar_t *device) {
@@ -70,10 +66,10 @@ namespace alia {
         }
 
         float monitor_dpi(HMONITOR handle, const wchar_t *device) {
-            using get_dpi_for_monitor_fn = HRESULT (WINAPI *)(HMONITOR, int, UINT *, UINT *);
+            using get_dpi_for_monitor_fn = HRESULT(WINAPI *)(HMONITOR, int, UINT *, UINT *);
             if (HMODULE shcore = LoadLibraryW(L"Shcore.dll")) {
-                const auto get_dpi = reinterpret_cast<get_dpi_for_monitor_fn>(
-                    GetProcAddress(shcore, "GetDpiForMonitor"));
+                const auto get_dpi =
+                    reinterpret_cast<get_dpi_for_monitor_fn>(GetProcAddress(shcore, "GetDpiForMonitor"));
                 UINT x = 0, y = 0;
                 const bool ok = get_dpi && SUCCEEDED(get_dpi(handle, 0, &x, &y));
                 FreeLibrary(shcore);
@@ -99,7 +95,7 @@ namespace alia {
             result.pop_back();
             return result;
         }
-    }
+    } // namespace
 
     namespace detail {
         void *win32_monitor_handle(int index) {
@@ -120,7 +116,7 @@ namespace alia {
             const auto monitors = enumerate_native_monitors();
             return checked_monitor(monitors, index).info.szDevice;
         }
-    }
+    } // namespace detail
 
     std::vector<display_mode> win32_display_modes(os_context_handle *, int monitor_index) {
         const std::wstring device = detail::win32_monitor_device_name(monitor_index);
@@ -163,8 +159,10 @@ namespace alia {
             info.index = static_cast<int>(i);
             info.name = utf8_from_wide(have_name ? display.DeviceString : entry.info.szDevice);
             info.position = {entry.info.rcMonitor.left, entry.info.rcMonitor.top};
-            info.size = {entry.info.rcMonitor.right - entry.info.rcMonitor.left,
-                         entry.info.rcMonitor.bottom - entry.info.rcMonitor.top};
+            info.size = {
+                entry.info.rcMonitor.right - entry.info.rcMonitor.left,
+                entry.info.rcMonitor.bottom - entry.info.rcMonitor.top
+            };
             info.size_mm = physical_size_mm(entry.info.szDevice);
             info.dpi = dpi;
             info.scale_factor = dpi / 96.0f;

@@ -58,16 +58,16 @@ namespace alia {
     } // namespace detail
 
     template <typename T>
-    concept vertex_type = std::is_standard_layout_v<T> && detail::has_elements<T>::value &&
-        !detail::has_instance_elements<T>::value;
+    concept vertex_type =
+        std::is_standard_layout_v<T> && detail::has_elements<T>::value && !detail::has_instance_elements<T>::value;
 
     // A standard-layout type with static constexpr instance_elements(), returning
     // instance_element descriptors. Nonempty layouts, unique slots and offsets
     // within sizeof(T) are checked at compile time when the draw layout is used.
     // Instance data cannot also be vertex data.
     template <typename T>
-    concept instance_type = std::is_standard_layout_v<T> && detail::has_instance_elements<T>::value &&
-        !detail::has_elements<T>::value;
+    concept instance_type =
+        std::is_standard_layout_v<T> && detail::has_instance_elements<T>::value && !detail::has_elements<T>::value;
 
     // ── Built-in vertex types ────────────────────────────────────────────
 

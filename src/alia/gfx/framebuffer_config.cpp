@@ -5,19 +5,18 @@
 namespace alia {
     namespace {
         template <class T>
-        std::optional<std::string> check(
-            std::string_view name, const gfx_option<T> &requested, const T &actual) {
+        std::optional<std::string> check(std::string_view name, const gfx_option<T> &requested, const T &actual) {
             if (requested.required() && requested.value != actual)
                 return std::string(name) + " requirement was not met";
             return std::nullopt;
         }
-    }
+    } // namespace
 
-    std::optional<std::string> check_framebuffer_requirements(
-        const framebuffer_config &requested,
-        const framebuffer_properties &actual) {
-#define ALIA_CHECK_FRAMEBUFFER_OPTION(name) \
-        if (auto error = check(#name, requested.name, actual.name)) return error
+    std::optional<std::string>
+    check_framebuffer_requirements(const framebuffer_config &requested, const framebuffer_properties &actual) {
+#define ALIA_CHECK_FRAMEBUFFER_OPTION(name)                                                                            \
+    if (auto error = check(#name, requested.name, actual.name))                                                        \
+    return error
         ALIA_CHECK_FRAMEBUFFER_OPTION(color_bits);
         ALIA_CHECK_FRAMEBUFFER_OPTION(red_bits);
         ALIA_CHECK_FRAMEBUFFER_OPTION(green_bits);

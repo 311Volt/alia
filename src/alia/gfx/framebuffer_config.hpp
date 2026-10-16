@@ -27,12 +27,14 @@ namespace alia {
         option_importance importance = option_importance::dont_care;
 
         constexpr gfx_option() = default;
-        constexpr gfx_option(T v, option_importance i = option_importance::suggest)
-            : value(v), importance(i) {}
+
+        constexpr gfx_option(T v, option_importance i = option_importance::suggest) : value(v), importance(i) {
+        }
 
         [[nodiscard]] constexpr bool requested() const noexcept {
             return importance != option_importance::dont_care;
         }
+
         [[nodiscard]] constexpr bool required() const noexcept {
             return importance == option_importance::require;
         }
@@ -109,9 +111,9 @@ namespace alia {
         bool cube_textures = false;
         bool render_to_texture = false;
         bool separate_alpha_blend = false;
-        bool index32 = false; // 32-bit index buffers and transient indices.
+        bool index32 = false;    // 32-bit index buffers and transient indices.
         bool instancing = false; // Shader draws using per-instance buffer attributes.
-        int max_lights = 0; // Zero means fixed-function lighting is unsupported.
+        int max_lights = 0;      // Zero means fixed-function lighting is unsupported.
         // Which of the two required spot parameter sets this device applies.
         spot_light_model spot_model = spot_light_model::inner_outer;
         bool fog = false;
@@ -125,9 +127,8 @@ namespace alia {
         gfx_option<render_method> render;
     };
 
-    [[nodiscard]] std::optional<std::string> check_framebuffer_requirements(
-        const framebuffer_config &requested,
-        const framebuffer_properties &actual);
+    [[nodiscard]] std::optional<std::string>
+    check_framebuffer_requirements(const framebuffer_config &requested, const framebuffer_properties &actual);
 
 } // namespace alia
 

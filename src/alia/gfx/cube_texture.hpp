@@ -34,35 +34,28 @@ namespace alia {
         cube_texture &operator=(const cube_texture &) = delete;
 
         /// Create an uninitialised color cube texture.
-        cube_texture(
-            gfx_device &device,
-            int edge,
-            const cube_texture_config &config = {}
-        );
+        cube_texture(gfx_device &device, int edge, const cube_texture_config &config = {});
 
         /// Create and initialise level 0 from six type-erased face views.
         /// Faces are ordered according to @c cube_face.
         cube_texture(
-            gfx_device &device,
-            std::span<const any_bitmap_view, cube_face_count> faces,
+            gfx_device &device, std::span<const any_bitmap_view, cube_face_count> faces,
             const cube_texture_config &config = {}
         );
 
         /// Create and initialise level 0 from six owning bitmaps.
         cube_texture(
-            gfx_device &device,
-            std::span<const bitmap, cube_face_count> faces,
-            const cube_texture_config &config = {}
+            gfx_device &device, std::span<const bitmap, cube_face_count> faces, const cube_texture_config &config = {}
         );
 
         /// Create and initialise level 0 from six typed face views.
         template <pixel TPixel>
         cube_texture(
-            gfx_device &device,
-            std::span<const bitmap_view<TPixel>, cube_face_count> faces,
+            gfx_device &device, std::span<const bitmap_view<TPixel>, cube_face_count> faces,
             const cube_texture_config &config = {}
         )
-            : cube_texture(device, copy_faces(faces), config) {}
+            : cube_texture(device, copy_faces(faces), config) {
+        }
 
         /// Query the exact configured format, or bgra8888 if omitted, without
         /// allocating. Returns false if cube textures are unsupported.
@@ -70,14 +63,18 @@ namespace alia {
         [[nodiscard]] static bool can_create(const gfx_device &, const cube_texture_config &);
 
         [[nodiscard]] pixel_format format() const noexcept;
+
         [[nodiscard]] texture_usage usage() const noexcept {
             return usage_;
         }
+
         [[nodiscard]] int edge() const noexcept;
+
         [[nodiscard]] vec2i face_size() const noexcept {
             const int value = edge();
             return {value, value};
         }
+
         [[nodiscard]] int mip_levels() const noexcept;
 
         void set_sampler(const sampler_state &s);
@@ -92,7 +89,8 @@ namespace alia {
         [[nodiscard]] locked_texture_region<TPixel, texture_lock_mode::read_write>
         lock(cube_face face, std::optional<rect_i> region = {}, int level = 0) {
             return locked_texture_region<TPixel, texture_lock_mode::read_write>(
-                lock_impl(face, region, level, TPixel::format_id, texture_lock_mode::read_write));
+                lock_impl(face, region, level, TPixel::format_id, texture_lock_mode::read_write)
+            );
         }
 
         /// Acquire a typed lock to inspect pixels without modifying them.
@@ -105,7 +103,8 @@ namespace alia {
         [[nodiscard]] locked_texture_region<TPixel, texture_lock_mode::read_only>
         lock_read_only(cube_face face, std::optional<rect_i> region = {}, int level = 0) {
             return locked_texture_region<TPixel, texture_lock_mode::read_only>(
-                lock_impl(face, region, level, TPixel::format_id, texture_lock_mode::read_only));
+                lock_impl(face, region, level, TPixel::format_id, texture_lock_mode::read_only)
+            );
         }
 
         /// Acquire a typed lock without preserving current contents.
@@ -119,7 +118,8 @@ namespace alia {
         [[nodiscard]] locked_texture_region<TPixel, texture_lock_mode::write_only>
         lock_write_only(cube_face face, std::optional<rect_i> region = {}, int level = 0) {
             return locked_texture_region<TPixel, texture_lock_mode::write_only>(
-                lock_impl(face, region, level, TPixel::format_id, texture_lock_mode::write_only));
+                lock_impl(face, region, level, TPixel::format_id, texture_lock_mode::write_only)
+            );
         }
 
         /// Acquire a runtime-format lock for reading and writing pixels on one face.
@@ -129,7 +129,8 @@ namespace alia {
         [[nodiscard]] any_locked_texture_region<texture_lock_mode::read_write>
         lock_any(cube_face face, std::optional<rect_i> region = {}, int level = 0) {
             return any_locked_texture_region<texture_lock_mode::read_write>(
-                lock_impl(face, region, level, std::nullopt, texture_lock_mode::read_write));
+                lock_impl(face, region, level, std::nullopt, texture_lock_mode::read_write)
+            );
         }
 
         /// Acquire a runtime-format lock to inspect pixels without modifying them.
@@ -140,7 +141,8 @@ namespace alia {
         [[nodiscard]] any_locked_texture_region<texture_lock_mode::read_only>
         lock_any_read_only(cube_face face, std::optional<rect_i> region = {}, int level = 0) {
             return any_locked_texture_region<texture_lock_mode::read_only>(
-                lock_impl(face, region, level, std::nullopt, texture_lock_mode::read_only));
+                lock_impl(face, region, level, std::nullopt, texture_lock_mode::read_only)
+            );
         }
 
         /// Acquire a runtime-format lock without preserving current contents.
@@ -152,7 +154,8 @@ namespace alia {
         [[nodiscard]] any_locked_texture_region<texture_lock_mode::write_only>
         lock_any_write_only(cube_face face, std::optional<rect_i> region = {}, int level = 0) {
             return any_locked_texture_region<texture_lock_mode::write_only>(
-                lock_impl(face, region, level, std::nullopt, texture_lock_mode::write_only));
+                lock_impl(face, region, level, std::nullopt, texture_lock_mode::write_only)
+            );
         }
 
         void generate_mipmaps();
@@ -162,64 +165,57 @@ namespace alia {
         [[nodiscard]] texture_handle *impl() noexcept {
             return handle_;
         }
+
         [[nodiscard]] const texture_handle *impl() const noexcept {
             return handle_;
         }
+
         [[nodiscard]] const graphics_backend_interface *backend() const noexcept {
             return backend_;
         }
+
         [[nodiscard]] device_handle *device() const noexcept {
             return device_;
         }
 
     private:
         template <pixel TPixel>
-        static std::array<bitmap, cube_face_count> copy_faces(
-            std::span<const bitmap_view<TPixel>, cube_face_count> faces
-        ) {
+        static std::array<bitmap, cube_face_count>
+        copy_faces(std::span<const bitmap_view<TPixel>, cube_face_count> faces) {
             return {
-                bitmap(faces[0]), bitmap(faces[1]), bitmap(faces[2]),
-                bitmap(faces[3]), bitmap(faces[4]), bitmap(faces[5])
+                bitmap(faces[0]),
+                bitmap(faces[1]),
+                bitmap(faces[2]),
+                bitmap(faces[3]),
+                bitmap(faces[4]),
+                bitmap(faces[5])
             };
         }
 
         cube_texture(
-            gfx_device &device,
-            const std::array<bitmap, cube_face_count> &faces,
-            const cube_texture_config &config
+            gfx_device &device, const std::array<bitmap, cube_face_count> &faces, const cube_texture_config &config
         )
-            : cube_texture(
-                device,
-                std::span<const bitmap, cube_face_count>(faces),
-                config
-            ) {}
+            : cube_texture(device, std::span<const bitmap, cube_face_count>(faces), config) {
+        }
 
         cube_texture(
-            gfx_device &device,
-            const std::array<any_bitmap_view, cube_face_count> &faces,
+            gfx_device &device, const std::array<any_bitmap_view, cube_face_count> &faces,
             const cube_texture_config &config
         )
-            : cube_texture(
-                device,
-                std::span<const any_bitmap_view, cube_face_count>(faces),
-                config
-            ) {}
+            : cube_texture(device, std::span<const any_bitmap_view, cube_face_count>(faces), config) {
+        }
 
         std::unique_ptr<detail::texture_lock_state> lock_impl(
-            cube_face face,
-            const std::optional<rect_i> &region,
-            int level,
-            std::optional<pixel_format> expected_fmt,
+            cube_face face, const std::optional<rect_i> &region, int level, std::optional<pixel_format> expected_fmt,
             texture_lock_mode mode
         );
 
         explicit cube_texture(
-            texture_handle *handle,
-            const graphics_backend_interface *backend,
-            device_handle *device,
+            texture_handle *handle, const graphics_backend_interface *backend, device_handle *device,
             texture_usage usage
         ) noexcept
-            : handle_(handle), backend_(backend), device_(device), usage_(usage) {}
+            : handle_(handle), backend_(backend), device_(device), usage_(usage) {
+        }
 
         texture_handle *handle_ = nullptr;
         const graphics_backend_interface *backend_ = nullptr;

@@ -16,28 +16,21 @@ namespace alia {
             case pixel_format::rgb888:
             case pixel_format::bgr888:
             case pixel_format::rgb565:
-            case pixel_format::xy_u8:
-                return color_u8;
+            case pixel_format::xy_u8:  return color_u8;
             case pixel_format::gray_u8:
                 return role == texture_role::color ? std::span<const pixel_format>(color_u8)
                                                    : std::span<const pixel_format>{};
-            case pixel_format::rgba8888:
-                return bgra;
-            case pixel_format::bgra8888:
-                return rgba;
+            case pixel_format::rgba8888: return bgra;
+            case pixel_format::bgra8888: return rgba;
             case pixel_format::gray_f32:
             case pixel_format::rgb_f32:
-            case pixel_format::xy_f32:
-                return color_float;
-            default:
-                return {};
+            case pixel_format::xy_f32:   return color_float;
+            default:                     return {};
             }
         }
 
         bool upload_bitmap_view(
-            texture_handle *dst_handle,
-            const graphics_backend_interface *backend,
-            const any_bitmap_view &src,
+            texture_handle *dst_handle, const graphics_backend_interface *backend, const any_bitmap_view &src,
             std::optional<cube_face> face
         ) {
             const pixel_format src_fmt = src.format();
@@ -47,11 +40,11 @@ namespace alia {
 
             texture_lock_info info{};
             const rect_i full{{0, 0}, {src.width(), src.height()}};
-            const bool locked = face
-                ? backend->cube_texture_lock.get_or_throw()(
-                    dst_handle, *face, full, 0, texture_lock_mode::write_only, info)
-                : backend->texture_lock.get_or_throw()(
-                    dst_handle, full, 0, texture_lock_mode::write_only, info);
+            const bool locked =
+                face ? backend->cube_texture_lock.get_or_throw()(
+                           dst_handle, *face, full, 0, texture_lock_mode::write_only, info
+                       )
+                     : backend->texture_lock.get_or_throw()(dst_handle, full, 0, texture_lock_mode::write_only, info);
             if (!locked)
                 return false;
 
@@ -81,11 +74,10 @@ namespace alia {
     }
 
     texture::texture(texture &&other) noexcept
-        : handle_(std::exchange(other.handle_, nullptr))
-        , backend_(std::exchange(other.backend_, nullptr))
-        , device_(std::exchange(other.device_, nullptr))
-        , role_(std::exchange(other.role_, texture_role::color))
-        , usage_(std::exchange(other.usage_, texture_usage::sampling_only)) {}
+        : handle_(std::exchange(other.handle_, nullptr)), backend_(std::exchange(other.backend_, nullptr)),
+          device_(std::exchange(other.device_, nullptr)), role_(std::exchange(other.role_, texture_role::color)),
+          usage_(std::exchange(other.usage_, texture_usage::sampling_only)) {
+    }
 
     texture &texture::operator=(texture &&other) noexcept {
         if (this != &other) {
@@ -102,22 +94,19 @@ namespace alia {
 
     // ── Constructors ──────────────────────────────────────────────────────
 
-    texture::texture(
-        gfx_device &device,
-        vec2i size,
-        const texture_config &config
-    ) {
+    texture::texture(gfx_device &device, vec2i size, const texture_config &config) {
         if (!device.valid())
             throw std::runtime_error("texture: device is not valid");
         const pixel_format fmt = config.format.value_or(
-            config.role == texture_role::alpha_mask ? pixel_format::gray_u8 : pixel_format::bgra8888);
+            config.role == texture_role::alpha_mask ? pixel_format::gray_u8 : pixel_format::bgra8888
+        );
         detail::validate_texture_desc(fmt, size, config.mip_levels, "texture");
         if (!can_create(device, config))
             throw std::runtime_error("texture: requested pixel format is not supported by this device");
 
         const auto *b = device.backend();
-        handle_ = b->create_texture.get_or_throw()(
-            device.device(), fmt, size, config.mip_levels, config.role, config.usage);
+        handle_ =
+            b->create_texture.get_or_throw()(device.device(), fmt, size, config.mip_levels, config.role, config.usage);
         if (!handle_)
             throw std::runtime_error("texture: backend failed to create texture");
 
@@ -127,11 +116,7 @@ namespace alia {
         usage_ = config.usage;
     }
 
-    texture::texture(
-        gfx_device &device,
-        const any_bitmap_view &src,
-        const texture_config &config
-    ) {
+    texture::texture(gfx_device &device, const any_bitmap_view &src, const texture_config &config) {
         if (!device.valid())
             throw std::runtime_error("texture: device is not valid");
         detail::validate_texture_desc(src.format(), src.size(), config.mip_levels, "texture");
@@ -141,11 +126,11 @@ namespace alia {
         const auto *b = device.backend();
         const auto supported = [&](pixel_format fmt) {
             return b->texture_format_supported.get_or_throw()(
-                device.device(), fmt, config.mip_levels, config.role, config.usage);
+                device.device(), fmt, config.mip_levels, config.role, config.usage
+            );
         };
-        const auto fmt = config.format
-            ? (supported(*config.format) ? config.format : std::nullopt)
-            : detail::closest_texture_format(src.format(), config.role, supported);
+        const auto fmt = config.format ? (supported(*config.format) ? config.format : std::nullopt)
+                                       : detail::closest_texture_format(src.format(), config.role, supported);
         if (!fmt)
             throw std::runtime_error("texture: requested pixel format is not supported by this device");
         if (!can_convert_pixel_lossy(src.format(), *fmt))
@@ -171,18 +156,20 @@ namespace alia {
     }
 
     texture::texture(gfx_device &device, const bitmap &src, const texture_config &config)
-        : texture(device, src.view(), config) {}
+        : texture(device, src.view(), config) {
+    }
 
     bool texture::can_create(const gfx_device &device, const texture_config &config) {
-        if (!device.valid() || config.mip_levels < 0 ||
-            !device.backend()->texture_format_supported.is_supported())
+        if (!device.valid() || config.mip_levels < 0 || !device.backend()->texture_format_supported.is_supported())
             return false;
         const auto fmt = config.format.value_or(
-            config.role == texture_role::alpha_mask ? pixel_format::gray_u8 : pixel_format::bgra8888);
+            config.role == texture_role::alpha_mask ? pixel_format::gray_u8 : pixel_format::bgra8888
+        );
         if (bytes_per_pixel_for_format(fmt) == 0)
             return false;
         return device.backend()->texture_format_supported.get_or_throw()(
-            device.device(), fmt, config.mip_levels, config.role, config.usage);
+            device.device(), fmt, config.mip_levels, config.role, config.usage
+        );
     }
 
     // ── Accessors ────────────────────────────────────────────────────────
@@ -190,12 +177,15 @@ namespace alia {
     pixel_format texture::format() const noexcept {
         return backend_->texture_format.get_or_throw()(handle_);
     }
+
     int texture::width() const noexcept {
         return backend_->texture_width.get_or_throw()(handle_);
     }
+
     int texture::height() const noexcept {
         return backend_->texture_height.get_or_throw()(handle_);
     }
+
     int texture::mip_levels() const noexcept {
         return backend_->texture_mip_levels.get_or_throw()(handle_);
     }
@@ -203,16 +193,15 @@ namespace alia {
     void texture::set_sampler(const sampler_state &s) {
         backend_->texture_set_sampler.get_or_throw()(handle_, s);
     }
+
     sampler_state texture::sampler() const noexcept {
         return backend_->texture_sampler.get_or_throw()(handle_);
     }
 
     // ── lock_impl ────────────────────────────────────────────────────────
 
-    std::unique_ptr<detail::texture_lock_state>
-    texture::lock_impl(
-        const std::optional<rect_i> &region, int level,
-        std::optional<pixel_format> expected_fmt, texture_lock_mode mode
+    std::unique_ptr<detail::texture_lock_state> texture::lock_impl(
+        const std::optional<rect_i> &region, int level, std::optional<pixel_format> expected_fmt, texture_lock_mode mode
     ) {
         if (!handle_ || level < 0 || level >= mip_levels())
             return nullptr;

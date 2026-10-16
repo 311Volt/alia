@@ -11,14 +11,18 @@ namespace alia {
         D3DCOLORVALUE native_color(color value) {
             return {value.r, value.g, value.b, value.a};
         }
+
         D3DVECTOR native_direction(vec3f value) {
             // Validation permits any finite, nonzero magnitude.
-            const double length = std::hypot(
-                static_cast<double>(value.x), static_cast<double>(value.y), static_cast<double>(value.z));
-            return {static_cast<float>(value.x / length), static_cast<float>(value.y / length),
-                static_cast<float>(value.z / length)};
+            const double length =
+                std::hypot(static_cast<double>(value.x), static_cast<double>(value.y), static_cast<double>(value.z));
+            return {
+                static_cast<float>(value.x / length),
+                static_cast<float>(value.y / length),
+                static_cast<float>(value.z / length)
+            };
         }
-    }
+    } // namespace
 
     void d3d9_set_lighting(device_handle *h, const lighting_state &lighting) {
         auto &device = *as_d3d9_device(h);
@@ -29,26 +33,29 @@ namespace alia {
             value.Range = std::sqrt((std::numeric_limits<float>::max)());
             value.Falloff = 1.0f;
             value.Ambient = native_color(black);
-            std::visit([&](const auto &source) {
-                using source_type = std::decay_t<decltype(source)>;
-                value.Diffuse = native_color(source.diffuse);
-                value.Specular = native_color(source.specular);
-                if constexpr (std::is_same_v<source_type, directional_light>) {
-                    value.Type = D3DLIGHT_DIRECTIONAL;
-                } else {
-                    value.Type = std::is_same_v<source_type, point_light> ? D3DLIGHT_POINT : D3DLIGHT_SPOT;
-                    value.Position = {source.position.x, source.position.y, source.position.z};
-                    value.Attenuation0 = source.attenuation.constant;
-                    value.Attenuation1 = source.attenuation.linear;
-                    value.Attenuation2 = source.attenuation.quadratic;
-                }
-                if constexpr (!std::is_same_v<source_type, point_light>)
-                    value.Direction = native_direction(source.direction);
-                if constexpr (std::is_same_v<source_type, spot_light>) {
-                    value.Theta = source.inner_outer.inner;
-                    value.Phi = source.inner_outer.outer;
-                }
-            }, lighting.lights[index]);
+            std::visit(
+                [&](const auto &source) {
+                    using source_type = std::decay_t<decltype(source)>;
+                    value.Diffuse = native_color(source.diffuse);
+                    value.Specular = native_color(source.specular);
+                    if constexpr (std::is_same_v<source_type, directional_light>) {
+                        value.Type = D3DLIGHT_DIRECTIONAL;
+                    } else {
+                        value.Type = std::is_same_v<source_type, point_light> ? D3DLIGHT_POINT : D3DLIGHT_SPOT;
+                        value.Position = {source.position.x, source.position.y, source.position.z};
+                        value.Attenuation0 = source.attenuation.constant;
+                        value.Attenuation1 = source.attenuation.linear;
+                        value.Attenuation2 = source.attenuation.quadratic;
+                    }
+                    if constexpr (!std::is_same_v<source_type, point_light>)
+                        value.Direction = native_direction(source.direction);
+                    if constexpr (std::is_same_v<source_type, spot_light>) {
+                        value.Theta = source.inner_outer.inner;
+                        value.Phi = source.inner_outer.outer;
+                    }
+                },
+                lighting.lights[index]
+            );
             device.device->SetLight(static_cast<DWORD>(index), &value);
             device.device->LightEnable(static_cast<DWORD>(index), TRUE);
         }

@@ -8,12 +8,18 @@
 #include <string_view>
 
 namespace alia {
-    key_led get_keyboard_leds() { auto &c = get_os_context(); return c.backend()->keyboard_leds.get_or_throw()(c.handle()); }
-    void set_keyboard_leds(key_led leds) { auto &c = get_os_context(); c.backend()->set_keyboard_leds.get_or_throw()(c.handle(), leds); }
+    key_led get_keyboard_leds() {
+        auto &c = get_os_context();
+        return c.backend()->keyboard_leds.get_or_throw()(c.handle());
+    }
+
+    void set_keyboard_leds(key_led leds) {
+        auto &c = get_os_context();
+        c.backend()->set_keyboard_leds.get_or_throw()(c.handle(), leds);
+    }
 
     namespace {
-        constexpr key_mod lock_modifiers =
-            key_mod::caps_lock | key_mod::num_lock | key_mod::scroll_lock;
+        constexpr key_mod lock_modifiers = key_mod::caps_lock | key_mod::num_lock | key_mod::scroll_lock;
 
         keyboard_state &tracked_keyboard_state() {
             static keyboard_state state;
@@ -27,8 +33,7 @@ namespace alia {
 
         constexpr bool is_valid_key(key value) {
             const int index = static_cast<int>(value);
-            return index > static_cast<int>(key::unknown) &&
-                   index < static_cast<int>(key::key_count);
+            return index > static_cast<int>(key::unknown) && index < static_cast<int>(key::key_count);
         }
 
         constexpr bool has_modifier(key_mod modifiers, key_mod modifier) {
@@ -36,13 +41,10 @@ namespace alia {
         }
 
         bool equal_key_names(std::string_view a, std::string_view b) {
-            return a.size() == b.size() &&
-                   std::equal(
-                       a.begin(), a.end(), b.begin(),
-                       [](char left, char right) {
-                           return std::tolower(static_cast<unsigned char>(left)) ==
-                                  std::tolower(static_cast<unsigned char>(right));
-                       });
+            return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](char left, char right) {
+                       return std::tolower(static_cast<unsigned char>(left)) ==
+                              std::tolower(static_cast<unsigned char>(right));
+                   });
         }
 
         constexpr std::array key_names{
@@ -51,9 +53,8 @@ namespace alia {
 #undef ALIA_KEYCODE
         };
 
-        static_assert(
-            key_names.size() == static_cast<std::size_t>(key::key_count));
-    }
+        static_assert(key_names.size() == static_cast<std::size_t>(key::key_count));
+    } // namespace
 
     keyboard_state::keyboard_state() = default;
 
@@ -99,19 +100,15 @@ namespace alia {
 
     void keyboard_state::refresh_modifiers(key_mod modifiers) {
         modifiers_ = modifiers & lock_modifiers;
-        if (keys_[static_cast<std::size_t>(key::lshift)] ||
-            keys_[static_cast<std::size_t>(key::rshift)])
+        if (keys_[static_cast<std::size_t>(key::lshift)] || keys_[static_cast<std::size_t>(key::rshift)])
             modifiers_ |= key_mod::shift;
-        if (keys_[static_cast<std::size_t>(key::lctrl)] ||
-            keys_[static_cast<std::size_t>(key::rctrl)])
+        if (keys_[static_cast<std::size_t>(key::lctrl)] || keys_[static_cast<std::size_t>(key::rctrl)])
             modifiers_ |= key_mod::ctrl;
-        if (keys_[static_cast<std::size_t>(key::lalt)] ||
-            keys_[static_cast<std::size_t>(key::ralt)])
+        if (keys_[static_cast<std::size_t>(key::lalt)] || keys_[static_cast<std::size_t>(key::ralt)])
             modifiers_ |= key_mod::alt;
         if (keys_[static_cast<std::size_t>(key::ralt)])
             modifiers_ |= key_mod::alt_gr;
-        if (keys_[static_cast<std::size_t>(key::lsuper)] ||
-            keys_[static_cast<std::size_t>(key::rsuper)])
+        if (keys_[static_cast<std::size_t>(key::lsuper)] || keys_[static_cast<std::size_t>(key::rsuper)])
             modifiers_ |= key_mod::super;
     }
 
@@ -167,5 +164,5 @@ namespace alia {
             state.keys_.fill(false);
             state.modifiers_ = modifiers & lock_modifiers;
         }
-    }
+    } // namespace detail
 } // namespace alia

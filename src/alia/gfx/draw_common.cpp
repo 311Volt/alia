@@ -4,11 +4,7 @@
 #include <stdexcept>
 
 namespace alia::detail {
-    vec2f anchor_offset(
-        const std::variant<draw_anchor, vec2f> &anchor,
-        vec2f size,
-        const char *non_finite_message
-    ) {
+    vec2f anchor_offset(const std::variant<draw_anchor, vec2f> &anchor, vec2f size, const char *non_finite_message) {
         if (const auto *offset = std::get_if<vec2f>(&anchor)) {
             if (!std::isfinite(offset->x) || !std::isfinite(offset->y))
                 throw std::invalid_argument(non_finite_message);

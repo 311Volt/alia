@@ -25,10 +25,7 @@ namespace alia {
     // current vertex count before appending and offset their local indices.
     template <class T>
     concept primitive_sink = requires(
-        T &sink,
-        const T &const_sink,
-        std::span<const colored_vertex> vertices,
-        std::span<const uint32_t> indices
+        T &sink, const T &const_sink, std::span<const colored_vertex> vertices, std::span<const uint32_t> indices
     ) {
         sink.append_vertices(vertices);
         sink.append_indices(indices);
@@ -66,12 +63,7 @@ namespace alia {
         };
 
         template <primitive_sink Sink>
-        [[nodiscard]] primitive_vertex_pair append_vertex_pair(
-            Sink &sink,
-            vec2f plus,
-            vec2f minus,
-            color c
-        ) {
+        [[nodiscard]] primitive_vertex_pair append_vertex_pair(Sink &sink, vec2f plus, vec2f minus, color c) {
             const uint32_t base = sink.vertex_count();
             const std::array vertices{
                 colored_vertex{plus, c},
@@ -82,11 +74,7 @@ namespace alia {
         }
 
         template <primitive_sink Sink>
-        void append_quad(
-            Sink &sink,
-            primitive_vertex_pair start,
-            primitive_vertex_pair end
-        ) {
+        void append_quad(Sink &sink, primitive_vertex_pair start, primitive_vertex_pair end) {
             const std::array<uint32_t, 6> indices{
                 start.plus,
                 end.plus,
@@ -100,17 +88,8 @@ namespace alia {
 
         template <primitive_sink Sink>
         [[nodiscard]] primitive_joint append_joint(
-            Sink &sink,
-            vec2f point,
-            vec2f direction_in,
-            vec2f normal_in,
-            float length_in,
-            vec2f direction_out,
-            vec2f normal_out,
-            float length_out,
-            color c,
-            float half_thickness,
-            line_join join
+            Sink &sink, vec2f point, vec2f direction_in, vec2f normal_in, float length_in, vec2f direction_out,
+            vec2f normal_out, float length_out, color c, float half_thickness, line_join join
         ) {
             const float cross = vec_cross(direction_in, direction_out);
             const float dot = vec_dot(direction_in, direction_out);
@@ -118,10 +97,7 @@ namespace alia {
             if (std::abs(cross) <= collinear_eps) {
                 if (dot >= 0.0f) {
                     const auto pair = append_vertex_pair(
-                        sink,
-                        point + normal_in * half_thickness,
-                        point - normal_in * half_thickness,
-                        c
+                        sink, point + normal_in * half_thickness, point - normal_in * half_thickness, c
                     );
                     return {pair, pair};
                 }
@@ -146,10 +122,8 @@ namespace alia {
             }
 
             const float outer_sign = cross > 0.0f ? -1.0f : 1.0f;
-            const float inner_extent = (std::min)(
-                half_thickness / (std::max)(cos_half, min_cos_half),
-                (std::min)(length_in, length_out)
-            );
+            const float inner_extent =
+                (std::min)(half_thickness / (std::max)(cos_half, min_cos_half), (std::min)(length_in, length_out));
             const vec2f inner = point - miter * (outer_sign * inner_extent);
             const vec2f outer_in = point + normal_in * (outer_sign * half_thickness);
             const vec2f outer_out = point + normal_out * (outer_sign * half_thickness);
@@ -200,13 +174,7 @@ namespace alia {
         }
 
         template <primitive_sink Sink>
-        void emit_line(
-            Sink &sink,
-            vec2f a,
-            vec2f b,
-            color c,
-            float thickness = 1.0f
-        ) {
+        void emit_line(Sink &sink, vec2f a, vec2f b, color c, float thickness = 1.0f) {
             const vec2f delta = b - a;
             const float length = delta.length();
             if (thickness <= 0.0f || length <= 0.0f)
@@ -236,12 +204,8 @@ namespace alia {
 
         template <primitive_sink Sink>
         void emit_polyline(
-            Sink &sink,
-            std::span<const vec2f> input_points,
-            color c,
-            float thickness = 1.0f,
-            line_join join = line_join::miter,
-            bool closed = false
+            Sink &sink, std::span<const vec2f> input_points, color c, float thickness = 1.0f,
+            line_join join = line_join::miter, bool closed = false
         ) {
             if (thickness <= 0.0f)
                 return;
@@ -354,7 +318,8 @@ namespace alia {
     // Sharp inner clamps and reversal spikes may produce localized overlap.
     class generic_primitive_renderer {
     public:
-        void finish_primitive(frame &) noexcept {}
+        void finish_primitive(frame &) noexcept {
+        }
 
         template <class Self>
         void fill_rect(this Self &&self, frame &target, rect_f rectangle, color c)
@@ -366,53 +331,36 @@ namespace alia {
 
         template <class Self>
         void draw_rect(
-            this Self &&self,
-            frame &target,
-            rect_f rectangle,
-            color c,
-            float thickness = 1.0f,
+            this Self &&self, frame &target, rect_f rectangle, color c, float thickness = 1.0f,
             line_join join = line_join::miter
-        ) requires primitive_sink<std::remove_reference_t<Self>> {
+        )
+            requires primitive_sink<std::remove_reference_t<Self>>
+        {
             const std::array points{
                 rectangle.tl(),
                 rectangle.tr(),
                 rectangle.br(),
                 rectangle.bl(),
             };
-            detail::emit_polyline(
-                self,
-                std::span<const vec2f>{points},
-                c,
-                thickness,
-                join,
-                true
-            );
+            detail::emit_polyline(self, std::span<const vec2f>{points}, c, thickness, join, true);
             self.finish_primitive(target);
         }
 
         template <class Self>
-        void draw_line(
-            this Self &&self,
-            frame &target,
-            vec2f a,
-            vec2f b,
-            color c,
-            float thickness = 1.0f
-        ) requires primitive_sink<std::remove_reference_t<Self>> {
+        void draw_line(this Self &&self, frame &target, vec2f a, vec2f b, color c, float thickness = 1.0f)
+            requires primitive_sink<std::remove_reference_t<Self>>
+        {
             detail::emit_line(self, a, b, c, thickness);
             self.finish_primitive(target);
         }
 
         template <class Self>
         void draw_polyline(
-            this Self &&self,
-            frame &target,
-            std::span<const vec2f> points,
-            color c,
-            float thickness = 1.0f,
-            line_join join = line_join::miter,
-            bool closed = false
-        ) requires primitive_sink<std::remove_reference_t<Self>> {
+            this Self &&self, frame &target, std::span<const vec2f> points, color c, float thickness = 1.0f,
+            line_join join = line_join::miter, bool closed = false
+        )
+            requires primitive_sink<std::remove_reference_t<Self>>
+        {
             detail::emit_polyline(self, points, c, thickness, join, closed);
             self.finish_primitive(target);
         }
@@ -446,9 +394,7 @@ namespace alia {
         void flush(frame &target) {
             if (empty())
                 return;
-            indices_.visit([&](auto indices) {
-                target.draw_indexed<colored_vertex>(vertices_, indices);
-            });
+            indices_.visit([&](auto indices) { target.draw_indexed<colored_vertex>(vertices_, indices); });
             clear();
         }
 

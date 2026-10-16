@@ -14,11 +14,12 @@
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
 #define WIN32_LEAN_AND_MEAN
 
-    #ifndef NOMINMAX
-    #define NOMINMAX
-    #endif
-    
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include <windows.h>
+
 namespace alia {
     void register_win32_ogl_platform();
 }
@@ -55,10 +56,8 @@ namespace alia {
     static void *load_gl_proc_raw(const char *name) {
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
         void *p = reinterpret_cast<void *>(wglGetProcAddress(name));
-        if (p == reinterpret_cast<void *>(0x1) ||
-            p == reinterpret_cast<void *>(0x2) ||
-            p == reinterpret_cast<void *>(0x3) ||
-            p == reinterpret_cast<void *>(static_cast<std::intptr_t>(-1)))
+        if (p == reinterpret_cast<void *>(0x1) || p == reinterpret_cast<void *>(0x2) ||
+            p == reinterpret_cast<void *>(0x3) || p == reinterpret_cast<void *>(static_cast<std::intptr_t>(-1)))
             return nullptr;
         return p;
 #else
@@ -122,28 +121,36 @@ namespace alia {
         bool ok = true;
         ok = (load_gl_proc(ogl_s_glVertexAttribDivisor, "glVertexAttribDivisor") ||
               load_gl_proc(ogl_s_glVertexAttribDivisor, "glVertexAttribDivisorARB") ||
-              load_gl_proc(ogl_s_glVertexAttribDivisor, "glVertexAttribDivisorEXT")) && ok;
+              load_gl_proc(ogl_s_glVertexAttribDivisor, "glVertexAttribDivisorEXT")) &&
+             ok;
         ok = (load_gl_proc(ogl_s_glDrawArraysInstanced, "glDrawArraysInstanced") ||
               load_gl_proc(ogl_s_glDrawArraysInstanced, "glDrawArraysInstancedARB") ||
-              load_gl_proc(ogl_s_glDrawArraysInstanced, "glDrawArraysInstancedEXT")) && ok;
+              load_gl_proc(ogl_s_glDrawArraysInstanced, "glDrawArraysInstancedEXT")) &&
+             ok;
         ok = (load_gl_proc(ogl_s_glDrawElementsInstanced, "glDrawElementsInstanced") ||
               load_gl_proc(ogl_s_glDrawElementsInstanced, "glDrawElementsInstancedARB") ||
-              load_gl_proc(ogl_s_glDrawElementsInstanced, "glDrawElementsInstancedEXT")) && ok;
+              load_gl_proc(ogl_s_glDrawElementsInstanced, "glDrawElementsInstancedEXT")) &&
+             ok;
         return ok;
     }
 
     static bool load_framebuffer_procs() {
         bool ok = true;
         ok = (load_gl_proc(ogl_s_glGenFramebuffers, "glGenFramebuffers") ||
-              load_gl_proc(ogl_s_glGenFramebuffers, "glGenFramebuffersEXT")) && ok;
+              load_gl_proc(ogl_s_glGenFramebuffers, "glGenFramebuffersEXT")) &&
+             ok;
         ok = (load_gl_proc(ogl_s_glDeleteFramebuffers, "glDeleteFramebuffers") ||
-              load_gl_proc(ogl_s_glDeleteFramebuffers, "glDeleteFramebuffersEXT")) && ok;
+              load_gl_proc(ogl_s_glDeleteFramebuffers, "glDeleteFramebuffersEXT")) &&
+             ok;
         ok = (load_gl_proc(ogl_s_glBindFramebuffer, "glBindFramebuffer") ||
-              load_gl_proc(ogl_s_glBindFramebuffer, "glBindFramebufferEXT")) && ok;
+              load_gl_proc(ogl_s_glBindFramebuffer, "glBindFramebufferEXT")) &&
+             ok;
         ok = (load_gl_proc(ogl_s_glFramebufferTexture2D, "glFramebufferTexture2D") ||
-              load_gl_proc(ogl_s_glFramebufferTexture2D, "glFramebufferTexture2DEXT")) && ok;
+              load_gl_proc(ogl_s_glFramebufferTexture2D, "glFramebufferTexture2DEXT")) &&
+             ok;
         ok = (load_gl_proc(ogl_s_glCheckFramebufferStatus, "glCheckFramebufferStatus") ||
-              load_gl_proc(ogl_s_glCheckFramebufferStatus, "glCheckFramebufferStatusEXT")) && ok;
+              load_gl_proc(ogl_s_glCheckFramebufferStatus, "glCheckFramebufferStatusEXT")) &&
+             ok;
         return ok;
     }
 
@@ -172,34 +179,27 @@ namespace alia {
         const bool gl13_or_later = (gl_major > 1 || (gl_major == 1 && gl_minor >= 3));
         raw->separate_specular_color = gl_major > 1 || (gl_major == 1 && gl_minor >= 2);
         raw->radial_fog = has_gl_extension("GL_NV_fog_distance");
-        const bool has_cube_maps =
-            gl13_or_later || has_gl_extension("GL_ARB_texture_cube_map");
+        const bool has_cube_maps = gl13_or_later || has_gl_extension("GL_ARB_texture_cube_map");
 
         if (gl30_or_later || has_generate_mipmap) {
 #ifdef ALIA_COMPILE_PLATFORM_BACKEND_WIN32
-            ogl_s_glGenerateMipmap =
-                reinterpret_cast<PFNGLGENERATEMIPMAPPROC>(
-                    wglGetProcAddress("glGenerateMipmap")
-                );
+            ogl_s_glGenerateMipmap = reinterpret_cast<PFNGLGENERATEMIPMAPPROC>(wglGetProcAddress("glGenerateMipmap"));
             if (!ogl_s_glGenerateMipmap) {
                 // Try the EXT suffixed version
                 ogl_s_glGenerateMipmap =
-                    reinterpret_cast<PFNGLGENERATEMIPMAPPROC>(
-                        wglGetProcAddress("glGenerateMipmapEXT")
-                    );
+                    reinterpret_cast<PFNGLGENERATEMIPMAPPROC>(wglGetProcAddress("glGenerateMipmapEXT"));
             }
 #endif
         }
 
         const bool has_shaders = gl20_or_later && load_shader_procs();
         const bool has_buffers = gl15_or_later && load_buffer_procs();
-        const bool has_instancing = has_shaders && has_buffers &&
-            (gl33_or_later || has_gl_extension("GL_ARB_instanced_arrays")) &&
+        const bool has_instancing =
+            has_shaders && has_buffers && (gl33_or_later || has_gl_extension("GL_ARB_instanced_arrays")) &&
             (gl31_or_later || has_gl_extension("GL_ARB_draw_instanced") || has_gl_extension("GL_EXT_draw_instanced")) &&
             load_instancing_procs();
         const bool has_framebuffers =
-            (gl30_or_later || has_gl_extension("GL_EXT_framebuffer_object")) &&
-            load_framebuffer_procs();
+            (gl30_or_later || has_gl_extension("GL_EXT_framebuffer_object")) && load_framebuffer_procs();
 
         graphics_backend_interface iface;
         iface.id = gfx_backend::opengl;
@@ -208,129 +208,118 @@ namespace alia {
         GLint max_texture_size = 0;
         glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
         iface.caps.max_texture_size = max_texture_size;
-        iface.caps.npot_textures = gl20_or_later ||
-            has_gl_extension("GL_ARB_texture_non_power_of_two");
+        iface.caps.npot_textures = gl20_or_later || has_gl_extension("GL_ARB_texture_non_power_of_two");
         iface.caps.cube_textures = has_cube_maps;
         iface.caps.render_to_texture = has_framebuffers;
         iface.caps.index32 = true; // Desktop OpenGL 1.1 supports GL_UNSIGNED_INT.
         iface.caps.instancing = has_instancing;
         iface.caps.separate_alpha_blend =
-            gl_major > 1 || (gl_major == 1 && gl_minor >= 4) ||
-            has_gl_extension("GL_EXT_blend_func_separate");
+            gl_major > 1 || (gl_major == 1 && gl_minor >= 4) || has_gl_extension("GL_EXT_blend_func_separate");
         GLint native_max_lights = 0;
         glGetIntegerv(GL_MAX_LIGHTS, &native_max_lights);
         iface.caps.max_lights = (std::clamp)(static_cast<int>(native_max_lights), 0, max_lights);
         iface.caps.spot_model = spot_light_model::cutoff_exponent;
         iface.caps.fog = true;
-        iface.caps.fog_distance = raw->radial_fog
-            ? fog_distance_model::radial : fog_distance_model::view_depth;
+        iface.caps.fog_distance = raw->radial_fog ? fog_distance_model::radial : fog_distance_model::view_depth;
         if (const auto *renderer = reinterpret_cast<const char *>(glGetString(GL_RENDERER)))
             iface.caps.renderer_name = renderer;
         std::string renderer_lower = iface.caps.renderer_name;
-        std::transform(renderer_lower.begin(), renderer_lower.end(), renderer_lower.begin(),
-            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        iface.caps.render =
-            renderer_lower.find("gdi generic") != std::string::npos ||
-            renderer_lower.find("llvmpipe") != std::string::npos ||
-            renderer_lower.find("softpipe") != std::string::npos
-                ? render_method::software : render_method::hardware;
+        std::transform(renderer_lower.begin(), renderer_lower.end(), renderer_lower.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        iface.caps.render = renderer_lower.find("gdi generic") != std::string::npos ||
+                                    renderer_lower.find("llvmpipe") != std::string::npos ||
+                                    renderer_lower.find("softpipe") != std::string::npos
+                                ? render_method::software
+                                : render_method::hardware;
 
         iface.destroy_device = {ogl_destroy_device};
 
-        iface.create_texture           = {ogl_create_texture};
+        iface.create_texture = {ogl_create_texture};
         iface.texture_format_supported = {ogl_texture_format_supported};
         if (has_cube_maps) {
             iface.create_cube_texture = {ogl_create_cube_texture};
             iface.cube_texture_format_supported = {ogl_cube_texture_format_supported};
         } else {
-            iface.create_cube_texture = {
-                nullptr,
-                "cube textures require OpenGL 1.3 or GL_ARB_texture_cube_map"
-            };
+            iface.create_cube_texture = {nullptr, "cube textures require OpenGL 1.3 or GL_ARB_texture_cube_map"};
             iface.cube_texture_format_supported = {
-                nullptr,
-                "cube textures require OpenGL 1.3 or GL_ARB_texture_cube_map"
+                nullptr, "cube textures require OpenGL 1.3 or GL_ARB_texture_cube_map"
             };
         }
-        iface.destroy_texture          = {ogl_destroy_texture};
-        iface.texture_format           = {ogl_texture_format};
-        iface.texture_width            = {ogl_texture_width};
-        iface.texture_height           = {ogl_texture_height};
-        iface.texture_mip_levels       = {ogl_texture_mip_levels};
-        iface.texture_sampler          = {ogl_texture_sampler};
-        iface.texture_set_sampler      = {ogl_texture_set_sampler};
-        iface.texture_lock             = {ogl_texture_lock};
-        iface.cube_texture_lock        = {ogl_cube_texture_lock};
-        iface.texture_unlock           = {ogl_texture_unlock};
-        iface.texture_clone            = {ogl_texture_clone};
+        iface.destroy_texture = {ogl_destroy_texture};
+        iface.texture_format = {ogl_texture_format};
+        iface.texture_width = {ogl_texture_width};
+        iface.texture_height = {ogl_texture_height};
+        iface.texture_mip_levels = {ogl_texture_mip_levels};
+        iface.texture_sampler = {ogl_texture_sampler};
+        iface.texture_set_sampler = {ogl_texture_set_sampler};
+        iface.texture_lock = {ogl_texture_lock};
+        iface.cube_texture_lock = {ogl_cube_texture_lock};
+        iface.texture_unlock = {ogl_texture_unlock};
+        iface.texture_clone = {ogl_texture_clone};
         iface.copy_render_target_to_texture = {ogl_copy_render_target_to_texture};
 
         if (ogl_s_glGenerateMipmap) {
             iface.texture_generate_mipmaps = {ogl_texture_generate_mipmaps};
         } else {
             iface.texture_generate_mipmaps = {
-                nullptr,
-                "glGenerateMipmap requires GL 3.0+ or GL_EXT_framebuffer_object"
+                nullptr, "glGenerateMipmap requires GL 3.0+ or GL_EXT_framebuffer_object"
             };
         }
 
         if (has_buffers) {
-            iface.create_vertex_buffer  = {ogl_create_vertex_buffer};
+            iface.create_vertex_buffer = {ogl_create_vertex_buffer};
             iface.destroy_vertex_buffer = {ogl_destroy_vertex_buffer};
-            iface.vertex_buffer_count   = {ogl_vertex_buffer_count};
-            iface.vertex_buffer_stride  = {ogl_vertex_buffer_stride};
-            iface.vertex_buffer_usage   = {ogl_vertex_buffer_usage};
-            iface.vertex_buffer_lock    = {ogl_vertex_buffer_lock};
-            iface.vertex_buffer_unlock  = {ogl_vertex_buffer_unlock};
-            iface.create_index_buffer   = {ogl_create_index_buffer};
-            iface.destroy_index_buffer  = {ogl_destroy_index_buffer};
-            iface.index_buffer_count    = {ogl_index_buffer_count};
-            iface.index_buffer_usage    = {ogl_index_buffer_usage};
-            iface.index_buffer_lock     = {ogl_index_buffer_lock};
-            iface.index_buffer_unlock   = {ogl_index_buffer_unlock};
+            iface.vertex_buffer_count = {ogl_vertex_buffer_count};
+            iface.vertex_buffer_stride = {ogl_vertex_buffer_stride};
+            iface.vertex_buffer_usage = {ogl_vertex_buffer_usage};
+            iface.vertex_buffer_lock = {ogl_vertex_buffer_lock};
+            iface.vertex_buffer_unlock = {ogl_vertex_buffer_unlock};
+            iface.create_index_buffer = {ogl_create_index_buffer};
+            iface.destroy_index_buffer = {ogl_destroy_index_buffer};
+            iface.index_buffer_count = {ogl_index_buffer_count};
+            iface.index_buffer_usage = {ogl_index_buffer_usage};
+            iface.index_buffer_lock = {ogl_index_buffer_lock};
+            iface.index_buffer_unlock = {ogl_index_buffer_unlock};
         } else {
             const char *reason = "vertex and index buffers require OpenGL 1.5 buffer object entry points";
-            iface.create_vertex_buffer  = {nullptr, reason};
+            iface.create_vertex_buffer = {nullptr, reason};
             iface.destroy_vertex_buffer = {nullptr, reason};
-            iface.vertex_buffer_count   = {nullptr, reason};
-            iface.vertex_buffer_stride  = {nullptr, reason};
-            iface.vertex_buffer_usage   = {nullptr, reason};
-            iface.vertex_buffer_lock    = {nullptr, reason};
-            iface.vertex_buffer_unlock  = {nullptr, reason};
-            iface.create_index_buffer   = {nullptr, reason};
-            iface.destroy_index_buffer  = {nullptr, reason};
-            iface.index_buffer_count    = {nullptr, reason};
-            iface.index_buffer_usage    = {nullptr, reason};
-            iface.index_buffer_lock     = {nullptr, reason};
-            iface.index_buffer_unlock   = {nullptr, reason};
+            iface.vertex_buffer_count = {nullptr, reason};
+            iface.vertex_buffer_stride = {nullptr, reason};
+            iface.vertex_buffer_usage = {nullptr, reason};
+            iface.vertex_buffer_lock = {nullptr, reason};
+            iface.vertex_buffer_unlock = {nullptr, reason};
+            iface.create_index_buffer = {nullptr, reason};
+            iface.destroy_index_buffer = {nullptr, reason};
+            iface.index_buffer_count = {nullptr, reason};
+            iface.index_buffer_usage = {nullptr, reason};
+            iface.index_buffer_lock = {nullptr, reason};
+            iface.index_buffer_unlock = {nullptr, reason};
         }
 
         if (has_shaders) {
             iface.create_shader_program = {ogl_create_shader_program};
         } else {
-            iface.create_shader_program = {
-                nullptr,
-                "shader programs require OpenGL 2.0 and shader entry points"
-            };
+            iface.create_shader_program = {nullptr, "shader programs require OpenGL 2.0 and shader entry points"};
         }
         iface.destroy_shader_program = {ogl_destroy_shader_program};
         iface.shader_lookup_constant = {ogl_shader_lookup_constant};
-        iface.shader_set_constant    = {ogl_shader_set_constant};
-        iface.shader_lookup_sampler  = {ogl_shader_lookup_sampler};
-        iface.shader_set_sampler     = {ogl_shader_set_sampler};
+        iface.shader_set_constant = {ogl_shader_set_constant};
+        iface.shader_lookup_sampler = {ogl_shader_lookup_sampler};
+        iface.shader_set_sampler = {ogl_shader_set_sampler};
 
-        iface.create_swapchain       = {ogl_create_swapchain};
-        iface.destroy_swapchain      = {ogl_destroy_swapchain};
-        iface.swapchain_properties   = {ogl_swapchain_properties};
-        iface.swapchain_begin_frame  = {ogl_swapchain_begin_frame};
-        iface.swapchain_end_frame    = {ogl_swapchain_end_frame};
-        iface.swapchain_present      = {ogl_swapchain_present};
-        iface.swapchain_present_region = {
-            nullptr, "WGL has no partial buffer swap"};
-        iface.swapchain_on_resize    = {ogl_swapchain_on_resize};
+        iface.create_swapchain = {ogl_create_swapchain};
+        iface.destroy_swapchain = {ogl_destroy_swapchain};
+        iface.swapchain_properties = {ogl_swapchain_properties};
+        iface.swapchain_begin_frame = {ogl_swapchain_begin_frame};
+        iface.swapchain_end_frame = {ogl_swapchain_end_frame};
+        iface.swapchain_present = {ogl_swapchain_present};
+        iface.swapchain_present_region = {nullptr, "WGL has no partial buffer swap"};
+        iface.swapchain_on_resize = {ogl_swapchain_on_resize};
 
-        iface.set_render_state             = {ogl_set_render_state};
-        iface.set_transforms               = {ogl_set_transforms};
+        iface.set_render_state = {ogl_set_render_state};
+        iface.set_transforms = {ogl_set_transforms};
         if (iface.caps.max_lights > 0) {
             iface.set_lighting = {ogl_set_lighting};
             iface.set_material = {ogl_set_material};
@@ -339,22 +328,23 @@ namespace alia {
             iface.set_material = {nullptr, "device reports zero GL_MAX_LIGHTS"};
         }
         iface.set_fog = {ogl_set_fog};
-        iface.set_render_target            = {ogl_set_render_target};
-        iface.clear                        = {ogl_clear};
-        iface.set_viewport                 = {ogl_set_viewport};
-        iface.bind_vertex_buffer           = {ogl_bind_vertex_buffer};
-        iface.bind_index_buffer            = {ogl_bind_index_buffer};
+        iface.set_render_target = {ogl_set_render_target};
+        iface.clear = {ogl_clear};
+        iface.set_viewport = {ogl_set_viewport};
+        iface.bind_vertex_buffer = {ogl_bind_vertex_buffer};
+        iface.bind_index_buffer = {ogl_bind_index_buffer};
         iface.upload_transient_vertex_data = {ogl_upload_transient_vertex_data};
-        iface.upload_transient_index_data  = {ogl_upload_transient_index_data};
-        iface.bind_resources               = {ogl_bind_resources};
-        iface.draw                         = {ogl_draw};
-        iface.draw_indexed                 = {ogl_draw_indexed};
+        iface.upload_transient_index_data = {ogl_upload_transient_index_data};
+        iface.bind_resources = {ogl_bind_resources};
+        iface.draw = {ogl_draw};
+        iface.draw_indexed = {ogl_draw_indexed};
         if (has_instancing) {
             iface.bind_instance_buffer = {ogl_bind_instance_buffer};
             iface.draw_instanced = {ogl_draw_instanced};
             iface.draw_indexed_instanced = {ogl_draw_indexed_instanced};
         } else {
-            const char *reason = "instancing requires shaders, buffers, OpenGL 3.3 or GL_ARB_instanced_arrays, OpenGL 3.1 or GL_ARB_draw_instanced/GL_EXT_draw_instanced, and instancing entry points";
+            const char *reason = "instancing requires shaders, buffers, OpenGL 3.3 or GL_ARB_instanced_arrays, OpenGL "
+                                 "3.1 or GL_ARB_draw_instanced/GL_EXT_draw_instanced, and instancing entry points";
             iface.bind_instance_buffer = {nullptr, reason};
             iface.draw_instanced = {nullptr, reason};
             iface.draw_indexed_instanced = {nullptr, reason};

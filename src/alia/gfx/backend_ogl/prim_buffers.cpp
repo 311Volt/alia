@@ -37,11 +37,7 @@ namespace alia {
     } // namespace
 
     vertex_buffer_handle *ogl_create_vertex_buffer(
-        device_handle *,
-        int vertex_stride,
-        int vertex_count,
-        buffer_usage usage,
-        const void *initial_data
+        device_handle *, int vertex_stride, int vertex_count, buffer_usage usage, const void *initial_data
     ) {
         if (vertex_stride <= 0 || vertex_count <= 0 || !ogl_s_glGenBuffers)
             return nullptr;
@@ -84,11 +80,7 @@ namespace alia {
     }
 
     bool ogl_vertex_buffer_lock(
-        vertex_buffer_handle *h,
-        int first_vertex,
-        int vertex_count,
-        buffer_lock_mode mode,
-        buffer_lock_info &out
+        vertex_buffer_handle *h, int first_vertex, int vertex_count, buffer_lock_mode mode, buffer_lock_info &out
     ) {
         auto *buffer = as_ogl_vertex_buffer(h);
         if (first_vertex < 0 || vertex_count <= 0 || first_vertex + vertex_count > buffer->count)
@@ -118,11 +110,7 @@ namespace alia {
     }
 
     index_buffer_handle *ogl_create_index_buffer(
-        device_handle *,
-        index_format format,
-        int index_count,
-        buffer_usage usage,
-        const void *initial_data
+        device_handle *, index_format format, int index_count, buffer_usage usage, const void *initial_data
     ) {
         if (index_count <= 0 || !ogl_s_glGenBuffers)
             return nullptr;
@@ -161,11 +149,7 @@ namespace alia {
     }
 
     bool ogl_index_buffer_lock(
-        index_buffer_handle *h,
-        int first_index,
-        int index_count,
-        buffer_lock_mode mode,
-        buffer_lock_info &out
+        index_buffer_handle *h, int first_index, int index_count, buffer_lock_mode mode, buffer_lock_info &out
     ) {
         auto *buffer = as_ogl_index_buffer(h);
         if (first_index < 0 || index_count <= 0 || first_index + index_count > buffer->count)

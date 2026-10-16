@@ -29,22 +29,35 @@ namespace alia {
         gfx_device(const gfx_device &) = delete;
         gfx_device &operator=(const gfx_device &) = delete;
 
-        static gfx_device create(
-            gfx_backend pref = gfx_backend::auto_,
-            const gfx_device_config &config = {});
+        static gfx_device create(gfx_backend pref = gfx_backend::auto_, const gfx_device_config &config = {});
         [[nodiscard]] swapchain create_swapchain(const swapchain_config &config);
-        [[nodiscard]] bool valid() const noexcept { return backend_ != nullptr; }
-        [[nodiscard]] explicit operator bool() const noexcept { return valid(); }
-        [[nodiscard]] const graphics_backend_interface *backend() const noexcept { return backend_.get(); }
-        [[nodiscard]] device_handle *device() const noexcept { return device_; }
+
+        [[nodiscard]] bool valid() const noexcept {
+            return backend_ != nullptr;
+        }
+
+        [[nodiscard]] explicit operator bool() const noexcept {
+            return valid();
+        }
+
+        [[nodiscard]] const graphics_backend_interface *backend() const noexcept {
+            return backend_.get();
+        }
+
+        [[nodiscard]] device_handle *device() const noexcept {
+            return device_;
+        }
+
         [[nodiscard]] vec2f pixel_center_offset() const;
         [[nodiscard]] const gfx_device_caps &caps() const;
 
         // Top-left UI projection with backend-specific pixel-center correction.
         [[nodiscard]] transform ortho_ui(float width, float height) const;
+
         [[nodiscard]] transform ortho_ui(vec2f size) const {
             return ortho_ui(size.x, size.y);
         }
+
         [[nodiscard]] transform ortho_ui(vec2i size) const {
             return ortho_ui(static_cast<float>(size.x), static_cast<float>(size.y));
         }
@@ -52,40 +65,34 @@ namespace alia {
         // Right-handed orthographic projection with backend-specific clip depth.
         // Bounds and planes must be finite, with l != r, b != t, and near != far.
         // Invalid inputs throw std::invalid_argument in debug builds.
-        [[nodiscard]] transform orthographic(
-            float l, float r, float b, float t,
-            float near_plane, float far_plane) const;
+        [[nodiscard]] transform
+        orthographic(float l, float r, float b, float t, float near_plane, float far_plane) const;
 
         // Right-handed perspective frustum; bounds are on the near plane.
         // Uses backend-specific clip depth. Finite inputs, l != r, b != t,
         // and 0 < near < far are checked in debug builds (std::invalid_argument).
-        [[nodiscard]] transform perspective(
-            float l, float r, float b, float t,
-            float near_plane, float far_plane) const;
+        [[nodiscard]] transform
+        perspective(float l, float r, float b, float t, float near_plane, float far_plane) const;
 
         // Right-handed perspective projection with backend-specific clip depth.
         // Vertical field of view in degrees; debug builds validate finite inputs,
         // 0 < fov < 180, aspect > 0, and 0 < near < far (std::invalid_argument).
-        [[nodiscard]] transform perspective_vfov(
-            float vfov_degrees,
-            float aspect,
-            float near_plane,
-            float far_plane) const;
+        [[nodiscard]] transform
+        perspective_vfov(float vfov_degrees, float aspect, float near_plane, float far_plane) const;
 
         // Like perspective_vfov, with a horizontal field of view in degrees.
-        [[nodiscard]] transform perspective_hfov(
-            float hfov_degrees,
-            float aspect,
-            float near_plane,
-            float far_plane) const;
+        [[nodiscard]] transform
+        perspective_hfov(float hfov_degrees, float aspect, float near_plane, float far_plane) const;
 
     private:
         device_handle *device_ = nullptr;
         // Heap-allocated so the raw aliases held by device-owned objects
         // survive moves of the device.
         std::unique_ptr<graphics_backend_interface> backend_;
+
         explicit gfx_device(device_handle *device, std::unique_ptr<graphics_backend_interface> backend) noexcept
-            : device_(device), backend_(std::move(backend)) {}
+            : device_(device), backend_(std::move(backend)) {
+        }
     };
 
     class swapchain {
@@ -100,14 +107,38 @@ namespace alia {
         // The frame ends with frame::present or, without presenting, its destructor.
         [[nodiscard]] frame begin_frame();
         void on_resize(vec2i new_size);
-        [[nodiscard]] bool valid() const noexcept { return handle_ != nullptr; }
-        [[nodiscard]] explicit operator bool() const noexcept { return valid(); }
-        [[nodiscard]] swapchain_handle *handle() const noexcept { return handle_; }
-        [[nodiscard]] const graphics_backend_interface *backend() const noexcept { return backend_; }
-        [[nodiscard]] vec2i size() const noexcept { return size_; }
-        [[nodiscard]] const framebuffer_properties &properties() const noexcept { return props_; }
-        [[nodiscard]] pixel_format color_format() const noexcept { return props_.color_format; }
-        [[nodiscard]] bool has_depth() const noexcept { return props_.depth_bits > 0; }
+
+        [[nodiscard]] bool valid() const noexcept {
+            return handle_ != nullptr;
+        }
+
+        [[nodiscard]] explicit operator bool() const noexcept {
+            return valid();
+        }
+
+        [[nodiscard]] swapchain_handle *handle() const noexcept {
+            return handle_;
+        }
+
+        [[nodiscard]] const graphics_backend_interface *backend() const noexcept {
+            return backend_;
+        }
+
+        [[nodiscard]] vec2i size() const noexcept {
+            return size_;
+        }
+
+        [[nodiscard]] const framebuffer_properties &properties() const noexcept {
+            return props_;
+        }
+
+        [[nodiscard]] pixel_format color_format() const noexcept {
+            return props_.color_format;
+        }
+
+        [[nodiscard]] bool has_depth() const noexcept {
+            return props_.depth_bits > 0;
+        }
 
     private:
         friend class gfx_device;
@@ -118,13 +149,13 @@ namespace alia {
         vec2i size_ = {};
         framebuffer_properties props_ = {};
         bool frame_active_ = false;
+
         explicit swapchain(
-            swapchain_handle *handle,
-            const graphics_backend_interface *backend,
-            device_handle *device,
-            vec2i size,
-            framebuffer_properties props) noexcept
-            : handle_(handle), backend_(backend), device_(device), size_(size), props_(std::move(props)) {}
+            swapchain_handle *handle, const graphics_backend_interface *backend, device_handle *device, vec2i size,
+            framebuffer_properties props
+        ) noexcept
+            : handle_(handle), backend_(backend), device_(device), size_(size), props_(std::move(props)) {
+        }
     };
 
     inline thread_local window *tl_current_window = nullptr;
@@ -140,7 +171,8 @@ namespace alia {
         [[nodiscard]] const vertex_definition_view &vertex_definition_of() {
             static constexpr auto elements = TVertex::elements();
             static const vertex_definition_view definition{
-                register_vertex_definition(typeid(TVertex)), static_cast<int>(sizeof(TVertex)), elements};
+                register_vertex_definition(typeid(TVertex)), static_cast<int>(sizeof(TVertex)), elements
+            };
             return definition;
         }
 
@@ -159,7 +191,7 @@ namespace alia {
                 case vertex_storage::float_2: size = 2 * sizeof(float); break;
                 case vertex_storage::float_3: size = 3 * sizeof(float); break;
                 case vertex_storage::float_4: size = 4 * sizeof(float); break;
-                default: return false;
+                default:                      return false;
                 }
                 if (element.offset < 0 || size > sizeof(TInstance) ||
                     static_cast<std::size_t>(element.offset) > sizeof(TInstance) - size)
@@ -170,11 +202,15 @@ namespace alia {
 
         template <instance_type TInstance>
         [[nodiscard]] const instance_definition_view &instance_definition_of() {
-            static_assert(valid_instance_definition<TInstance>(),
-                "instance_elements() must be nonempty, use unique slots in [0, max_instance_attributes), and fit inside the instance type");
+            static_assert(
+                valid_instance_definition<TInstance>(),
+                "instance_elements() must be nonempty, use unique slots in [0, max_instance_attributes), and fit "
+                "inside the instance type"
+            );
             static constexpr auto elements = TInstance::instance_elements();
             static const instance_definition_view definition{
-                register_instance_definition(typeid(TInstance)), static_cast<int>(sizeof(TInstance)), elements};
+                register_instance_definition(typeid(TInstance)), static_cast<int>(sizeof(TInstance)), elements
+            };
             return definition;
         }
     } // namespace detail

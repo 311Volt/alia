@@ -12,23 +12,15 @@ namespace alia {
             return (leds & led) != key_led::none;
         }
 
-        void set_led(
-            int virtual_key,
-            bool extended,
-            bool enabled,
-            bool currently_enabled) {
+        void set_led(int virtual_key, bool extended, bool enabled, bool currently_enabled) {
             if (enabled == currently_enabled)
                 return;
-            const auto scan_code = static_cast<BYTE>(
-                MapVirtualKeyW(static_cast<UINT>(virtual_key), MAPVK_VK_TO_VSC));
+            const auto scan_code = static_cast<BYTE>(MapVirtualKeyW(static_cast<UINT>(virtual_key), MAPVK_VK_TO_VSC));
             const DWORD flags = extended ? KEYEVENTF_EXTENDEDKEY : 0;
-            keybd_event(
-                static_cast<BYTE>(virtual_key), scan_code, flags, 0);
-            keybd_event(
-                static_cast<BYTE>(virtual_key), scan_code,
-                flags | KEYEVENTF_KEYUP, 0);
+            keybd_event(static_cast<BYTE>(virtual_key), scan_code, flags, 0);
+            keybd_event(static_cast<BYTE>(virtual_key), scan_code, flags | KEYEVENTF_KEYUP, 0);
         }
-    }
+    } // namespace
 
     key_led win32_keyboard_leds(os_context_handle *) {
         BYTE state[256]{};
@@ -47,21 +39,9 @@ namespace alia {
 
     void win32_set_keyboard_leds(os_context_handle *, key_led leds) {
         const key_led current = win32_keyboard_leds(nullptr);
-        set_led(
-            VK_NUMLOCK,
-            true,
-            has_led(leds, key_led::num_lock),
-            has_led(current, key_led::num_lock));
-        set_led(
-            VK_CAPITAL,
-            false,
-            has_led(leds, key_led::caps_lock),
-            has_led(current, key_led::caps_lock));
-        set_led(
-            VK_SCROLL,
-            false,
-            has_led(leds, key_led::scroll_lock),
-            has_led(current, key_led::scroll_lock));
+        set_led(VK_NUMLOCK, true, has_led(leds, key_led::num_lock), has_led(current, key_led::num_lock));
+        set_led(VK_CAPITAL, false, has_led(leds, key_led::caps_lock), has_led(current, key_led::caps_lock));
+        set_led(VK_SCROLL, false, has_led(leds, key_led::scroll_lock), has_led(current, key_led::scroll_lock));
     }
 } // namespace alia
 

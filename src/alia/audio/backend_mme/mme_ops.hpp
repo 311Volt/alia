@@ -18,14 +18,28 @@
 
 namespace alia::detail {
     struct mme_context : audio_context_handle {};
+
     struct mme_event {
         HANDLE value;
-        explicit mme_event(bool manual = false) : value(CreateEventW(nullptr, manual, FALSE, nullptr)) {}
-        ~mme_event() { if (value) CloseHandle(value); }
+
+        explicit mme_event(bool manual = false) : value(CreateEventW(nullptr, manual, FALSE, nullptr)) {
+        }
+
+        ~mme_event() {
+            if (value)
+                CloseHandle(value);
+        }
+
         mme_event(const mme_event &) = delete;
         mme_event &operator=(const mme_event &) = delete;
     };
-    enum class mme_command { none, start, stop, quit };
+    enum class mme_command {
+        none,
+        start,
+        stop,
+        quit
+    };
+
     struct mme_stream : audio_stream_handle {
         mme_context *context = nullptr;
         audio_direction direction{};
@@ -48,9 +62,18 @@ namespace alia::detail {
         std::thread worker;
         ~mme_stream();
     };
-    inline mme_context *as_mme_context(audio_context_handle *p) { return static_cast<mme_context *>(p); }
-    inline mme_stream *as_mme_stream(audio_stream_handle *p) { return static_cast<mme_stream *>(p); }
-    inline const mme_stream *as_mme_stream(const audio_stream_handle *p) { return static_cast<const mme_stream *>(p); }
+
+    inline mme_context *as_mme_context(audio_context_handle *p) {
+        return static_cast<mme_context *>(p);
+    }
+
+    inline mme_stream *as_mme_stream(audio_stream_handle *p) {
+        return static_cast<mme_stream *>(p);
+    }
+
+    inline const mme_stream *as_mme_stream(const audio_stream_handle *p) {
+        return static_cast<const mme_stream *>(p);
+    }
 
     bool mme_device_id(audio_direction, std::string_view, UINT &);
     bool mme_wave_format(const audio_stream_format &, WAVEFORMATEXTENSIBLE &);
@@ -64,6 +87,6 @@ namespace alia::detail {
     void mme_stop(audio_stream_handle *);
     audio_stream_state mme_state(const audio_stream_handle *);
     std::int64_t mme_position(const audio_stream_handle *);
-}
+} // namespace alia::detail
 #endif
 #endif

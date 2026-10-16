@@ -31,6 +31,7 @@ namespace alia {
             return {uint8_t(v >> 16), uint8_t(v >> 8), uint8_t(v)};
         }
     };
+
     static_assert(sizeof(px_rgb888) == 3, "px_rgb888 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_rgb888>);
     static_assert(std::is_standard_layout_v<px_rgb888>);
@@ -51,6 +52,7 @@ namespace alia {
             return {uint8_t(v >> 24), uint8_t(v >> 16), uint8_t(v >> 8), uint8_t(v)};
         }
     };
+
     static_assert(sizeof(px_rgba8888) == 4, "px_rgba8888 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_rgba8888>);
     static_assert(std::is_standard_layout_v<px_rgba8888>);
@@ -74,9 +76,11 @@ namespace alia {
             return {uint16_t(v & 0x1F), uint16_t((v >> 5) & 0x3F), uint16_t((v >> 11) & 0x1F)};
         }
     };
+
     static_assert(sizeof(px_rgb565) == 2, "px_rgb565 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_rgb565>);
     static_assert(std::is_standard_layout_v<px_rgb565>);
+
     // Note: standard_layout is not guaranteed for bit-field structs by the
     // standard, but holds on all mainstream compilers for this layout.
 
@@ -95,6 +99,7 @@ namespace alia {
             return {uint8_t(v >> 16), uint8_t(v >> 8), uint8_t(v)};
         }
     };
+
     static_assert(sizeof(px_bgr888) == 3, "px_bgr888 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_bgr888>);
     static_assert(std::is_standard_layout_v<px_bgr888>);
@@ -115,6 +120,7 @@ namespace alia {
             return {uint8_t(v >> 24), uint8_t(v >> 16), uint8_t(v >> 8), uint8_t(v)};
         }
     };
+
     static_assert(sizeof(px_bgra8888) == 4, "px_bgra8888 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_bgra8888>);
     static_assert(std::is_standard_layout_v<px_bgra8888>);
@@ -127,6 +133,7 @@ namespace alia {
         using channel_type = uint8_t;
         static constexpr pixel_format format_id = pixel_format::gray_u8;
     };
+
     static_assert(sizeof(px_gray_u8) == 1, "px_gray_u8 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_gray_u8>);
     static_assert(std::is_standard_layout_v<px_gray_u8>);
@@ -139,6 +146,7 @@ namespace alia {
         using channel_type = float;
         static constexpr pixel_format format_id = pixel_format::gray_f32;
     };
+
     static_assert(sizeof(px_gray_f32) == 4, "px_gray_f32 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_gray_f32>);
     static_assert(std::is_standard_layout_v<px_gray_f32>);
@@ -154,6 +162,7 @@ namespace alia {
         using channel_type = float;
         static constexpr pixel_format format_id = pixel_format::rgba_f32;
     };
+
     static_assert(sizeof(px_rgba_f32) == 16, "px_rgba_f32 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_rgba_f32>);
     static_assert(std::is_standard_layout_v<px_rgba_f32>);
@@ -168,6 +177,7 @@ namespace alia {
         using channel_type = float;
         static constexpr pixel_format format_id = pixel_format::rgb_f32;
     };
+
     static_assert(sizeof(px_rgb_f32) == 12, "px_rgb_f32 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_rgb_f32>);
     static_assert(std::is_standard_layout_v<px_rgb_f32>);
@@ -181,6 +191,7 @@ namespace alia {
         using channel_type = uint8_t;
         static constexpr pixel_format format_id = pixel_format::xy_u8;
     };
+
     static_assert(sizeof(px_xy_u8) == 2, "px_xy_u8 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_xy_u8>);
     static_assert(std::is_standard_layout_v<px_xy_u8>);
@@ -194,6 +205,7 @@ namespace alia {
         using channel_type = float;
         static constexpr pixel_format format_id = pixel_format::xy_f32;
     };
+
     static_assert(sizeof(px_xy_f32) == 8, "px_xy_f32 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_xy_f32>);
     static_assert(std::is_standard_layout_v<px_xy_f32>);
@@ -206,6 +218,7 @@ namespace alia {
         using channel_type = uint8_t;
         static constexpr pixel_format format_id = pixel_format::palette_u8;
     };
+
     static_assert(sizeof(px_palette_u8) == 1, "px_palette_u8 must not have padding");
     static_assert(std::is_trivially_copyable_v<px_palette_u8>);
     static_assert(std::is_standard_layout_v<px_palette_u8>);

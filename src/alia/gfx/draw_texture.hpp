@@ -1,5 +1,5 @@
-#ifndef ALIA_GFX_DRAW_TEXTURE_HPP
-#define ALIA_GFX_DRAW_TEXTURE_HPP
+#ifndef DRAW_TEXTURE_C9E9C78C_07A4_49A0_B078_694C1A238B44
+#define DRAW_TEXTURE_C9E9C78C_07A4_49A0_B078_694C1A238B44
 
 #include "../core/color.hpp"
 #include "../core/rect.hpp"
@@ -43,4 +43,4 @@ namespace alia {
     void draw_texture(const draw_texture_params &);
 } // namespace alia
 
-#endif
+#endif /* DRAW_TEXTURE_C9E9C78C_07A4_49A0_B078_694C1A238B44 */

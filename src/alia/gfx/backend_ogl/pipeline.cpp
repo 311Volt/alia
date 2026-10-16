@@ -16,22 +16,40 @@ namespace alia {
             return format == index_format::u16 ? sizeof(uint16_t) : sizeof(uint32_t);
         }
 
-        const ogl_compiled_vertex_definition &get_or_compile(ogl_device &device, const vertex_definition_view &definition) {
+        const ogl_compiled_vertex_definition &
+        get_or_compile(ogl_device &device, const vertex_definition_view &definition) {
             if (device.vertex_definitions.size() <= definition.index)
                 device.vertex_definitions.resize(definition.index + 1);
             auto &slot = device.vertex_definitions[definition.index];
-            if (slot) return *slot;
-            struct action { vertex_attr attr; vertex_storage storage; int offset; };
+            if (slot)
+                return *slot;
+
+            struct action {
+                vertex_attr attr;
+                vertex_storage storage;
+                int offset;
+            };
+
             std::vector<action> actions;
-            for (const auto &element : definition.elements) actions.push_back({element.attribute, element.storage, element.offset});
+            for (const auto &element : definition.elements)
+                actions.push_back({element.attribute, element.storage, element.offset});
             const auto attribute_index = [](vertex_attr attr) -> GLuint {
-                switch (attr) { case vertex_attr::position: return 0; case vertex_attr::color_attr: return 1; case vertex_attr::tex_coord: return 2; case vertex_attr::normal: return 3; }
+                switch (attr) {
+                case vertex_attr::position:   return 0;
+                case vertex_attr::color_attr: return 1;
+                case vertex_attr::tex_coord:  return 2;
+                case vertex_attr::normal:     return 3;
+                }
                 return 0;
             };
-            const auto components = [](vertex_storage storage) { return storage == vertex_storage::float_2 ? 2 : storage == vertex_storage::float_3 ? 3 : 4; };
+            const auto components = [](vertex_storage storage) {
+                return storage == vertex_storage::float_2 ? 2 : storage == vertex_storage::float_3 ? 3 : 4;
+            };
             auto setup = [actions, attribute_index, components](const void *base, int stride, bool shader) {
                 for (const auto &action : actions) {
-                    const void *ptr = reinterpret_cast<const void *>(reinterpret_cast<std::uintptr_t>(base) + static_cast<std::uintptr_t>(action.offset));
+                    const void *ptr = reinterpret_cast<const void *>(
+                        reinterpret_cast<std::uintptr_t>(base) + static_cast<std::uintptr_t>(action.offset)
+                    );
                     if (shader) {
                         const GLuint index = attribute_index(action.attr);
                         ogl_s_glEnableVertexAttribArray(index);
@@ -39,102 +57,185 @@ namespace alia {
                         continue;
                     }
                     switch (action.attr) {
-                    case vertex_attr::position: glEnableClientState(GL_VERTEX_ARRAY); glVertexPointer(components(action.storage), GL_FLOAT, stride, ptr); break;
-                    case vertex_attr::normal: glEnableClientState(GL_NORMAL_ARRAY); glNormalPointer(GL_FLOAT, stride, ptr); break;
-                    case vertex_attr::color_attr: glEnableClientState(GL_COLOR_ARRAY); glColorPointer(4, GL_FLOAT, stride, ptr); break;
-                    case vertex_attr::tex_coord: glEnableClientState(GL_TEXTURE_COORD_ARRAY); glTexCoordPointer(2, GL_FLOAT, stride, ptr); break;
+                    case vertex_attr::position:
+                        glEnableClientState(GL_VERTEX_ARRAY);
+                        glVertexPointer(components(action.storage), GL_FLOAT, stride, ptr);
+                        break;
+                    case vertex_attr::normal:
+                        glEnableClientState(GL_NORMAL_ARRAY);
+                        glNormalPointer(GL_FLOAT, stride, ptr);
+                        break;
+                    case vertex_attr::color_attr:
+                        glEnableClientState(GL_COLOR_ARRAY);
+                        glColorPointer(4, GL_FLOAT, stride, ptr);
+                        break;
+                    case vertex_attr::tex_coord:
+                        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+                        glTexCoordPointer(2, GL_FLOAT, stride, ptr);
+                        break;
                     }
                 }
             };
             auto teardown = [actions, attribute_index](bool shader) {
                 for (const auto &action : actions) {
-                    if (shader) { ogl_s_glDisableVertexAttribArray(attribute_index(action.attr)); continue; }
+                    if (shader) {
+                        ogl_s_glDisableVertexAttribArray(attribute_index(action.attr));
+                        continue;
+                    }
                     switch (action.attr) {
-                    case vertex_attr::position: glDisableClientState(GL_VERTEX_ARRAY); break;
-                    case vertex_attr::normal: glDisableClientState(GL_NORMAL_ARRAY); break;
+                    case vertex_attr::position:   glDisableClientState(GL_VERTEX_ARRAY); break;
+                    case vertex_attr::normal:     glDisableClientState(GL_NORMAL_ARRAY); break;
                     case vertex_attr::color_attr: glDisableClientState(GL_COLOR_ARRAY); break;
-                    case vertex_attr::tex_coord: glDisableClientState(GL_TEXTURE_COORD_ARRAY); break;
+                    case vertex_attr::tex_coord:  glDisableClientState(GL_TEXTURE_COORD_ARRAY); break;
                     }
                 }
             };
             slot = std::make_unique<ogl_compiled_vertex_definition>(
-                ogl_compiled_vertex_definition{std::move(setup), std::move(teardown)});
+                ogl_compiled_vertex_definition{std::move(setup), std::move(teardown)}
+            );
             return *slot;
         }
+
         GLenum to_gl(primitive_topology topology) {
-            switch (topology) { case primitive_topology::triangle_list: return GL_TRIANGLES; case primitive_topology::triangle_strip: return GL_TRIANGLE_STRIP; case primitive_topology::triangle_fan: return GL_TRIANGLE_FAN; }
+            switch (topology) {
+            case primitive_topology::triangle_list:  return GL_TRIANGLES;
+            case primitive_topology::triangle_strip: return GL_TRIANGLE_STRIP;
+            case primitive_topology::triangle_fan:   return GL_TRIANGLE_FAN;
+            }
             return GL_TRIANGLES;
         }
-        GLenum to_gl(blend_factor factor) { switch (factor) { case blend_factor::zero: return GL_ZERO; case blend_factor::one: return GL_ONE; case blend_factor::src_alpha: return GL_SRC_ALPHA; case blend_factor::inv_src_alpha: return GL_ONE_MINUS_SRC_ALPHA; } return GL_ONE; }
+
+        GLenum to_gl(blend_factor factor) {
+            switch (factor) {
+            case blend_factor::zero:          return GL_ZERO;
+            case blend_factor::one:           return GL_ONE;
+            case blend_factor::src_alpha:     return GL_SRC_ALPHA;
+            case blend_factor::inv_src_alpha: return GL_ONE_MINUS_SRC_ALPHA;
+            }
+            return GL_ONE;
+        }
+
         GLenum to_gl(compare_func compare) {
-            switch (compare) { case compare_func::never: return GL_NEVER; case compare_func::less: return GL_LESS; case compare_func::equal: return GL_EQUAL; case compare_func::less_equal: return GL_LEQUAL; case compare_func::greater: return GL_GREATER; case compare_func::not_equal: return GL_NOTEQUAL; case compare_func::greater_equal: return GL_GEQUAL; case compare_func::always: return GL_ALWAYS; }
+            switch (compare) {
+            case compare_func::never:         return GL_NEVER;
+            case compare_func::less:          return GL_LESS;
+            case compare_func::equal:         return GL_EQUAL;
+            case compare_func::less_equal:    return GL_LEQUAL;
+            case compare_func::greater:       return GL_GREATER;
+            case compare_func::not_equal:     return GL_NOTEQUAL;
+            case compare_func::greater_equal: return GL_GEQUAL;
+            case compare_func::always:        return GL_ALWAYS;
+            }
             return GL_LEQUAL;
         }
+
         void bind_texture_unit(int unit, texture_handle *texture) {
-            if (ogl_s_glActiveTexture) ogl_s_glActiveTexture(GL_TEXTURE0 + unit);
+            if (ogl_s_glActiveTexture)
+                ogl_s_glActiveTexture(GL_TEXTURE0 + unit);
             auto *value = texture ? as_ogl_texture(texture) : nullptr;
             if (!value) {
                 glBindTexture(GL_TEXTURE_2D, 0);
                 glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
             } else {
                 glBindTexture(value->target, value->tex_id);
-                glBindTexture(
-                    value->target == GL_TEXTURE_2D
-                        ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D,
-                    0);
+                glBindTexture(value->target == GL_TEXTURE_2D ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, 0);
             }
         }
+
         void apply_sampler(const ogl_texture &texture, const sampler_state &state) {
-            const auto filter = [](texture_filter value) { return value == texture_filter::nearest ? GL_NEAREST : GL_LINEAR; };
-            const auto wrap = [](texture_wrap value) { switch (value) { case texture_wrap::clamp: return GL_CLAMP_TO_EDGE; case texture_wrap::repeat: return GL_REPEAT; case texture_wrap::mirror: return GL_MIRRORED_REPEAT; } return GL_CLAMP_TO_EDGE; };
-            glTexParameteri(texture.target, GL_TEXTURE_MIN_FILTER, texture.mip_levels <= 1 ? filter(state.min_filter) : (state.min_filter == texture_filter::nearest ? GL_NEAREST_MIPMAP_LINEAR : GL_LINEAR_MIPMAP_LINEAR));
+            const auto filter = [](texture_filter value) {
+                return value == texture_filter::nearest ? GL_NEAREST : GL_LINEAR;
+            };
+            const auto wrap = [](texture_wrap value) {
+                switch (value) {
+                case texture_wrap::clamp:  return GL_CLAMP_TO_EDGE;
+                case texture_wrap::repeat: return GL_REPEAT;
+                case texture_wrap::mirror: return GL_MIRRORED_REPEAT;
+                }
+                return GL_CLAMP_TO_EDGE;
+            };
+            glTexParameteri(
+                texture.target,
+                GL_TEXTURE_MIN_FILTER,
+                texture.mip_levels <= 1
+                    ? filter(state.min_filter)
+                    : (state.min_filter == texture_filter::nearest ? GL_NEAREST_MIPMAP_LINEAR : GL_LINEAR_MIPMAP_LINEAR)
+            );
             glTexParameteri(texture.target, GL_TEXTURE_MAG_FILTER, filter(state.mag_filter));
-            glTexParameteri(texture.target, GL_TEXTURE_WRAP_S, wrap(state.wrap_u)); glTexParameteri(texture.target, GL_TEXTURE_WRAP_T, wrap(state.wrap_v));
+            glTexParameteri(texture.target, GL_TEXTURE_WRAP_S, wrap(state.wrap_u));
+            glTexParameteri(texture.target, GL_TEXTURE_WRAP_T, wrap(state.wrap_v));
             if (texture.target == GL_TEXTURE_CUBE_MAP)
                 glTexParameteri(texture.target, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
         }
+
         void apply_texture_op(texture_operation operation) {
             switch (operation) {
             case texture_operation::vertex_color: glDisable(GL_TEXTURE_2D); break;
-            case texture_operation::modulate: glEnable(GL_TEXTURE_2D); glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE); glColor4f(1, 1, 1, 1); break;
+            case texture_operation::modulate:
+                glEnable(GL_TEXTURE_2D);
+                glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+                glColor4f(1, 1, 1, 1);
+                break;
             case texture_operation::alpha_mask:
-                glEnable(GL_TEXTURE_2D); glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
-                glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_REPLACE); glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB, GL_PRIMARY_COLOR); glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_RGB, GL_SRC_COLOR);
-                glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA, GL_MODULATE); glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA, GL_TEXTURE); glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_ALPHA); glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_ALPHA, GL_PRIMARY_COLOR); glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA, GL_SRC_ALPHA); glColor4f(1, 1, 1, 1); break;
+                glEnable(GL_TEXTURE_2D);
+                glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
+                glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_REPLACE);
+                glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB, GL_PRIMARY_COLOR);
+                glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_RGB, GL_SRC_COLOR);
+                glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA, GL_MODULATE);
+                glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA, GL_TEXTURE);
+                glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_ALPHA);
+                glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_ALPHA, GL_PRIMARY_COLOR);
+                glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA, GL_SRC_ALPHA);
+                glColor4f(1, 1, 1, 1);
+                break;
             }
         }
+
         void clear_applied_layout(ogl_device &device) {
-            if (device.applied_layout) device.applied_layout->teardown(device.applied_shader_active);
-            device.applied_layout = nullptr; device.applied_base = nullptr; device.applied_shader_active = false;
+            if (device.applied_layout)
+                device.applied_layout->teardown(device.applied_shader_active);
+            device.applied_layout = nullptr;
+            device.applied_base = nullptr;
+            device.applied_shader_active = false;
             device.applied_vb = nullptr;
         }
+
         void apply_layout(ogl_device &device, const void *base) {
             const auto &layout = get_or_compile(device, device.state.vertex_layout);
             const bool shader = device.state.shader != nullptr;
             if (&layout == device.applied_layout && shader == device.applied_shader_active &&
-                base == device.applied_base && device.current_vb == device.applied_vb) return;
+                base == device.applied_base && device.current_vb == device.applied_vb)
+                return;
             clear_applied_layout(device);
-            if (ogl_s_glBindBuffer) ogl_s_glBindBuffer(GL_ARRAY_BUFFER, device.current_vb ? device.current_vb->buffer_id : 0);
+            if (ogl_s_glBindBuffer)
+                ogl_s_glBindBuffer(GL_ARRAY_BUFFER, device.current_vb ? device.current_vb->buffer_id : 0);
             layout.setup(base, device.state.vertex_layout.stride, shader);
-            device.applied_layout = &layout; device.applied_shader_active = shader; device.applied_base = base;
+            device.applied_layout = &layout;
+            device.applied_shader_active = shader;
+            device.applied_base = base;
             device.applied_vb = device.current_vb;
         }
+
         void apply_instance_layout(ogl_device &device, int first_instance) {
             const auto &definition = device.state.instance_layout;
             ogl_s_glBindBuffer(GL_ARRAY_BUFFER, device.current_instance_vb->buffer_id);
             const auto base = static_cast<std::uintptr_t>(first_instance) * definition.stride;
             for (const auto &element : definition.elements) {
                 const GLuint location = static_cast<GLuint>(4 + element.slot);
-                const int components = element.storage == vertex_storage::float_2 ? 2 :
-                    element.storage == vertex_storage::float_3 ? 3 : 4;
+                const int components = element.storage == vertex_storage::float_2   ? 2
+                                       : element.storage == vertex_storage::float_3 ? 3
+                                                                                    : 4;
                 const void *offset = reinterpret_cast<const void *>(base + element.offset);
                 ogl_s_glEnableVertexAttribArray(location);
                 ogl_s_glVertexAttribPointer(location, components, GL_FLOAT, GL_FALSE, definition.stride, offset);
                 ogl_s_glVertexAttribDivisor(location, 1);
             }
         }
+
         struct instance_layout_scope {
             const instance_definition_view &definition;
+
             ~instance_layout_scope() {
                 for (const auto &element : definition.elements) {
                     const GLuint location = static_cast<GLuint>(4 + element.slot);
@@ -143,6 +244,7 @@ namespace alia {
                 }
             }
         };
+
         void prepare_draw(ogl_device &device) {
             if (device.lights_need_upload)
                 ogl_upload_lights(device);
@@ -153,23 +255,41 @@ namespace alia {
             apply_texture_op(device.state.texture_op);
             // A layout without color must not inherit the last color-array value.
             glColor4f(1, 1, 1, 1);
-            glMatrixMode(GL_PROJECTION); glLoadMatrixf(&device.transforms.projection.m[0][0]);
+            glMatrixMode(GL_PROJECTION);
+            glLoadMatrixf(&device.transforms.projection.m[0][0]);
             const transform modelview = device.transforms.world * device.transforms.view;
-            glMatrixMode(GL_MODELVIEW); glLoadMatrixf(&modelview.m[0][0]);
+            glMatrixMode(GL_MODELVIEW);
+            glLoadMatrixf(&modelview.m[0][0]);
         }
-        bool fbo_available() { return ogl_s_glGenFramebuffers && ogl_s_glBindFramebuffer && ogl_s_glFramebufferTexture2D && ogl_s_glCheckFramebufferStatus; }
-    }
+
+        bool fbo_available() {
+            return ogl_s_glGenFramebuffers && ogl_s_glBindFramebuffer && ogl_s_glFramebufferTexture2D &&
+                   ogl_s_glCheckFramebufferStatus;
+        }
+    } // namespace
 
     void ogl_set_render_state(device_handle *h, const render_state &state) {
         auto &device = *as_ogl_device(h);
         if (ogl_s_glUseProgram)
             ogl_s_glUseProgram(state.shader ? as_ogl_shader_program(state.shader)->program : 0);
-        if (state.depth.test_enabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
-        glDepthMask(state.depth.write_enabled ? GL_TRUE : GL_FALSE); glDepthFunc(to_gl(state.depth.compare));
-        if (state.blend.enabled) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+        if (state.depth.test_enabled)
+            glEnable(GL_DEPTH_TEST);
+        else
+            glDisable(GL_DEPTH_TEST);
+        glDepthMask(state.depth.write_enabled ? GL_TRUE : GL_FALSE);
+        glDepthFunc(to_gl(state.depth.compare));
+        if (state.blend.enabled)
+            glEnable(GL_BLEND);
+        else
+            glDisable(GL_BLEND);
         glBlendFunc(to_gl(state.blend.src), to_gl(state.blend.dst));
-        if (state.raster.cull == cull_mode::none) glDisable(GL_CULL_FACE);
-        else { glEnable(GL_CULL_FACE); glCullFace(GL_BACK); glFrontFace(state.raster.cull == cull_mode::clockwise ? GL_CCW : GL_CW); }
+        if (state.raster.cull == cull_mode::none)
+            glDisable(GL_CULL_FACE);
+        else {
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+            glFrontFace(state.raster.cull == cull_mode::clockwise ? GL_CCW : GL_CW);
+        }
         if (state.lighting) {
             glEnable(GL_LIGHTING);
             glEnable(GL_NORMALIZE);
@@ -186,9 +306,13 @@ namespace alia {
             if (device.state.vertex_color_material)
                 ogl_apply_material(device);
         }
-        if (state.fog && !state.shader) glEnable(GL_FOG); else glDisable(GL_FOG);
+        if (state.fog && !state.shader)
+            glEnable(GL_FOG);
+        else
+            glDisable(GL_FOG);
         device.state = state;
     }
+
     void ogl_set_transforms(device_handle *h, const transform_state &transforms) {
         auto &device = *as_ogl_device(h);
         if (device.light_count != 0) {
@@ -199,39 +323,68 @@ namespace alia {
         }
         device.transforms = transforms;
     }
+
     bool ogl_set_render_target(device_handle *h, const render_target_info &info) {
         auto &device = *as_ogl_device(h);
-        GLuint &target_fbo = device.current_swapchain
-            ? device.current_swapchain->target_fbo : device.target_fbo;
+        GLuint &target_fbo = device.current_swapchain ? device.current_swapchain->target_fbo : device.target_fbo;
         if (info.target_texture) {
-            if (!fbo_available()) return false;
-            if (!target_fbo) ogl_s_glGenFramebuffers(1, &target_fbo);
-            if (!target_fbo) return false;
+            if (!fbo_available())
+                return false;
+            if (!target_fbo)
+                ogl_s_glGenFramebuffers(1, &target_fbo);
+            if (!target_fbo)
+                return false;
             ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, target_fbo);
             auto *texture = as_ogl_texture(info.target_texture);
             ogl_s_glFramebufferTexture2D(
-                GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                ogl_face_target(*texture, info.target_face), texture->tex_id,
-                info.target_level);
-            if (ogl_s_glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0); return false; }
+                GL_FRAMEBUFFER,
+                GL_COLOR_ATTACHMENT0,
+                ogl_face_target(*texture, info.target_face),
+                texture->tex_id,
+                info.target_level
+            );
+            if (ogl_s_glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+                ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                return false;
+            }
         } else if (fbo_available()) {
             ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
         glViewport(0, 0, info.target_size.x, info.target_size.y);
         return true;
     }
+
     bool ogl_clear(device_handle *, const std::optional<color> &clear_color, const std::optional<float> &clear_depth) {
         GLbitfield mask = 0;
-        if (clear_color) { glClearColor(clear_color->r, clear_color->g, clear_color->b, clear_color->a); mask |= GL_COLOR_BUFFER_BIT; }
-        if (clear_depth) { GLboolean write_mask = GL_FALSE; glGetBooleanv(GL_DEPTH_WRITEMASK, &write_mask); glDepthMask(GL_TRUE); glClearDepth(*clear_depth); mask |= GL_DEPTH_BUFFER_BIT; glClear(mask); glDepthMask(write_mask); mask = 0; }
-        if (mask) glClear(mask);
+        if (clear_color) {
+            glClearColor(clear_color->r, clear_color->g, clear_color->b, clear_color->a);
+            mask |= GL_COLOR_BUFFER_BIT;
+        }
+        if (clear_depth) {
+            GLboolean write_mask = GL_FALSE;
+            glGetBooleanv(GL_DEPTH_WRITEMASK, &write_mask);
+            glDepthMask(GL_TRUE);
+            glClearDepth(*clear_depth);
+            mask |= GL_DEPTH_BUFFER_BIT;
+            glClear(mask);
+            glDepthMask(write_mask);
+            mask = 0;
+        }
+        if (mask)
+            glClear(mask);
         return true;
     }
+
     void ogl_reset_frame_state(ogl_device &device) {
         clear_applied_layout(device);
-        if (ogl_s_glBindBuffer) { ogl_s_glBindBuffer(GL_ARRAY_BUFFER, 0); ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); }
-        if (fbo_available()) ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        device.state = {}; device.transforms = {};
+        if (ogl_s_glBindBuffer) {
+            ogl_s_glBindBuffer(GL_ARRAY_BUFFER, 0);
+            ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        }
+        if (fbo_available())
+            ogl_s_glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        device.state = {};
+        device.transforms = {};
         glDisable(GL_LIGHTING);
         glDisable(GL_NORMALIZE);
         glDisable(GL_COLOR_MATERIAL);
@@ -243,39 +396,96 @@ namespace alia {
         device.ambient = black;
         device.surface_material = {};
         device.lights_need_upload = false;
-        device.current_vb = nullptr; device.current_ib = nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; device.transient_indices = nullptr; device.transient_index_count = 0;
+        device.current_vb = nullptr;
+        device.current_ib = nullptr;
+        device.transient_vertices = nullptr;
+        device.transient_vertex_bytes = 0;
+        device.transient_indices = nullptr;
+        device.transient_index_count = 0;
         device.current_instance_vb = nullptr;
     }
-    void ogl_set_viewport(device_handle *, const render_viewport &viewport) { glViewport(viewport.origin.x, viewport.origin.y, viewport.size.x, viewport.size.y); glDepthRange(viewport.min_depth, viewport.max_depth); }
-    void ogl_bind_vertex_buffer(device_handle *h, vertex_buffer_handle *buffer) { auto &device = *as_ogl_device(h); device.current_vb = buffer ? as_ogl_vertex_buffer(buffer) : nullptr; device.transient_vertices = nullptr; device.transient_vertex_bytes = 0; }
+
+    void ogl_set_viewport(device_handle *, const render_viewport &viewport) {
+        glViewport(viewport.origin.x, viewport.origin.y, viewport.size.x, viewport.size.y);
+        glDepthRange(viewport.min_depth, viewport.max_depth);
+    }
+
+    void ogl_bind_vertex_buffer(device_handle *h, vertex_buffer_handle *buffer) {
+        auto &device = *as_ogl_device(h);
+        device.current_vb = buffer ? as_ogl_vertex_buffer(buffer) : nullptr;
+        device.transient_vertices = nullptr;
+        device.transient_vertex_bytes = 0;
+    }
+
     void ogl_bind_instance_buffer(device_handle *h, vertex_buffer_handle *buffer) {
         as_ogl_device(h)->current_instance_vb = buffer ? as_ogl_vertex_buffer(buffer) : nullptr;
     }
-    void ogl_bind_index_buffer(device_handle *h, index_buffer_handle *buffer) { auto &device = *as_ogl_device(h); device.current_ib = buffer ? as_ogl_index_buffer(buffer) : nullptr; device.transient_indices = nullptr; device.transient_index_count = 0; }
-    void ogl_upload_transient_vertex_data(device_handle *h, const void *data, int bytes) { auto &device = *as_ogl_device(h); device.current_vb = nullptr; device.transient_vertices = data; device.transient_vertex_bytes = bytes; }
-    void ogl_upload_transient_index_data(device_handle *h, const void *indices, int index_count, index_format format) { auto &device = *as_ogl_device(h); device.current_ib = nullptr; device.transient_indices = indices; device.transient_index_count = index_count; device.transient_index_format = format; }
+
+    void ogl_bind_index_buffer(device_handle *h, index_buffer_handle *buffer) {
+        auto &device = *as_ogl_device(h);
+        device.current_ib = buffer ? as_ogl_index_buffer(buffer) : nullptr;
+        device.transient_indices = nullptr;
+        device.transient_index_count = 0;
+    }
+
+    void ogl_upload_transient_vertex_data(device_handle *h, const void *data, int bytes) {
+        auto &device = *as_ogl_device(h);
+        device.current_vb = nullptr;
+        device.transient_vertices = data;
+        device.transient_vertex_bytes = bytes;
+    }
+
+    void ogl_upload_transient_index_data(device_handle *h, const void *indices, int index_count, index_format format) {
+        auto &device = *as_ogl_device(h);
+        device.current_ib = nullptr;
+        device.transient_indices = indices;
+        device.transient_index_count = index_count;
+        device.transient_index_format = format;
+    }
+
     void ogl_bind_resources(device_handle *, const texture_sampler_binding &binding) {
         bind_texture_unit(binding.slot, binding.texture);
-        if (binding.texture) apply_sampler(*as_ogl_texture(binding.texture), binding.sampler);
-        if (ogl_s_glActiveTexture) ogl_s_glActiveTexture(GL_TEXTURE0);
+        if (binding.texture)
+            apply_sampler(*as_ogl_texture(binding.texture), binding.sampler);
+        if (ogl_s_glActiveTexture)
+            ogl_s_glActiveTexture(GL_TEXTURE0);
     }
+
     void ogl_draw(device_handle *h, primitive_topology topology, int vertex_count, int first_vertex) {
-        auto &device = *as_ogl_device(h); if (vertex_count < 3) return;
+        auto &device = *as_ogl_device(h);
+        if (vertex_count < 3)
+            return;
         const void *base = device.current_vb ? nullptr : device.transient_vertices;
-        apply_layout(device, base); prepare_draw(device); glDrawArrays(to_gl(topology), first_vertex, vertex_count);
+        apply_layout(device, base);
+        prepare_draw(device);
+        glDrawArrays(to_gl(topology), first_vertex, vertex_count);
     }
-    void ogl_draw_indexed(device_handle *h, primitive_topology topology, int index_count, int first_index, int base_vertex) {
-        auto &device = *as_ogl_device(h); if (index_count < 3) return;
+
+    void
+    ogl_draw_indexed(device_handle *h, primitive_topology topology, int index_count, int first_index, int base_vertex) {
+        auto &device = *as_ogl_device(h);
+        if (index_count < 3)
+            return;
         const int stride = device.state.vertex_layout.stride;
-        const void *base = device.current_vb ? reinterpret_cast<const void *>(static_cast<std::uintptr_t>(base_vertex * stride)) : static_cast<const std::byte *>(device.transient_vertices) + base_vertex * stride;
-        apply_layout(device, base); prepare_draw(device);
-        if (ogl_s_glBindBuffer) ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, device.current_ib ? device.current_ib->buffer_id : 0);
+        const void *base = device.current_vb
+                               ? reinterpret_cast<const void *>(static_cast<std::uintptr_t>(base_vertex * stride))
+                               : static_cast<const std::byte *>(device.transient_vertices) + base_vertex * stride;
+        apply_layout(device, base);
+        prepare_draw(device);
+        if (ogl_s_glBindBuffer)
+            ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, device.current_ib ? device.current_ib->buffer_id : 0);
         const index_format format = device.current_ib ? device.current_ib->format : device.transient_index_format;
         const auto offset_bytes = static_cast<std::uintptr_t>(first_index) * index_size(format);
-        const void *indices = device.current_ib ? reinterpret_cast<const void *>(offset_bytes) : static_cast<const std::byte *>(device.transient_indices) + offset_bytes;
+        const void *indices = device.current_ib
+                                  ? reinterpret_cast<const void *>(offset_bytes)
+                                  : static_cast<const std::byte *>(device.transient_indices) + offset_bytes;
         glDrawElements(to_gl(topology), index_count, to_gl(format), indices);
     }
-    void ogl_draw_instanced(device_handle *h, primitive_topology topology, int vertex_count, int first_vertex, int instance_count, int first_instance) {
+
+    void ogl_draw_instanced(
+        device_handle *h, primitive_topology topology, int vertex_count, int first_vertex, int instance_count,
+        int first_instance
+    ) {
         auto &device = *as_ogl_device(h);
         if (vertex_count < 3)
             return;
@@ -285,7 +495,11 @@ namespace alia {
         instance_layout_scope instances{device.state.instance_layout};
         ogl_s_glDrawArraysInstanced(to_gl(topology), first_vertex, vertex_count, instance_count);
     }
-    void ogl_draw_indexed_instanced(device_handle *h, primitive_topology topology, int index_count, int first_index, int base_vertex, int instance_count, int first_instance) {
+
+    void ogl_draw_indexed_instanced(
+        device_handle *h, primitive_topology topology, int index_count, int first_index, int base_vertex,
+        int instance_count, int first_instance
+    ) {
         auto &device = *as_ogl_device(h);
         if (index_count < 3)
             return;
@@ -297,8 +511,13 @@ namespace alia {
         ogl_s_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, device.current_ib->buffer_id);
         const index_format format = device.current_ib->format;
         const auto index_offset_bytes = static_cast<std::uintptr_t>(first_index) * index_size(format);
-        ogl_s_glDrawElementsInstanced(to_gl(topology), index_count, to_gl(format),
-            reinterpret_cast<const void *>(index_offset_bytes), instance_count);
+        ogl_s_glDrawElementsInstanced(
+            to_gl(topology),
+            index_count,
+            to_gl(format),
+            reinterpret_cast<const void *>(index_offset_bytes),
+            instance_count
+        );
     }
 } // namespace alia
 

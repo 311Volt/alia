@@ -31,26 +31,24 @@ namespace alia {
     // Returns the number of bytes per pixel for a pixel_format.
     [[nodiscard]] inline constexpr int bytes_per_pixel_for_format(pixel_format fmt) noexcept {
         switch (fmt) {
-        case pixel_format::rgb888:   return 3;
-        case pixel_format::rgba8888: return 4;
-        case pixel_format::rgb565:   return 2;
-        case pixel_format::bgr888:   return 3;
-        case pixel_format::bgra8888: return 4;
-        case pixel_format::gray_u8:  return 1;
-        case pixel_format::gray_f32: return 4;
-        case pixel_format::rgba_f32: return 16;
-        case pixel_format::rgb_f32:  return 12;
-        case pixel_format::xy_u8:    return 2;
-        case pixel_format::xy_f32:   return 8;
+        case pixel_format::rgb888:     return 3;
+        case pixel_format::rgba8888:   return 4;
+        case pixel_format::rgb565:     return 2;
+        case pixel_format::bgr888:     return 3;
+        case pixel_format::bgra8888:   return 4;
+        case pixel_format::gray_u8:    return 1;
+        case pixel_format::gray_f32:   return 4;
+        case pixel_format::rgba_f32:   return 16;
+        case pixel_format::rgb_f32:    return 12;
+        case pixel_format::xy_u8:      return 2;
+        case pixel_format::xy_f32:     return 8;
         case pixel_format::palette_u8: return 1;
-        default:                     return 0;
+        default:                       return 0;
         }
     }
 
     template <typename T>
-    inline constexpr bool is_pixel_type_v = requires {
-        typename std::remove_cvref_t<T>::is_pixel_type;
-    };
+    inline constexpr bool is_pixel_type_v = requires { typename std::remove_cvref_t<T>::is_pixel_type; };
 
     template <typename...>
     inline constexpr bool dependent_false_v = false;
@@ -66,30 +64,37 @@ namespace alia {
         struct has_red : std::bool_constant < requires {
         typename T::has_red;
     } > {};
+
     template <typename T>
         struct has_green : std::bool_constant < requires {
         typename T::has_green;
     } > {};
+
     template <typename T>
         struct has_blue : std::bool_constant < requires {
         typename T::has_blue;
     } > {};
+
     template <typename T>
         struct has_alpha : std::bool_constant < requires {
         typename T::has_alpha;
     } > {};
+
     template <typename T>
         struct has_gray : std::bool_constant < requires {
         typename T::has_gray;
     } > {};
+
     template <typename T>
         struct has_x : std::bool_constant < requires {
         typename T::has_x;
     } > {};
+
     template <typename T>
         struct has_y : std::bool_constant < requires {
         typename T::has_y;
     } > {};
+
     template <typename T>
         struct has_palette_index : std::bool_constant < requires {
         typename T::has_palette_index;
@@ -163,9 +168,10 @@ namespace alia {
     // ============================================================================
 
     template <typename T>
-    concept pixel = std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T> && is_pixel_type_v<T> && requires {
-        typename channel_type<T>::type;
-    } && (has_color_v<T> || has_gray_v<T> || has_xy_v<T> || has_palette_index_v<T>) && requires { requires std::is_same_v<std::remove_cv_t<decltype(T::format_id)>, pixel_format>; };
+    concept pixel = std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T> && is_pixel_type_v<T> &&
+                    requires { typename channel_type<T>::type; } &&
+                    (has_color_v<T> || has_gray_v<T> || has_xy_v<T> || has_palette_index_v<T>) &&
+                    requires { requires std::is_same_v<std::remove_cv_t<decltype(T::format_id)>, pixel_format>; };
 
     // ============================================================================
     // Channel getters
@@ -197,7 +203,9 @@ namespace alia {
         else if constexpr (requires { px.g; })
             return static_cast<channel_type_t<PixelT>>(px.g);
         else
-            static_assert(dependent_false_v<PixelT>, "pixel type declares has_green but has no get_green() or .g member");
+            static_assert(
+                dependent_false_v<PixelT>, "pixel type declares has_green but has no get_green() or .g member"
+            );
     }
 
     template <pixel PixelT>
@@ -219,7 +227,9 @@ namespace alia {
         else if constexpr (requires { px.a; })
             return static_cast<channel_type_t<PixelT>>(px.a);
         else
-            static_assert(dependent_false_v<PixelT>, "pixel type declares has_alpha but has no get_alpha() or .a member");
+            static_assert(
+                dependent_false_v<PixelT>, "pixel type declares has_alpha but has no get_alpha() or .a member"
+            );
     }
 
     template <pixel PixelT>
@@ -263,7 +273,10 @@ namespace alia {
         else if constexpr (requires { px.palette_index; })
             return static_cast<channel_type_t<PixelT>>(px.palette_index);
         else
-            static_assert(dependent_false_v<PixelT>, "pixel type declares has_palette_index but has no get_palette_index() or .palette_index member");
+            static_assert(
+                dependent_false_v<PixelT>,
+                "pixel type declares has_palette_index but has no get_palette_index() or .palette_index member"
+            );
     }
 
 } // namespace alia

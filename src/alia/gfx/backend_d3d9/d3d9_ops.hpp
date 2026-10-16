@@ -26,18 +26,34 @@ namespace alia {
     struct d3d9_compiled_vertex_definition {
         IDirect3DVertexDeclaration9 *declaration = nullptr;
         d3d9_compiled_vertex_definition() = default;
-        explicit d3d9_compiled_vertex_definition(IDirect3DVertexDeclaration9 *d) noexcept : declaration(d) {}
-        ~d3d9_compiled_vertex_definition() { if (declaration) declaration->Release(); }
-        d3d9_compiled_vertex_definition(d3d9_compiled_vertex_definition &&o) noexcept : declaration(std::exchange(o.declaration, nullptr)) {}
+
+        explicit d3d9_compiled_vertex_definition(IDirect3DVertexDeclaration9 *d) noexcept : declaration(d) {
+        }
+
+        ~d3d9_compiled_vertex_definition() {
+            if (declaration)
+                declaration->Release();
+        }
+
+        d3d9_compiled_vertex_definition(d3d9_compiled_vertex_definition &&o) noexcept
+            : declaration(std::exchange(o.declaration, nullptr)) {
+        }
+
         d3d9_compiled_vertex_definition &operator=(d3d9_compiled_vertex_definition &&o) noexcept {
-            if (this != &o) { if (declaration) declaration->Release(); declaration = std::exchange(o.declaration, nullptr); }
+            if (this != &o) {
+                if (declaration)
+                    declaration->Release();
+                declaration = std::exchange(o.declaration, nullptr);
+            }
             return *this;
         }
+
         d3d9_compiled_vertex_definition(const d3d9_compiled_vertex_definition &) = delete;
         d3d9_compiled_vertex_definition &operator=(const d3d9_compiled_vertex_definition &) = delete;
     };
     struct d3d9_vertex_buffer;
     struct d3d9_index_buffer;
+
     struct d3d9_device : device_handle {
         IDirect3D9 *d3d = nullptr;
         IDirect3DDevice9 *device = nullptr;
@@ -64,6 +80,7 @@ namespace alia {
         int transient_index_count = 0;
         index_format transient_index_format = index_format::u16;
     };
+
     struct d3d9_texture : texture_handle {
         IDirect3DDevice9 *device = nullptr;
         IDirect3DTexture9 *texture = nullptr;
@@ -76,12 +93,14 @@ namespace alia {
         sampler_state sampler = {};
         IDirect3DSurface9 *lock_surface = nullptr;
     };
+
     struct d3d9_vertex_buffer : vertex_buffer_handle {
         IDirect3DDevice9 *device = nullptr;
         IDirect3DVertexBuffer9 *buffer = nullptr;
         int stride = 0, count = 0;
         buffer_usage usage = buffer_usage::static_mesh;
     };
+
     struct d3d9_index_buffer : index_buffer_handle {
         IDirect3DDevice9 *device = nullptr;
         IDirect3DIndexBuffer9 *buffer = nullptr;
@@ -89,6 +108,7 @@ namespace alia {
         index_format format = index_format::u16;
         buffer_usage usage = buffer_usage::static_mesh;
     };
+
     struct d3d9_swapchain : swapchain_handle {
         d3d9_device *owner = nullptr;
         IDirect3DDevice9 *device = nullptr;
@@ -105,8 +125,12 @@ namespace alia {
         framebuffer_properties props;
     };
     enum class d3d9_shader_register_set : std::uint16_t {
-        bool_ = 0, int4 = 1, float4 = 2, sampler = 3
+        bool_ = 0,
+        int4 = 1,
+        float4 = 2,
+        sampler = 3
     };
+
     struct d3d9_reflected_constant {
         std::string name;
         d3d9_shader_register_set register_set = d3d9_shader_register_set::float4;
@@ -114,10 +138,12 @@ namespace alia {
         int register_count = 0;
         std::optional<shader_constant_value_type> type;
     };
+
     struct d3d9_shader_reflection {
         bool reflected = false;
         std::vector<d3d9_reflected_constant> constants;
     };
+
     struct d3d9_stored_shader_constant {
         shader_constant_slot slot = {};
         d3d9_shader_register_set register_set = d3d9_shader_register_set::float4;
@@ -127,6 +153,7 @@ namespace alia {
         std::vector<float> floats;
         std::vector<int> ints;
     };
+
     struct d3d9_shader_program : shader_program_handle {
         IDirect3DDevice9 *device = nullptr;
         IDirect3DVertexShader9 *vertex_shader = nullptr;
@@ -137,29 +164,57 @@ namespace alia {
         std::unordered_map<int, texture_handle *> sampler_textures;
     };
 
-    inline d3d9_device *as_d3d9_device(device_handle *h) { return static_cast<d3d9_device *>(h); }
-    inline d3d9_texture *as_d3d9_texture(texture_handle *h) { return static_cast<d3d9_texture *>(h); }
-    inline const d3d9_texture *as_d3d9_texture(const texture_handle *h) { return static_cast<const d3d9_texture *>(h); }
+    inline d3d9_device *as_d3d9_device(device_handle *h) {
+        return static_cast<d3d9_device *>(h);
+    }
+
+    inline d3d9_texture *as_d3d9_texture(texture_handle *h) {
+        return static_cast<d3d9_texture *>(h);
+    }
+
+    inline const d3d9_texture *as_d3d9_texture(const texture_handle *h) {
+        return static_cast<const d3d9_texture *>(h);
+    }
+
     inline IDirect3DBaseTexture9 *d3d9_base_texture(const d3d9_texture &texture) {
-        return texture.cube
-            ? static_cast<IDirect3DBaseTexture9 *>(texture.cube)
-            : static_cast<IDirect3DBaseTexture9 *>(texture.texture);
+        return texture.cube ? static_cast<IDirect3DBaseTexture9 *>(texture.cube)
+                            : static_cast<IDirect3DBaseTexture9 *>(texture.texture);
     }
-    inline HRESULT d3d9_get_level_surface(
-        const d3d9_texture &texture, int face, int level, IDirect3DSurface9 **out
-    ) {
+
+    inline HRESULT d3d9_get_level_surface(const d3d9_texture &texture, int face, int level, IDirect3DSurface9 **out) {
         return texture.cube
-            ? texture.cube->GetCubeMapSurface(
-                static_cast<D3DCUBEMAP_FACES>(face), static_cast<UINT>(level), out)
-            : texture.texture->GetSurfaceLevel(static_cast<UINT>(level), out);
+                   ? texture.cube->GetCubeMapSurface(static_cast<D3DCUBEMAP_FACES>(face), static_cast<UINT>(level), out)
+                   : texture.texture->GetSurfaceLevel(static_cast<UINT>(level), out);
     }
-    inline d3d9_vertex_buffer *as_d3d9_vertex_buffer(vertex_buffer_handle *h) { return static_cast<d3d9_vertex_buffer *>(h); }
-    inline const d3d9_vertex_buffer *as_d3d9_vertex_buffer(const vertex_buffer_handle *h) { return static_cast<const d3d9_vertex_buffer *>(h); }
-    inline d3d9_index_buffer *as_d3d9_index_buffer(index_buffer_handle *h) { return static_cast<d3d9_index_buffer *>(h); }
-    inline const d3d9_index_buffer *as_d3d9_index_buffer(const index_buffer_handle *h) { return static_cast<const d3d9_index_buffer *>(h); }
-    inline d3d9_swapchain *as_d3d9_swapchain(swapchain_handle *h) { return static_cast<d3d9_swapchain *>(h); }
-    inline const d3d9_swapchain *as_d3d9_swapchain(const swapchain_handle *h) { return static_cast<const d3d9_swapchain *>(h); }
-    inline d3d9_shader_program *as_d3d9_shader_program(shader_program_handle *h) { return static_cast<d3d9_shader_program *>(h); }
+
+    inline d3d9_vertex_buffer *as_d3d9_vertex_buffer(vertex_buffer_handle *h) {
+        return static_cast<d3d9_vertex_buffer *>(h);
+    }
+
+    inline const d3d9_vertex_buffer *as_d3d9_vertex_buffer(const vertex_buffer_handle *h) {
+        return static_cast<const d3d9_vertex_buffer *>(h);
+    }
+
+    inline d3d9_index_buffer *as_d3d9_index_buffer(index_buffer_handle *h) {
+        return static_cast<d3d9_index_buffer *>(h);
+    }
+
+    inline const d3d9_index_buffer *as_d3d9_index_buffer(const index_buffer_handle *h) {
+        return static_cast<const d3d9_index_buffer *>(h);
+    }
+
+    inline d3d9_swapchain *as_d3d9_swapchain(swapchain_handle *h) {
+        return static_cast<d3d9_swapchain *>(h);
+    }
+
+    inline const d3d9_swapchain *as_d3d9_swapchain(const swapchain_handle *h) {
+        return static_cast<const d3d9_swapchain *>(h);
+    }
+
+    inline d3d9_shader_program *as_d3d9_shader_program(shader_program_handle *h) {
+        return static_cast<d3d9_shader_program *>(h);
+    }
+
     inline DWORD to_d3d_color(color c) {
         auto clamp = [](float v) { return static_cast<BYTE>(std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f); };
         return D3DCOLOR_RGBA(clamp(c.r), clamp(c.g), clamp(c.b), clamp(c.a));
@@ -169,41 +224,72 @@ namespace alia {
         return format == index_format::u16 ? D3DFMT_INDEX16 : D3DFMT_INDEX32;
     }
 
-    d3d9_device *d3d9_create_device(const gfx_device_config &); void d3d9_destroy_device(device_handle *);
+    d3d9_device *d3d9_create_device(const gfx_device_config &);
+    void d3d9_destroy_device(device_handle *);
     texture_handle *d3d9_create_texture(device_handle *, pixel_format, vec2i, int, texture_role, texture_usage);
     texture_handle *d3d9_create_cube_texture(device_handle *, pixel_format, int, int, texture_usage);
     bool d3d9_texture_format_supported(device_handle *, pixel_format, int, texture_role, texture_usage);
     bool d3d9_cube_texture_format_supported(device_handle *, pixel_format, int, texture_usage);
-    void d3d9_destroy_texture(texture_handle *); pixel_format d3d9_texture_format(const texture_handle *);
-    int d3d9_texture_width(const texture_handle *); int d3d9_texture_height(const texture_handle *); int d3d9_texture_mip_levels(const texture_handle *);
-    sampler_state d3d9_texture_sampler(const texture_handle *); void d3d9_texture_set_sampler(texture_handle *, const sampler_state &);
-    bool d3d9_texture_lock(texture_handle *, rect_i, int, texture_lock_mode, texture_lock_info &); void d3d9_texture_unlock(texture_handle *, const texture_lock_info &, bool);
+    void d3d9_destroy_texture(texture_handle *);
+    pixel_format d3d9_texture_format(const texture_handle *);
+    int d3d9_texture_width(const texture_handle *);
+    int d3d9_texture_height(const texture_handle *);
+    int d3d9_texture_mip_levels(const texture_handle *);
+    sampler_state d3d9_texture_sampler(const texture_handle *);
+    void d3d9_texture_set_sampler(texture_handle *, const sampler_state &);
+    bool d3d9_texture_lock(texture_handle *, rect_i, int, texture_lock_mode, texture_lock_info &);
+    void d3d9_texture_unlock(texture_handle *, const texture_lock_info &, bool);
     bool d3d9_cube_texture_lock(texture_handle *, cube_face, rect_i, int, texture_lock_mode, texture_lock_info &);
-    void d3d9_texture_generate_mipmaps(texture_handle *); texture_handle *d3d9_texture_clone(const texture_handle *);
+    void d3d9_texture_generate_mipmaps(texture_handle *);
+    texture_handle *d3d9_texture_clone(const texture_handle *);
     bool d3d9_copy_render_target_to_texture(device_handle *, texture_handle *, rect_i, vec2i, vec2i, int, int);
-    vertex_buffer_handle *d3d9_create_vertex_buffer(device_handle *, int, int, buffer_usage, const void *); void d3d9_destroy_vertex_buffer(vertex_buffer_handle *);
-    int d3d9_vertex_buffer_count(const vertex_buffer_handle *); int d3d9_vertex_buffer_stride(const vertex_buffer_handle *); buffer_usage d3d9_vertex_buffer_usage(const vertex_buffer_handle *);
-    bool d3d9_vertex_buffer_lock(vertex_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void d3d9_vertex_buffer_unlock(vertex_buffer_handle *, const buffer_lock_info &, bool);
-    index_buffer_handle *d3d9_create_index_buffer(device_handle *, index_format, int, buffer_usage, const void *); void d3d9_destroy_index_buffer(index_buffer_handle *);
-    int d3d9_index_buffer_count(const index_buffer_handle *); buffer_usage d3d9_index_buffer_usage(const index_buffer_handle *);
-    bool d3d9_index_buffer_lock(index_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &); void d3d9_index_buffer_unlock(index_buffer_handle *, const buffer_lock_info &, bool);
-    shader_program_handle *d3d9_create_shader_program(device_handle *, const shader_program_desc &); void d3d9_destroy_shader_program(shader_program_handle *);
-    shader_constant_slot d3d9_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type, std::optional<shader_register>); void d3d9_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
-    shader_sampler_slot d3d9_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type, int); void d3d9_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
+    vertex_buffer_handle *d3d9_create_vertex_buffer(device_handle *, int, int, buffer_usage, const void *);
+    void d3d9_destroy_vertex_buffer(vertex_buffer_handle *);
+    int d3d9_vertex_buffer_count(const vertex_buffer_handle *);
+    int d3d9_vertex_buffer_stride(const vertex_buffer_handle *);
+    buffer_usage d3d9_vertex_buffer_usage(const vertex_buffer_handle *);
+    bool d3d9_vertex_buffer_lock(vertex_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &);
+    void d3d9_vertex_buffer_unlock(vertex_buffer_handle *, const buffer_lock_info &, bool);
+    index_buffer_handle *d3d9_create_index_buffer(device_handle *, index_format, int, buffer_usage, const void *);
+    void d3d9_destroy_index_buffer(index_buffer_handle *);
+    int d3d9_index_buffer_count(const index_buffer_handle *);
+    buffer_usage d3d9_index_buffer_usage(const index_buffer_handle *);
+    bool d3d9_index_buffer_lock(index_buffer_handle *, int, int, buffer_lock_mode, buffer_lock_info &);
+    void d3d9_index_buffer_unlock(index_buffer_handle *, const buffer_lock_info &, bool);
+    shader_program_handle *d3d9_create_shader_program(device_handle *, const shader_program_desc &);
+    void d3d9_destroy_shader_program(shader_program_handle *);
+    shader_constant_slot
+    d3d9_shader_lookup_constant(shader_program_handle *, std::string_view, shader_type, std::optional<shader_register>);
+    void
+    d3d9_shader_set_constant(shader_program_handle *, const shader_constant_slot &, const shader_constant_payload &);
+    shader_sampler_slot d3d9_shader_lookup_sampler(shader_program_handle *, std::string_view, shader_type, int);
+    void d3d9_shader_set_sampler(shader_program_handle *, const shader_sampler_slot &, texture_handle *);
     void d3d9_apply_program_state(IDirect3DDevice9 *, d3d9_shader_program *);
-    swapchain_handle *d3d9_create_swapchain(device_handle *, void *, vec2i, const swapchain_desc &); void d3d9_destroy_swapchain(swapchain_handle *);
+    swapchain_handle *d3d9_create_swapchain(device_handle *, void *, vec2i, const swapchain_desc &);
+    void d3d9_destroy_swapchain(swapchain_handle *);
     framebuffer_properties d3d9_swapchain_properties(const swapchain_handle *);
-    void d3d9_swapchain_begin_frame(swapchain_handle *); void d3d9_swapchain_end_frame(swapchain_handle *); void d3d9_swapchain_present(swapchain_handle *); bool d3d9_swapchain_present_region(swapchain_handle *, rect_i); void d3d9_swapchain_on_resize(swapchain_handle *, vec2i);
+    void d3d9_swapchain_begin_frame(swapchain_handle *);
+    void d3d9_swapchain_end_frame(swapchain_handle *);
+    void d3d9_swapchain_present(swapchain_handle *);
+    bool d3d9_swapchain_present_region(swapchain_handle *, rect_i);
+    void d3d9_swapchain_on_resize(swapchain_handle *, vec2i);
     void d3d9_set_render_state(device_handle *, const render_state &);
     void d3d9_set_transforms(device_handle *, const transform_state &);
     void d3d9_set_lighting(device_handle *, const lighting_state &);
     void d3d9_set_material(device_handle *, const material &);
     void d3d9_set_fog(device_handle *, const fog_state &);
-    bool d3d9_set_render_target(device_handle *, const render_target_info &); bool d3d9_clear(device_handle *, const std::optional<color> &, const std::optional<float> &); void d3d9_reset_frame_state(d3d9_device &); void d3d9_set_viewport(device_handle *, const render_viewport &);
-    void d3d9_bind_vertex_buffer(device_handle *, vertex_buffer_handle *); void d3d9_bind_index_buffer(device_handle *, index_buffer_handle *);
+    bool d3d9_set_render_target(device_handle *, const render_target_info &);
+    bool d3d9_clear(device_handle *, const std::optional<color> &, const std::optional<float> &);
+    void d3d9_reset_frame_state(d3d9_device &);
+    void d3d9_set_viewport(device_handle *, const render_viewport &);
+    void d3d9_bind_vertex_buffer(device_handle *, vertex_buffer_handle *);
+    void d3d9_bind_index_buffer(device_handle *, index_buffer_handle *);
     void d3d9_bind_instance_buffer(device_handle *, vertex_buffer_handle *);
-    void d3d9_upload_transient_vertex_data(device_handle *, const void *, int); void d3d9_upload_transient_index_data(device_handle *, const void *, int, index_format);
-    void d3d9_bind_resources(device_handle *, const texture_sampler_binding &); void d3d9_draw(device_handle *, primitive_topology, int, int); void d3d9_draw_indexed(device_handle *, primitive_topology, int, int, int);
+    void d3d9_upload_transient_vertex_data(device_handle *, const void *, int);
+    void d3d9_upload_transient_index_data(device_handle *, const void *, int, index_format);
+    void d3d9_bind_resources(device_handle *, const texture_sampler_binding &);
+    void d3d9_draw(device_handle *, primitive_topology, int, int);
+    void d3d9_draw_indexed(device_handle *, primitive_topology, int, int, int);
     void d3d9_draw_instanced(device_handle *, primitive_topology, int, int, int, int);
     void d3d9_draw_indexed_instanced(device_handle *, primitive_topology, int, int, int, int, int);
 } // namespace alia

@@ -8,15 +8,15 @@
 
 // std::sqrt is constexpr when __cpp_lib_constexpr_cmath is available (C++26).
 #if defined(__cpp_lib_constexpr_cmath) && __cpp_lib_constexpr_cmath >= 202306L
-#  define ALIA_CXX26_MATH_CONSTEXPR constexpr
+#define ALIA_CXX26_MATH_CONSTEXPR constexpr
 #else
-#  define ALIA_CXX26_MATH_CONSTEXPR
+#define ALIA_CXX26_MATH_CONSTEXPR
 #endif
 
 namespace alia {
 
     struct color {
-        float r=0.f, g=0.f, b=0.f, a=0.f;
+        float r = 0.f, g = 0.f, b = 0.f, a = 0.f;
 
         // Creates a color from 8-bit RGBA channel values.
         static constexpr color from_rgba8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) {
@@ -31,7 +31,9 @@ namespace alia {
 
         // Creates a color from a 32-bit number of the form 0xAARRGGBB.
         static constexpr color from_rgba_u32(uint32_t x) {
-            return from_rgba8(uint8_t((x >> 16) & 0xFF), uint8_t((x >> 8) & 0xFF), uint8_t((x >> 0) & 0xFF), uint8_t((x >> 24) & 0xFF));
+            return from_rgba8(
+                uint8_t((x >> 16) & 0xFF), uint8_t((x >> 8) & 0xFF), uint8_t((x >> 0) & 0xFF), uint8_t((x >> 24) & 0xFF)
+            );
         }
 
         // Creates a color from pre-multiplied floating-point RGBA values; un-multiplies RGB by alpha.
@@ -58,7 +60,7 @@ namespace alia {
 
         // Returns the midpoint of two colors blended in approximate linear RGB (gamma 2.0).
         // RGB channels are squared before mixing and sqrt'd after; alpha is blended linearly.
-        static ALIA_CXX26_MATH_CONSTEXPR color average(const color& a, const color& b) {
+        static ALIA_CXX26_MATH_CONSTEXPR color average(const color &a, const color &b) {
             return {
                 std::sqrt((a.r * a.r + b.r * b.r) * 0.5f),
                 std::sqrt((a.g * a.g + b.g * b.g) * 0.5f),
@@ -69,7 +71,7 @@ namespace alia {
 
         // Interpolates between two colors in approximate linear RGB (gamma 2.0).
         // RGB channels are squared before mixing and sqrt'd after; alpha is blended linearly.
-        static ALIA_CXX26_MATH_CONSTEXPR color lerp(const color& a, const color& b, float t) {
+        static ALIA_CXX26_MATH_CONSTEXPR color lerp(const color &a, const color &b, float t) {
             float s = 1.0f - t;
             return {
                 std::sqrt(a.r * a.r * s + b.r * b.r * t),
@@ -80,17 +82,12 @@ namespace alia {
         }
 
         // Returns the midpoint of two colors blended directly in sRGB space (no gamma correction).
-        static constexpr color average_srgb(const color& a, const color& b) {
-            return {
-                (a.r + b.r) * 0.5f,
-                (a.g + b.g) * 0.5f,
-                (a.b + b.b) * 0.5f,
-                (a.a + b.a) * 0.5f
-            };
+        static constexpr color average_srgb(const color &a, const color &b) {
+            return {(a.r + b.r) * 0.5f, (a.g + b.g) * 0.5f, (a.b + b.b) * 0.5f, (a.a + b.a) * 0.5f};
         }
 
         // Interpolates between two colors directly in sRGB space (no gamma correction).
-        static constexpr color lerp_srgb(const color& a, const color& b, float t) {
+        static constexpr color lerp_srgb(const color &a, const color &b, float t) {
             float s = 1.0f - t;
             return {a.r * s + b.r * t, a.g * s + b.g * t, a.b * s + b.b * t, a.a * s + b.a * t};
         }
@@ -132,7 +129,6 @@ namespace alia {
         // Compares all four channels for equality.
         constexpr bool operator==(const color &other) const = default;
     };
-
 
     inline constexpr color black = color::cga(0);
     inline constexpr color blue = color::cga(1);

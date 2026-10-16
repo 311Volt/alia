@@ -5,15 +5,11 @@
 
 namespace alia {
 
-    swapchain_handle *ogl_create_swapchain(
-        device_handle *dev_h,
-        void *native_handle,
-        vec2i size,
-        const swapchain_desc &desc) {
+    swapchain_handle *
+    ogl_create_swapchain(device_handle *dev_h, void *native_handle, vec2i size, const swapchain_desc &desc) {
         auto *dev = as_ogl_device(dev_h);
         framebuffer_properties props;
-        void *surface = get_ogl_platform().create_surface(
-            native_handle, dev->ctx, desc, props);
+        void *surface = get_ogl_platform().create_surface(native_handle, dev->ctx, desc, props);
         if (!surface)
             return nullptr;
 

@@ -20,8 +20,7 @@ namespace alia {
             registered = true;
         }
         return CreateWindowExW(
-            0, cls, L"", WS_OVERLAPPEDWINDOW, 0, 0, 1, 1,
-            nullptr, nullptr, GetModuleHandleW(nullptr), nullptr
+            0, cls, L"", WS_OVERLAPPEDWINDOW, 0, 0, 1, 1, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr
         );
     }
 
@@ -47,7 +46,10 @@ namespace alia {
         UINT adapter = D3DADAPTER_DEFAULT;
         if (config.adapter >= 0) {
             void *wanted = nullptr;
-            try { wanted = detail::win32_monitor_handle(config.adapter); } catch (...) {}
+            try {
+                wanted = detail::win32_monitor_handle(config.adapter);
+            } catch (...) {
+            }
             for (UINT i = 0; wanted && i < d3d->GetAdapterCount(); ++i) {
                 if (d3d->GetAdapterMonitor(i) == static_cast<HMONITOR>(wanted)) {
                     adapter = i;
@@ -58,9 +60,8 @@ namespace alia {
 
         bool hardware_vertex_processing = false;
         auto try_create = [&](D3DDEVTYPE type, IDirect3DDevice9 **out) {
-            DWORD flags = type == D3DDEVTYPE_HAL
-                ? D3DCREATE_HARDWARE_VERTEXPROCESSING
-                : D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+            DWORD flags =
+                type == D3DDEVTYPE_HAL ? D3DCREATE_HARDWARE_VERTEXPROCESSING : D3DCREATE_SOFTWARE_VERTEXPROCESSING;
             HRESULT hr = d3d->CreateDevice(adapter, type, dummy, flags, &pp, out);
             if (FAILED(hr) && type == D3DDEVTYPE_HAL) {
                 flags = D3DCREATE_SOFTWARE_VERTEXPROCESSING;
@@ -71,8 +72,7 @@ namespace alia {
             return hr;
         };
 
-        const bool want_software = config.render.requested() &&
-            config.render.value == render_method::software;
+        const bool want_software = config.render.requested() && config.render.value == render_method::software;
         D3DDEVTYPE device_type = want_software ? D3DDEVTYPE_REF : D3DDEVTYPE_HAL;
         IDirect3DDevice9 *device = nullptr;
         HRESULT hr = try_create(device_type, &device);

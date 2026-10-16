@@ -9,20 +9,23 @@
 namespace alia {
     struct output_stream_config {
         std::optional<audio_output_device> device;
-        int sample_rate = 0; // Zero chooses the endpoint's preferred rate.
-        int period_frames = 0; // Hint; properties() reports the actual period.
+        int sample_rate = 0;       // Zero chooses the endpoint's preferred rate.
+        int period_frames = 0;     // Hint; properties() reports the actual period.
         bool exact_format = false; // Throw rather than converting point/channel formats in L3.
     };
+
     struct input_stream_config {
         std::optional<audio_input_device> device;
         int sample_rate = 0;
         int period_frames = 0;
         bool exact_format = false;
     };
+
     namespace detail {
         struct stream_runtime;
-        std::vector<sample_frame_format> audio_format_fallbacks(sample_frame_format requested, sample_frame_format preferred);
-    }
+        std::vector<sample_frame_format>
+        audio_format_fallbacks(sample_frame_format requested, sample_frame_format preferred);
+    } // namespace detail
 
     /// A stopped, move-only output stream. The context must outlive it. Callback
     /// views expire on return. Callbacks must not allocate, block, lock, emit
@@ -45,8 +48,13 @@ namespace alia {
         [[nodiscard]] audio_stream_state state() const;
         /// User-facing callback format; the backend may use another point/channel format.
         [[nodiscard]] const audio_stream_properties &properties() const;
-        [[nodiscard]] int sample_rate() const { return properties().format.sample_rate; }
+
+        [[nodiscard]] int sample_rate() const {
+            return properties().format.sample_rate;
+        }
+
         [[nodiscard]] std::int64_t position_frames() const;
+
     private:
         std::unique_ptr<detail::stream_runtime> runtime_;
     };
@@ -66,41 +74,63 @@ namespace alia {
         void stop();
         [[nodiscard]] audio_stream_state state() const;
         [[nodiscard]] const audio_stream_properties &properties() const;
-        [[nodiscard]] int sample_rate() const { return properties().format.sample_rate; }
+
+        [[nodiscard]] int sample_rate() const {
+            return properties().format.sample_rate;
+        }
+
         [[nodiscard]] std::int64_t position_frames() const;
+
     private:
         std::unique_ptr<detail::stream_runtime> runtime_;
     };
 
     /// Typed L2 wrapper. The callback accepts span<F>, optionally followed by
     /// audio_callback_info. Partially written output is initialized to silence.
-    template <sample_frame F> requires (!std::is_const_v<F>)
+    template <sample_frame F>
+        requires(!std::is_const_v<F>)
     class output_stream : public any_output_stream {
     public:
         output_stream() = default;
-        template <class Callback> requires (std::invocable<Callback &, std::span<F>> ||
-                                            std::invocable<Callback &, std::span<F>, const audio_callback_info &>)
+
+        template <class Callback>
+            requires(std::invocable<Callback &, std::span<F>> || std::invocable<Callback &, std::span<F>, const audio_callback_info &>)
         output_stream(audio_context &context, const output_stream_config &config, Callback &&callback)
-            : any_output_stream(context, sample_frame_format_of_v<F>, config,
-                [fn = std::forward<Callback>(callback)](any_audio_clip_view view, const audio_callback_info &info) mutable {
-                    auto frames = view.template as<F>().frames();
-                    if constexpr (std::invocable<decltype(fn) &, std::span<F>, const audio_callback_info &>) std::invoke(fn, frames, info);
-                    else std::invoke(fn, frames);
-                }) {}
+            : any_output_stream(
+                  context, sample_frame_format_of_v<F>, config,
+                  [fn = std::forward<Callback>(callback
+                   )](any_audio_clip_view view, const audio_callback_info &info) mutable {
+                      auto frames = view.template as<F>().frames();
+                      if constexpr (std::invocable<decltype(fn) &, std::span<F>, const audio_callback_info &>)
+                          std::invoke(fn, frames, info);
+                      else
+                          std::invoke(fn, frames);
+                  }
+              ) {
+        }
     };
-    template <sample_frame F> requires (!std::is_const_v<F>)
+
+    template <sample_frame F>
+        requires(!std::is_const_v<F>)
     class input_stream : public any_input_stream {
     public:
         input_stream() = default;
-        template <class Callback> requires (std::invocable<Callback &, std::span<const F>> ||
-                                            std::invocable<Callback &, std::span<const F>, const audio_callback_info &>)
+
+        template <class Callback>
+            requires(std::invocable<Callback &, std::span<const F>> || std::invocable<Callback &, std::span<const F>, const audio_callback_info &>)
         input_stream(audio_context &context, const input_stream_config &config, Callback &&callback)
-            : any_input_stream(context, sample_frame_format_of_v<F>, config,
-                [fn = std::forward<Callback>(callback)](const_audio_clip_view view, const audio_callback_info &info) mutable {
-                    auto frames = view.template as<F>().frames();
-                    if constexpr (std::invocable<decltype(fn) &, std::span<const F>, const audio_callback_info &>) std::invoke(fn, frames, info);
-                    else std::invoke(fn, frames);
-                }) {}
+            : any_input_stream(
+                  context, sample_frame_format_of_v<F>, config,
+                  [fn = std::forward<Callback>(callback
+                   )](const_audio_clip_view view, const audio_callback_info &info) mutable {
+                      auto frames = view.template as<F>().frames();
+                      if constexpr (std::invocable<decltype(fn) &, std::span<const F>, const audio_callback_info &>)
+                          std::invoke(fn, frames, info);
+                      else
+                          std::invoke(fn, frames);
+                  }
+              ) {
+        }
     };
-}
+} // namespace alia
 #endif

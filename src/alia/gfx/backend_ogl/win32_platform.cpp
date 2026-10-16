@@ -44,13 +44,11 @@ namespace alia {
         constexpr int WGL_SAMPLES_ARB_ = 0x2042;
         constexpr int WGL_TYPE_RGBA_FLOAT_ARB_ = 0x21A0;
 
-        using choose_pixel_format_arb_fn = BOOL (WINAPI *)(
-            HDC, const int *, const FLOAT *, UINT, int *, UINT *);
-        using get_pixel_format_attrib_arb_fn = BOOL (WINAPI *)(
-            HDC, int, int, UINT, const int *, int *);
-        using create_context_attribs_arb_fn = HGLRC (WINAPI *)(HDC, HGLRC, const int *);
-        using swap_interval_ext_fn = BOOL (WINAPI *)(int);
-        using get_swap_interval_ext_fn = int (WINAPI *)();
+        using choose_pixel_format_arb_fn = BOOL(WINAPI *)(HDC, const int *, const FLOAT *, UINT, int *, UINT *);
+        using get_pixel_format_attrib_arb_fn = BOOL(WINAPI *)(HDC, int, int, UINT, const int *, int *);
+        using create_context_attribs_arb_fn = HGLRC(WINAPI *)(HDC, HGLRC, const int *);
+        using swap_interval_ext_fn = BOOL(WINAPI *)(int);
+        using get_swap_interval_ext_fn = int(WINAPI *)();
 
         template <class T>
         T load_wgl_proc(const char *name) {
@@ -74,8 +72,8 @@ namespace alia {
                 registered = true;
             }
             return CreateWindowExW(
-                0, cls, L"", WS_OVERLAPPEDWINDOW, 0, 0, 1, 1,
-                nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+                0, cls, L"", WS_OVERLAPPEDWINDOW, 0, 0, 1, 1, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr
+            );
         }
 
         bool set_default_pixel_format(HDC hdc) {
@@ -107,37 +105,32 @@ namespace alia {
         };
 
         bool any_framebuffer_option_requested(const framebuffer_config &c) {
-            return c.color_bits.requested() || c.red_bits.requested() ||
-                c.green_bits.requested() || c.blue_bits.requested() ||
-                c.alpha_bits.requested() || c.red_shift.requested() ||
-                c.green_shift.requested() || c.blue_shift.requested() ||
-                c.alpha_shift.requested() || c.depth_bits.requested() ||
-                c.stencil_bits.requested() || c.samples.requested() ||
-                c.aux_buffers.requested() || c.accum_red_bits.requested() ||
-                c.accum_green_bits.requested() || c.accum_blue_bits.requested() ||
-                c.accum_alpha_bits.requested() || c.float_color.requested() ||
-                c.float_depth.requested() || c.single_buffer.requested() ||
-                c.update_display_region.requested() || c.swap.requested();
+            return c.color_bits.requested() || c.red_bits.requested() || c.green_bits.requested() ||
+                   c.blue_bits.requested() || c.alpha_bits.requested() || c.red_shift.requested() ||
+                   c.green_shift.requested() || c.blue_shift.requested() || c.alpha_shift.requested() ||
+                   c.depth_bits.requested() || c.stencil_bits.requested() || c.samples.requested() ||
+                   c.aux_buffers.requested() || c.accum_red_bits.requested() || c.accum_green_bits.requested() ||
+                   c.accum_blue_bits.requested() || c.accum_alpha_bits.requested() || c.float_color.requested() ||
+                   c.float_depth.requested() || c.single_buffer.requested() || c.update_display_region.requested() ||
+                   c.swap.requested();
         }
 
         template <class T>
         void append_option(
-            std::vector<int> &attributes,
-            int attribute,
-            const gfx_option<T> &option,
-            bool include_suggested) {
+            std::vector<int> &attributes, int attribute, const gfx_option<T> &option, bool include_suggested
+        ) {
             if (!option.requested() || (!include_suggested && !option.required()))
                 return;
             attributes.push_back(attribute);
             attributes.push_back(static_cast<int>(option.value));
         }
 
-        std::vector<int> pixel_format_attributes(
-            const framebuffer_config &config,
-            bool include_suggested) {
+        std::vector<int> pixel_format_attributes(const framebuffer_config &config, bool include_suggested) {
             std::vector<int> result{
-                WGL_DRAW_TO_WINDOW_ARB_, TRUE,
-                WGL_SUPPORT_OPENGL_ARB_, TRUE,
+                WGL_DRAW_TO_WINDOW_ARB_,
+                TRUE,
+                WGL_SUPPORT_OPENGL_ARB_,
+                TRUE,
             };
             const auto initial_size = result.size();
             append_option(result, WGL_COLOR_BITS_ARB_, config.color_bits, include_suggested);
@@ -153,51 +146,51 @@ namespace alia {
             append_option(result, WGL_ACCUM_BLUE_BITS_ARB_, config.accum_blue_bits, include_suggested);
             append_option(result, WGL_ACCUM_ALPHA_BITS_ARB_, config.accum_alpha_bits, include_suggested);
 
-            if (config.samples.requested() &&
-                (include_suggested || config.samples.required())) {
+            if (config.samples.requested() && (include_suggested || config.samples.required())) {
                 result.push_back(WGL_SAMPLE_BUFFERS_ARB_);
                 result.push_back(config.samples.value > 0 ? TRUE : FALSE);
                 result.push_back(WGL_SAMPLES_ARB_);
                 result.push_back((std::max)(0, config.samples.value));
             }
-            if (config.float_color.requested() &&
-                (include_suggested || config.float_color.required())) {
+            if (config.float_color.requested() && (include_suggested || config.float_color.required())) {
                 result.push_back(WGL_PIXEL_TYPE_ARB_);
-                result.push_back(config.float_color.value
-                    ? WGL_TYPE_RGBA_FLOAT_ARB_ : WGL_TYPE_RGBA_ARB_);
+                result.push_back(config.float_color.value ? WGL_TYPE_RGBA_FLOAT_ARB_ : WGL_TYPE_RGBA_ARB_);
             }
-            if (config.single_buffer.requested() &&
-                (include_suggested || config.single_buffer.required())) {
+            if (config.single_buffer.requested() && (include_suggested || config.single_buffer.required())) {
                 result.push_back(WGL_DOUBLE_BUFFER_ARB_);
                 result.push_back(config.single_buffer.value ? FALSE : TRUE);
             }
-            if (config.swap.requested() &&
-                (include_suggested || config.swap.required())) {
+            if (config.swap.requested() && (include_suggested || config.swap.required())) {
                 result.push_back(WGL_SWAP_METHOD_ARB_);
-                result.push_back(config.swap.value == swap_method::copy
-                    ? WGL_SWAP_COPY_ARB_
-                    : config.swap.value == swap_method::flip
-                        ? WGL_SWAP_EXCHANGE_ARB_ : WGL_SWAP_UNDEFINED_ARB_);
+                result.push_back(
+                    config.swap.value == swap_method::copy   ? WGL_SWAP_COPY_ARB_
+                    : config.swap.value == swap_method::flip ? WGL_SWAP_EXCHANGE_ARB_
+                                                             : WGL_SWAP_UNDEFINED_ARB_
+                );
             }
 
             // With no effective framebuffer request, preserve alia's historic
             // 32-bit color, 24/8 depth-stencil, double-buffered default.
             if (result.size() == initial_size) {
-                result.insert(result.end(), {
-                    WGL_COLOR_BITS_ARB_, 32,
-                    WGL_DEPTH_BITS_ARB_, 24,
-                    WGL_STENCIL_BITS_ARB_, 8,
-                    WGL_DOUBLE_BUFFER_ARB_, TRUE,
-                });
+                result.insert(
+                    result.end(),
+                    {
+                        WGL_COLOR_BITS_ARB_,
+                        32,
+                        WGL_DEPTH_BITS_ARB_,
+                        24,
+                        WGL_STENCIL_BITS_ARB_,
+                        8,
+                        WGL_DOUBLE_BUFFER_ARB_,
+                        TRUE,
+                    }
+                );
             }
             result.push_back(0);
             return result;
         }
 
-        int choose_arb_pixel_format(
-            HDC hdc,
-            const framebuffer_config &config,
-            choose_pixel_format_arb_fn choose) {
+        int choose_arb_pixel_format(HDC hdc, const framebuffer_config &config, choose_pixel_format_arb_fn choose) {
             for (bool include_suggested : {true, false}) {
                 if (!include_suggested && !any_framebuffer_option_requested(config))
                     break;
@@ -219,32 +212,31 @@ namespace alia {
             if (!single)
                 pfd.dwFlags |= PFD_DOUBLEBUFFER;
             pfd.iPixelType = PFD_TYPE_RGBA;
-            pfd.cColorBits = static_cast<BYTE>(config.color_bits.requested()
-                ? (std::clamp)(config.color_bits.value, 0, 255) : 32);
+            pfd.cColorBits =
+                static_cast<BYTE>(config.color_bits.requested() ? (std::clamp)(config.color_bits.value, 0, 255) : 32);
             pfd.cRedBits = static_cast<BYTE>((std::clamp)(config.red_bits.value, 0, 255));
             pfd.cGreenBits = static_cast<BYTE>((std::clamp)(config.green_bits.value, 0, 255));
             pfd.cBlueBits = static_cast<BYTE>((std::clamp)(config.blue_bits.value, 0, 255));
             pfd.cAlphaBits = static_cast<BYTE>((std::clamp)(config.alpha_bits.value, 0, 255));
-            pfd.cDepthBits = static_cast<BYTE>(config.depth_bits.requested()
-                ? (std::clamp)(config.depth_bits.value, 0, 255) : 24);
-            pfd.cStencilBits = static_cast<BYTE>(config.stencil_bits.requested()
-                ? (std::clamp)(config.stencil_bits.value, 0, 255) : 8);
+            pfd.cDepthBits =
+                static_cast<BYTE>(config.depth_bits.requested() ? (std::clamp)(config.depth_bits.value, 0, 255) : 24);
+            pfd.cStencilBits = static_cast<BYTE>(
+                config.stencil_bits.requested() ? (std::clamp)(config.stencil_bits.value, 0, 255) : 8
+            );
             pfd.cAuxBuffers = static_cast<BYTE>((std::clamp)(config.aux_buffers.value, 0, 255));
             pfd.cAccumRedBits = static_cast<BYTE>((std::clamp)(config.accum_red_bits.value, 0, 255));
             pfd.cAccumGreenBits = static_cast<BYTE>((std::clamp)(config.accum_green_bits.value, 0, 255));
             pfd.cAccumBlueBits = static_cast<BYTE>((std::clamp)(config.accum_blue_bits.value, 0, 255));
             pfd.cAccumAlphaBits = static_cast<BYTE>((std::clamp)(config.accum_alpha_bits.value, 0, 255));
-            pfd.cAccumBits = static_cast<BYTE>((std::min)(255,
-                static_cast<int>(pfd.cAccumRedBits) + pfd.cAccumGreenBits +
-                pfd.cAccumBlueBits + pfd.cAccumAlphaBits));
+            pfd.cAccumBits = static_cast<BYTE>((std::min)(
+                255,
+                static_cast<int>(pfd.cAccumRedBits) + pfd.cAccumGreenBits + pfd.cAccumBlueBits + pfd.cAccumAlphaBits
+            ));
             pfd.iLayerType = PFD_MAIN_PLANE;
             return ChoosePixelFormat(hdc, &pfd);
         }
 
-        framebuffer_properties read_properties(
-            HDC hdc,
-            int format,
-            get_pixel_format_attrib_arb_fn get_attribute) {
+        framebuffer_properties read_properties(HDC hdc, int format, get_pixel_format_attrib_arb_fn get_attribute) {
             framebuffer_properties props;
             PIXELFORMATDESCRIPTOR pfd = {};
             DescribePixelFormat(hdc, format, sizeof(pfd), &pfd);
@@ -265,43 +257,48 @@ namespace alia {
             props.accum_blue_bits = pfd.cAccumBlueBits;
             props.accum_alpha_bits = pfd.cAccumAlphaBits;
             props.single_buffer = (pfd.dwFlags & PFD_DOUBLEBUFFER) == 0;
-            props.swap = (pfd.dwFlags & PFD_SWAP_COPY) != 0
-                ? swap_method::copy
-                : (pfd.dwFlags & PFD_SWAP_EXCHANGE) != 0
-                    ? swap_method::flip : swap_method::undefined;
+            props.swap = (pfd.dwFlags & PFD_SWAP_COPY) != 0       ? swap_method::copy
+                         : (pfd.dwFlags & PFD_SWAP_EXCHANGE) != 0 ? swap_method::flip
+                                                                  : swap_method::undefined;
 
             int pixel_type = WGL_TYPE_RGBA_ARB_;
             if (get_attribute) {
                 const int attributes[]{
-                    WGL_COLOR_BITS_ARB_, WGL_RED_BITS_ARB_, WGL_GREEN_BITS_ARB_,
-                    WGL_BLUE_BITS_ARB_, WGL_ALPHA_BITS_ARB_, WGL_RED_SHIFT_ARB_,
-                    WGL_GREEN_SHIFT_ARB_, WGL_BLUE_SHIFT_ARB_, WGL_ALPHA_SHIFT_ARB_,
-                    WGL_DEPTH_BITS_ARB_, WGL_STENCIL_BITS_ARB_, WGL_SAMPLE_BUFFERS_ARB_,
-                    WGL_SAMPLES_ARB_, WGL_AUX_BUFFERS_ARB_, WGL_ACCUM_RED_BITS_ARB_,
-                    WGL_ACCUM_GREEN_BITS_ARB_, WGL_ACCUM_BLUE_BITS_ARB_,
-                    WGL_ACCUM_ALPHA_BITS_ARB_, WGL_DOUBLE_BUFFER_ARB_,
-                    WGL_PIXEL_TYPE_ARB_, WGL_SWAP_METHOD_ARB_,
+                    WGL_COLOR_BITS_ARB_,       WGL_RED_BITS_ARB_,        WGL_GREEN_BITS_ARB_,
+                    WGL_BLUE_BITS_ARB_,        WGL_ALPHA_BITS_ARB_,      WGL_RED_SHIFT_ARB_,
+                    WGL_GREEN_SHIFT_ARB_,      WGL_BLUE_SHIFT_ARB_,      WGL_ALPHA_SHIFT_ARB_,
+                    WGL_DEPTH_BITS_ARB_,       WGL_STENCIL_BITS_ARB_,    WGL_SAMPLE_BUFFERS_ARB_,
+                    WGL_SAMPLES_ARB_,          WGL_AUX_BUFFERS_ARB_,     WGL_ACCUM_RED_BITS_ARB_,
+                    WGL_ACCUM_GREEN_BITS_ARB_, WGL_ACCUM_BLUE_BITS_ARB_, WGL_ACCUM_ALPHA_BITS_ARB_,
+                    WGL_DOUBLE_BUFFER_ARB_,    WGL_PIXEL_TYPE_ARB_,      WGL_SWAP_METHOD_ARB_,
                 };
                 int values[std::size(attributes)]{};
-                if (get_attribute(
-                        hdc, format, 0, static_cast<UINT>(std::size(attributes)),
-                        attributes, values)) {
+                if (get_attribute(hdc, format, 0, static_cast<UINT>(std::size(attributes)), attributes, values)) {
                     int i = 0;
-                    props.color_bits = values[i++]; props.red_bits = values[i++];
-                    props.green_bits = values[i++]; props.blue_bits = values[i++];
-                    props.alpha_bits = values[i++]; props.red_shift = values[i++];
-                    props.green_shift = values[i++]; props.blue_shift = values[i++];
-                    props.alpha_shift = values[i++]; props.depth_bits = values[i++];
-                    props.stencil_bits = values[i++]; props.sample_buffers = values[i++];
+                    props.color_bits = values[i++];
+                    props.red_bits = values[i++];
+                    props.green_bits = values[i++];
+                    props.blue_bits = values[i++];
+                    props.alpha_bits = values[i++];
+                    props.red_shift = values[i++];
+                    props.green_shift = values[i++];
+                    props.blue_shift = values[i++];
+                    props.alpha_shift = values[i++];
+                    props.depth_bits = values[i++];
+                    props.stencil_bits = values[i++];
+                    props.sample_buffers = values[i++];
                     props.samples = props.sample_buffers ? values[i++] : (i++, 0);
-                    props.aux_buffers = values[i++]; props.accum_red_bits = values[i++];
-                    props.accum_green_bits = values[i++]; props.accum_blue_bits = values[i++];
-                    props.accum_alpha_bits = values[i++]; props.single_buffer = values[i++] == FALSE;
+                    props.aux_buffers = values[i++];
+                    props.accum_red_bits = values[i++];
+                    props.accum_green_bits = values[i++];
+                    props.accum_blue_bits = values[i++];
+                    props.accum_alpha_bits = values[i++];
+                    props.single_buffer = values[i++] == FALSE;
                     pixel_type = values[i++];
                     const int swap = values[i++];
-                    props.swap = swap == WGL_SWAP_COPY_ARB_ ? swap_method::copy
-                        : swap == WGL_SWAP_EXCHANGE_ARB_ ? swap_method::flip
-                        : swap_method::undefined;
+                    props.swap = swap == WGL_SWAP_COPY_ARB_       ? swap_method::copy
+                                 : swap == WGL_SWAP_EXCHANGE_ARB_ ? swap_method::flip
+                                                                  : swap_method::undefined;
                 }
             }
             props.float_color = pixel_type == WGL_TYPE_RGBA_FLOAT_ARB_;
@@ -336,13 +333,15 @@ namespace alia {
                 return nullptr;
             HDC hdc = GetDC(dummy);
             if (!hdc || !set_default_pixel_format(hdc)) {
-                if (hdc) ReleaseDC(dummy, hdc);
+                if (hdc)
+                    ReleaseDC(dummy, hdc);
                 DestroyWindow(dummy);
                 return nullptr;
             }
             HGLRC hglrc = wglCreateContext(hdc);
             if (!hglrc || !wglMakeCurrent(hdc, hglrc)) {
-                if (hglrc) wglDeleteContext(hglrc);
+                if (hglrc)
+                    wglDeleteContext(hglrc);
                 ReleaseDC(dummy, hdc);
                 DestroyWindow(dummy);
                 return nullptr;
@@ -369,30 +368,23 @@ namespace alia {
         // dummy-window context. A window's first swapchain fixes its pixel
         // format; later swapchains for the same window reuse it.
         void *win32_ogl_create_surface(
-            void *native_handle,
-            void *root_ctx,
-            const swapchain_desc &desc,
-            framebuffer_properties &out) {
+            void *native_handle, void *root_ctx, const swapchain_desc &desc, framebuffer_properties &out
+        ) {
             auto *root = static_cast<win_ogl_ctx *>(root_ctx);
             HWND hwnd = static_cast<HWND>(native_handle);
             if (!wglMakeCurrent(root->dummy_hdc, root->hglrc))
                 return nullptr;
 
-            const auto choose_arb = load_wgl_proc<choose_pixel_format_arb_fn>(
-                "wglChoosePixelFormatARB");
-            const auto get_attribute = load_wgl_proc<get_pixel_format_attrib_arb_fn>(
-                "wglGetPixelFormatAttribivARB");
-            const auto create_attribs = load_wgl_proc<create_context_attribs_arb_fn>(
-                "wglCreateContextAttribsARB");
+            const auto choose_arb = load_wgl_proc<choose_pixel_format_arb_fn>("wglChoosePixelFormatARB");
+            const auto get_attribute = load_wgl_proc<get_pixel_format_attrib_arb_fn>("wglGetPixelFormatAttribivARB");
+            const auto create_attribs = load_wgl_proc<create_context_attribs_arb_fn>("wglCreateContextAttribsARB");
 
             HDC hdc = GetDC(hwnd);
             if (!hdc)
                 return nullptr;
             int format = GetPixelFormat(hdc);
             if (!format) {
-                format = choose_arb
-                    ? choose_arb_pixel_format(hdc, desc.framebuffer, choose_arb)
-                    : 0;
+                format = choose_arb ? choose_arb_pixel_format(hdc, desc.framebuffer, choose_arb) : 0;
                 if (!format)
                     format = choose_legacy_pixel_format(hdc, desc.framebuffer);
                 PIXELFORMATDESCRIPTOR pfd = {};
@@ -407,12 +399,12 @@ namespace alia {
             // implementation-dependent, but is supported by mainstream Windows
             // ICDs. A cross-GPU/ICD incompatibility cleanly fails creation here.
             static constexpr int context_attributes[]{0};
-            HGLRC hglrc = create_attribs
-                ? create_attribs(hdc, root->hglrc, context_attributes) : nullptr;
+            HGLRC hglrc = create_attribs ? create_attribs(hdc, root->hglrc, context_attributes) : nullptr;
             if (!hglrc) {
                 hglrc = wglCreateContext(hdc);
                 if (!hglrc || !wglShareLists(root->hglrc, hglrc)) {
-                    if (hglrc) wglDeleteContext(hglrc);
+                    if (hglrc)
+                        wglDeleteContext(hglrc);
                     ReleaseDC(hwnd, hdc);
                     return nullptr;
                 }
@@ -473,7 +465,7 @@ namespace alia {
         void win32_ogl_make_none_current() {
             wglMakeCurrent(nullptr, nullptr);
         }
-    }
+    } // namespace
 
     void register_win32_ogl_platform() {
         register_ogl_platform({

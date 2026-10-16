@@ -77,8 +77,7 @@ namespace alia {
             return log;
         }
 
-        GLuint compile_shader(
-            const shader_stage_source &source, shader_type type, std::string_view program_name) {
+        GLuint compile_shader(const shader_stage_source &source, shader_type type, std::string_view program_name) {
             const GLenum gl_type = type == shader_type::vertex ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER;
             const GLuint shader = ogl_s_glCreateShader(gl_type);
             if (!shader)
@@ -106,45 +105,36 @@ namespace alia {
 
         shader_constant_value_type uniform_constant_type(GLenum type, std::string_view name) {
             switch (type) {
-            case GL_FLOAT: return shader_constant_value_type::float_1;
+            case GL_FLOAT:      return shader_constant_value_type::float_1;
             case GL_FLOAT_VEC2: return shader_constant_value_type::float_2;
             case GL_FLOAT_VEC3: return shader_constant_value_type::float_3;
             case GL_FLOAT_VEC4: return shader_constant_value_type::float_4;
-            case GL_INT: return shader_constant_value_type::int_1;
-            case GL_INT_VEC2: return shader_constant_value_type::int_2;
-            case GL_INT_VEC3: return shader_constant_value_type::int_3;
-            case GL_INT_VEC4: return shader_constant_value_type::int_4;
+            case GL_INT:        return shader_constant_value_type::int_1;
+            case GL_INT_VEC2:   return shader_constant_value_type::int_2;
+            case GL_INT_VEC3:   return shader_constant_value_type::int_3;
+            case GL_INT_VEC4:   return shader_constant_value_type::int_4;
             case GL_FLOAT_MAT4: return shader_constant_value_type::matrix_4x4;
             default:
-                throw shader_error("OpenGL shader constant '" + std::string(name) +
-                                   "' has an unsupported declared type");
+                throw shader_error(
+                    "OpenGL shader constant '" + std::string(name) + "' has an unsupported declared type"
+                );
             }
         }
 
         void apply_constant(const ogl_stored_shader_constant &c) {
             const GLint loc = static_cast<GLint>(c.slot.location);
             switch (c.type) {
-            case shader_constant_value_type::float_1:
-                ogl_s_glUniform1f(loc, c.floats[0]);
-                break;
-            case shader_constant_value_type::float_2:
-                ogl_s_glUniform2f(loc, c.floats[0], c.floats[1]);
-                break;
+            case shader_constant_value_type::float_1: ogl_s_glUniform1f(loc, c.floats[0]); break;
+            case shader_constant_value_type::float_2: ogl_s_glUniform2f(loc, c.floats[0], c.floats[1]); break;
             case shader_constant_value_type::float_3:
                 ogl_s_glUniform3f(loc, c.floats[0], c.floats[1], c.floats[2]);
                 break;
             case shader_constant_value_type::float_4:
                 ogl_s_glUniform4f(loc, c.floats[0], c.floats[1], c.floats[2], c.floats[3]);
                 break;
-            case shader_constant_value_type::int_1:
-                ogl_s_glUniform1i(loc, c.ints[0]);
-                break;
-            case shader_constant_value_type::int_2:
-                ogl_s_glUniform2i(loc, c.ints[0], c.ints[1]);
-                break;
-            case shader_constant_value_type::int_3:
-                ogl_s_glUniform3i(loc, c.ints[0], c.ints[1], c.ints[2]);
-                break;
+            case shader_constant_value_type::int_1: ogl_s_glUniform1i(loc, c.ints[0]); break;
+            case shader_constant_value_type::int_2: ogl_s_glUniform2i(loc, c.ints[0], c.ints[1]); break;
+            case shader_constant_value_type::int_3: ogl_s_glUniform3i(loc, c.ints[0], c.ints[1], c.ints[2]); break;
             case shader_constant_value_type::int_4:
                 ogl_s_glUniform4i(loc, c.ints[0], c.ints[1], c.ints[2], c.ints[3]);
                 break;
@@ -162,10 +152,7 @@ namespace alia {
                 glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
             } else {
                 glBindTexture(value->target, value->tex_id);
-                glBindTexture(
-                    value->target == GL_TEXTURE_2D
-                        ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D,
-                    0);
+                glBindTexture(value->target == GL_TEXTURE_2D ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, 0);
             }
         }
 
@@ -236,20 +223,14 @@ namespace alia {
     }
 
     shader_constant_slot
-    ogl_shader_lookup_constant(
-        shader_program_handle *h,
-        std::string_view name,
-        shader_type stage,
-        std::optional<shader_register>
-    ) {
+    ogl_shader_lookup_constant(shader_program_handle *h, std::string_view name, shader_type stage, std::optional<shader_register>) {
         auto *program = as_ogl_shader_program(h);
         const std::string uniform_name(name);
         const GLint location = ogl_s_glGetUniformLocation(program->program, uniform_name.c_str());
         if (location < 0)
             return {};
         if (name.find('[') != std::string_view::npos || name.find('.') != std::string_view::npos)
-            throw shader_error("OpenGL shader constant '" + uniform_name +
-                               "': arrays and structs are not supported");
+            throw shader_error("OpenGL shader constant '" + uniform_name + "': arrays and structs are not supported");
 
         GLint count = 0;
         GLint max_name_length = 0;
@@ -261,31 +242,32 @@ namespace alia {
             GLint size = 0;
             GLenum type = 0;
             ogl_s_glGetActiveUniform(
-                program->program, static_cast<GLuint>(i),
-                static_cast<GLsizei>(active_name.size()), &length, &size, &type, active_name.data());
+                program->program,
+                static_cast<GLuint>(i),
+                static_cast<GLsizei>(active_name.size()),
+                &length,
+                &size,
+                &type,
+                active_name.data()
+            );
             const std::string_view reflected_name(active_name.data(), static_cast<std::size_t>(length));
             if (reflected_name != name && reflected_name != uniform_name + "[0]")
                 continue;
             if (size > 1 || reflected_name.find('[') != std::string_view::npos)
-                throw shader_error("OpenGL shader constant '" + uniform_name +
-                                   "': arrays are not supported");
+                throw shader_error("OpenGL shader constant '" + uniform_name + "': arrays are not supported");
             return {true, stage, location, uniform_constant_type(type, name)};
         }
         throw shader_error("OpenGL shader constant '" + uniform_name + "': uniform reflection failed");
     }
 
     void ogl_shader_set_constant(
-        shader_program_handle *h,
-        const shader_constant_slot &slot,
-        const shader_constant_payload &payload
+        shader_program_handle *h, const shader_constant_slot &slot, const shader_constant_payload &payload
     ) {
         auto *program = as_ogl_shader_program(h);
         auto it = std::find_if(
             program->stored_constants.begin(),
             program->stored_constants.end(),
-            [&](const ogl_stored_shader_constant &c) {
-                return c.slot.location == slot.location;
-            }
+            [&](const ogl_stored_shader_constant &c) { return c.slot.location == slot.location; }
         );
         if (it == program->stored_constants.end()) {
             program->stored_constants.push_back({});
@@ -307,8 +289,10 @@ namespace alia {
             return {};
 
         auto it = std::find_if(
-            program->stored_samplers.begin(), program->stored_samplers.end(),
-            [&](const ogl_stored_shader_sampler &sampler) { return sampler.location == location; });
+            program->stored_samplers.begin(),
+            program->stored_samplers.end(),
+            [&](const ogl_stored_shader_sampler &sampler) { return sampler.location == location; }
+        );
         if (it == program->stored_samplers.end())
             program->stored_samplers.push_back({location, unit, nullptr});
         else
@@ -318,9 +302,11 @@ namespace alia {
 
     void ogl_shader_set_sampler(shader_program_handle *h, const shader_sampler_slot &slot, texture_handle *tex) {
         auto *program = as_ogl_shader_program(h);
-        auto it = std::find_if(program->stored_samplers.begin(), program->stored_samplers.end(), [&](const ogl_stored_shader_sampler &sampler) {
-            return sampler.location == slot.location;
-        });
+        auto it = std::find_if(
+            program->stored_samplers.begin(),
+            program->stored_samplers.end(),
+            [&](const ogl_stored_shader_sampler &sampler) { return sampler.location == slot.location; }
+        );
         if (it == program->stored_samplers.end()) {
             program->stored_samplers.push_back({static_cast<GLint>(slot.location), slot.slot, tex});
         } else {

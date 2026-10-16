@@ -41,12 +41,17 @@ namespace alia {
         class texture_lock_holder {
         public:
             texture_lock_holder() = default;
+
             explicit texture_lock_holder(std::unique_ptr<texture_lock_state> state) noexcept
-                : state_(std::move(state)) {}
+                : state_(std::move(state)) {
+            }
+
             ~texture_lock_holder() {
                 release();
             }
+
             texture_lock_holder(texture_lock_holder &&) noexcept = default;
+
             texture_lock_holder &operator=(texture_lock_holder &&other) noexcept {
                 if (this != &other) {
                     release();
@@ -54,15 +59,18 @@ namespace alia {
                 }
                 return *this;
             }
+
             texture_lock_holder(const texture_lock_holder &) = delete;
             texture_lock_holder &operator=(const texture_lock_holder &) = delete;
 
             [[nodiscard]] explicit operator bool() const noexcept {
                 return state_ != nullptr;
             }
+
             [[nodiscard]] const texture_lock_state *get() const noexcept {
                 return state_.get();
             }
+
             void release() {
                 if (state_) {
                     constexpr bool wrote = Mode != texture_lock_mode::read_only;
@@ -76,21 +84,16 @@ namespace alia {
         };
 
         bool upload_bitmap_view(
-            texture_handle *,
-            const graphics_backend_interface *,
-            const any_bitmap_view &,
+            texture_handle *, const graphics_backend_interface *, const any_bitmap_view &,
             std::optional<cube_face> face = {}
         );
-        void validate_texture_desc(
-            pixel_format, vec2i, int mip_levels, const char *operation
-        );
+        void validate_texture_desc(pixel_format, vec2i, int mip_levels, const char *operation);
 
         [[nodiscard]] std::span<const pixel_format> texture_format_fallbacks(pixel_format, texture_role);
 
         template <class F>
-        [[nodiscard]] std::optional<pixel_format> closest_texture_format(
-            pixel_format requested, texture_role role, F &&supported
-        ) {
+        [[nodiscard]] std::optional<pixel_format>
+        closest_texture_format(pixel_format requested, texture_role role, F &&supported) {
             if (std::invoke(supported, requested))
                 return requested;
             for (const auto fallback : texture_format_fallbacks(requested, role)) {
@@ -129,7 +132,8 @@ namespace alia {
         locked_texture_region() = default;
 
         locked_texture_region(locked_texture_region &&other) noexcept
-            : holder_(std::move(other.holder_)), view_(std::exchange(other.view_, {})) {}
+            : holder_(std::move(other.holder_)), view_(std::exchange(other.view_, {})) {
+        }
 
         locked_texture_region &operator=(locked_texture_region &&o) noexcept {
             if (this != &o) {
@@ -181,11 +185,14 @@ namespace alia {
         bitmap_view<TPixel> view_{};
 
         explicit locked_texture_region(std::unique_ptr<detail::texture_lock_state> s) noexcept
-            : holder_(std::move(s))
-            , view_(holder_
-                ? bitmap_view<TPixel>(holder_.get()->info.extent.x, holder_.get()->info.extent.y,
-                                      holder_.get()->info.stride_bytes, holder_.get()->info.data)
-                : bitmap_view<TPixel>{}) {}
+            : holder_(std::move(s)), view_(
+                                         holder_ ? bitmap_view<TPixel>(
+                                                       holder_.get()->info.extent.x, holder_.get()->info.extent.y,
+                                                       holder_.get()->info.stride_bytes, holder_.get()->info.data
+                                                   )
+                                                 : bitmap_view<TPixel>{}
+                                     ) {
+        }
     };
 
     /// RAII CPU access to a texture region in its runtime pixel format.
@@ -205,12 +212,15 @@ namespace alia {
         [[nodiscard]] explicit operator bool() const noexcept {
             return static_cast<bool>(holder_);
         }
+
         [[nodiscard]] pixel_format format() const noexcept {
             return holder_.get()->format;
         }
+
         [[nodiscard]] vec2i origin() const noexcept {
             return holder_.get()->info.origin;
         }
+
         [[nodiscard]] vec2i size() const noexcept {
             return holder_.get()->info.extent;
         }
@@ -219,8 +229,9 @@ namespace alia {
         /// Read-only constness is not enforced through any_bitmap_view.
         [[nodiscard]] any_bitmap_view view() noexcept {
             const auto &state = *holder_.get();
-            return any_bitmap_view(state.format, state.info.extent.x, state.info.extent.y,
-                                   state.info.stride_bytes, state.info.data);
+            return any_bitmap_view(
+                state.format, state.info.extent.x, state.info.extent.y, state.info.stride_bytes, state.info.data
+            );
         }
 
         /// Calls f(span<THub>, y) for each row, or span<const THub> for read-only.
@@ -233,9 +244,12 @@ namespace alia {
             if (!holder_)
                 return false;
             const auto &state = *holder_.get();
-            return detail::visit_pixel_rows<THub, Mode != texture_lock_mode::write_only,
-                                           Mode != texture_lock_mode::read_only>(
-                state.format, state.info.data, state.info.stride_bytes, state.info.extent, std::forward<F>(f));
+            return detail::visit_pixel_rows < THub, Mode != texture_lock_mode::write_only,
+                   Mode != texture_lock_mode::read_only > (state.format,
+                                                           state.info.data,
+                                                           state.info.stride_bytes,
+                                                           state.info.extent,
+                                                           std::forward<F>(f));
         }
 
         /// Calls f with a native bitmap_view<P>&, or const bitmap_view<P>& for
@@ -245,8 +259,9 @@ namespace alia {
             if (!holder_)
                 return false;
             const auto &state = *holder_.get();
-            return detail::visit_pixel_view<Mode == texture_lock_mode::read_only>(
-                state.format, state.info.data, state.info.stride_bytes, state.info.extent, std::forward<F>(f));
+            return detail::visit_pixel_view < Mode ==
+                   texture_lock_mode::read_only >
+                       (state.format, state.info.data, state.info.stride_bytes, state.info.extent, std::forward<F>(f));
         }
 
         /// Commit writes and release early. Safe to call more than once.
@@ -257,8 +272,11 @@ namespace alia {
     private:
         friend class texture;
         friend class cube_texture;
+
         explicit any_locked_texture_region(std::unique_ptr<detail::texture_lock_state> state) noexcept
-            : holder_(std::move(state)) {}
+            : holder_(std::move(state)) {
+        }
+
         detail::texture_lock_holder<Mode> holder_;
     };
 
@@ -280,34 +298,19 @@ namespace alia {
         // ── Construction ─────────────────────────────────────────────────
 
         /// Create an uninitialised texture.
-        texture(
-            gfx_device &device,
-            vec2i size,
-            const texture_config &config = {}
-        );
+        texture(gfx_device &device, vec2i size, const texture_config &config = {});
 
         /// Create and initialise level 0 from a type-erased CPU view.
-        texture(
-            gfx_device &device,
-            const any_bitmap_view &src,
-            const texture_config &config = {}
-        );
+        texture(gfx_device &device, const any_bitmap_view &src, const texture_config &config = {});
 
         /// Create and initialise level 0 from an owning bitmap.
-        texture(
-            gfx_device &device,
-            const bitmap &src,
-            const texture_config &config = {}
-        );
+        texture(gfx_device &device, const bitmap &src, const texture_config &config = {});
 
         /// Create and initialise level 0 from a typed CPU view.
         template <pixel TPixel>
-        texture(
-            gfx_device &device,
-            const bitmap_view<TPixel> &src,
-            const texture_config &config = {}
-        )
-            : texture(device, bitmap(src), config) {}
+        texture(gfx_device &device, const bitmap_view<TPixel> &src, const texture_config &config = {})
+            : texture(device, bitmap(src), config) {
+        }
 
         /// Query the exact configured format, or the uninitialised default if
         /// omitted. Checks format/mip/role/usage support without allocating;
@@ -317,17 +320,22 @@ namespace alia {
         // ── State queries ────────────────────────────────────────────────
 
         [[nodiscard]] pixel_format format() const noexcept;
+
         [[nodiscard]] texture_role role() const noexcept {
             return role_;
         }
+
         [[nodiscard]] texture_usage usage() const noexcept {
             return usage_;
         }
+
         [[nodiscard]] int width() const noexcept;
         [[nodiscard]] int height() const noexcept;
+
         [[nodiscard]] vec2i size() const noexcept {
             return {width(), height()};
         }
+
         [[nodiscard]] int mip_levels() const noexcept;
 
         // ── Sampler state ────────────────────────────────────────────────
@@ -349,7 +357,8 @@ namespace alia {
         [[nodiscard]] locked_texture_region<TPixel, texture_lock_mode::read_write>
         lock(std::optional<rect_i> region = {}, int level = 0) {
             return locked_texture_region<TPixel, texture_lock_mode::read_write>(
-                lock_impl(region, level, TPixel::format_id, texture_lock_mode::read_write));
+                lock_impl(region, level, TPixel::format_id, texture_lock_mode::read_write)
+            );
         }
 
         /// Acquire a typed lock to inspect pixels without modifying them.
@@ -363,7 +372,8 @@ namespace alia {
         [[nodiscard]] locked_texture_region<TPixel, texture_lock_mode::read_only>
         lock_read_only(std::optional<rect_i> region = {}, int level = 0) {
             return locked_texture_region<TPixel, texture_lock_mode::read_only>(
-                lock_impl(region, level, TPixel::format_id, texture_lock_mode::read_only));
+                lock_impl(region, level, TPixel::format_id, texture_lock_mode::read_only)
+            );
         }
 
         /// Acquire a typed lock for writing pixels without preserving current contents.
@@ -380,7 +390,8 @@ namespace alia {
         [[nodiscard]] locked_texture_region<TPixel, texture_lock_mode::write_only>
         lock_write_only(std::optional<rect_i> region = {}, int level = 0) {
             return locked_texture_region<TPixel, texture_lock_mode::write_only>(
-                lock_impl(region, level, TPixel::format_id, texture_lock_mode::write_only));
+                lock_impl(region, level, TPixel::format_id, texture_lock_mode::write_only)
+            );
         }
 
         /// Acquire a runtime-format lock for reading and writing pixels.
@@ -389,7 +400,8 @@ namespace alia {
         [[nodiscard]] any_locked_texture_region<texture_lock_mode::read_write>
         lock_any(std::optional<rect_i> region = {}, int level = 0) {
             return any_locked_texture_region<texture_lock_mode::read_write>(
-                lock_impl(region, level, std::nullopt, texture_lock_mode::read_write));
+                lock_impl(region, level, std::nullopt, texture_lock_mode::read_write)
+            );
         }
 
         /// Acquire a runtime-format lock to inspect pixels without modifying them.
@@ -399,7 +411,8 @@ namespace alia {
         [[nodiscard]] any_locked_texture_region<texture_lock_mode::read_only>
         lock_any_read_only(std::optional<rect_i> region = {}, int level = 0) {
             return any_locked_texture_region<texture_lock_mode::read_only>(
-                lock_impl(region, level, std::nullopt, texture_lock_mode::read_only));
+                lock_impl(region, level, std::nullopt, texture_lock_mode::read_only)
+            );
         }
 
         /// Acquire a runtime-format lock without preserving current contents.
@@ -410,7 +423,8 @@ namespace alia {
         [[nodiscard]] any_locked_texture_region<texture_lock_mode::write_only>
         lock_any_write_only(std::optional<rect_i> region = {}, int level = 0) {
             return any_locked_texture_region<texture_lock_mode::write_only>(
-                lock_impl(region, level, std::nullopt, texture_lock_mode::write_only));
+                lock_impl(region, level, std::nullopt, texture_lock_mode::write_only)
+            );
         }
 
         /// Regenerate all mip levels from level 0. No-op if @c mip_levels() == 1.
@@ -427,29 +441,31 @@ namespace alia {
         texture_handle *impl() noexcept {
             return handle_;
         }
+
         const texture_handle *impl() const noexcept {
             return handle_;
         }
+
         const graphics_backend_interface *backend() const noexcept {
             return backend_;
         }
+
         device_handle *device() const noexcept {
             return device_;
         }
 
     private:
         std::unique_ptr<detail::texture_lock_state> lock_impl(
-            const std::optional<rect_i> &region, int level, std::optional<pixel_format> expected_fmt, texture_lock_mode mode
+            const std::optional<rect_i> &region, int level, std::optional<pixel_format> expected_fmt,
+            texture_lock_mode mode
         );
 
         explicit texture(
-            texture_handle *handle,
-            const graphics_backend_interface *backend,
-            device_handle *device,
-            texture_role role,
+            texture_handle *handle, const graphics_backend_interface *backend, device_handle *device, texture_role role,
             texture_usage usage
         ) noexcept
-            : handle_(handle), backend_(backend), device_(device), role_(role), usage_(usage) {}
+            : handle_(handle), backend_(backend), device_(device), role_(role), usage_(usage) {
+        }
 
         texture_handle *handle_ = nullptr;
         const graphics_backend_interface *backend_ = nullptr;

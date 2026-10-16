@@ -5,13 +5,13 @@
 
 namespace alia {
 
-inline double get_time() {
-    using clock = std::chrono::steady_clock;
-    static const clock::time_point start = clock::now();
-    auto now = clock::now();
-    auto duration = std::chrono::duration<double>(now - start);
-    return duration.count();
-}
+    inline double get_time() {
+        using clock = std::chrono::steady_clock;
+        static const clock::time_point start = clock::now();
+        auto now = clock::now();
+        auto duration = std::chrono::duration<double>(now - start);
+        return duration.count();
+    }
 
 } // namespace alia
 

@@ -42,7 +42,8 @@ namespace alia {
         void write_png(const any_bitmap_view &view, std::string_view path) {
             int comp = ldr_comp(view.format());
             if (comp < 0)
-                throw std::invalid_argument("save_image: PNG writer requires gray_u8, rgb888, or rgba8888 pixel format");
+                throw std::invalid_argument("save_image: PNG writer requires gray_u8, rgb888, or rgba8888 pixel format"
+                );
             std::vector<std::byte> buf;
             const void *data = ensure_tight(view, comp, buf);
             std::string p(path);
@@ -53,7 +54,8 @@ namespace alia {
         void write_jpg(const any_bitmap_view &view, std::string_view path) {
             int comp = ldr_comp(view.format());
             if (comp < 0)
-                throw std::invalid_argument("save_image: JPEG writer requires gray_u8, rgb888, or rgba8888 pixel format");
+                throw std::invalid_argument("save_image: JPEG writer requires gray_u8, rgb888, or rgba8888 pixel format"
+                );
             std::vector<std::byte> buf;
             const void *data = ensure_tight(view, comp, buf);
             std::string p(path);
@@ -64,7 +66,8 @@ namespace alia {
         void write_bmp(const any_bitmap_view &view, std::string_view path) {
             int comp = ldr_comp(view.format());
             if (comp < 0)
-                throw std::invalid_argument("save_image: BMP writer requires gray_u8, rgb888, or rgba8888 pixel format");
+                throw std::invalid_argument("save_image: BMP writer requires gray_u8, rgb888, or rgba8888 pixel format"
+                );
             std::vector<std::byte> buf;
             const void *data = ensure_tight(view, comp, buf);
             std::string p(path);
@@ -75,7 +78,8 @@ namespace alia {
         void write_tga(const any_bitmap_view &view, std::string_view path) {
             int comp = ldr_comp(view.format());
             if (comp < 0)
-                throw std::invalid_argument("save_image: TGA writer requires gray_u8, rgb888, or rgba8888 pixel format");
+                throw std::invalid_argument("save_image: TGA writer requires gray_u8, rgb888, or rgba8888 pixel format"
+                );
             std::vector<std::byte> buf;
             const void *data = ensure_tight(view, comp, buf);
             std::string p(path);
@@ -86,7 +90,9 @@ namespace alia {
         void write_hdr(const any_bitmap_view &view, std::string_view path) {
             int comp = hdr_comp(view.format());
             if (comp < 0)
-                throw std::invalid_argument("save_image: HDR writer requires gray_f32, rgb_f32, or rgba_f32 pixel format");
+                throw std::invalid_argument(
+                    "save_image: HDR writer requires gray_f32, rgb_f32, or rgba_f32 pixel format"
+                );
             std::vector<std::byte> buf;
             const void *data = ensure_tight(view, comp * static_cast<int>(sizeof(float)), buf);
             std::string p(path);

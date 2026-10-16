@@ -16,9 +16,8 @@ namespace alia {
         }
 
         void validate_rect(rect_f value, const char *message) {
-            if (!is_finite(value.p1) || !is_finite(value.p2) ||
-                value.right() < value.left() || value.bottom() < value.top() ||
-                !is_finite(value.size()))
+            if (!is_finite(value.p1) || !is_finite(value.p2) || value.right() < value.left() ||
+                value.bottom() < value.top() || !is_finite(value.size()))
                 throw std::invalid_argument(message);
         }
 
@@ -34,16 +33,15 @@ namespace alia {
     void draw_texture(const draw_texture_params &params) {
         const vec2f texture_size(params.texture.size());
         const auto *explicit_crop = std::get_if<rect_f>(&params.source_crop_rect);
-        const rect_f crop = explicit_crop
-            ? *explicit_crop : rect_f::pos_size({}, texture_size);
+        const rect_f crop = explicit_crop ? *explicit_crop : rect_f::pos_size({}, texture_size);
         validate_rect(crop, "draw_texture: crop must be finite and not inverted");
         const vec2f crop_size = crop.size();
 
         std::array<vec2f, 4> positions;
         vec2f destination_size;
         if (const auto *position = std::get_if<vec2i>(&params.destination)) {
-            const vec2f offset = detail::anchor_offset(
-                params.source_anchor, crop_size, "draw_texture: source anchor must be finite");
+            const vec2f offset =
+                detail::anchor_offset(params.source_anchor, crop_size, "draw_texture: source anchor must be finite");
             const rect_f destination = rect_f::pos_size(vec2f(*position) - offset, crop_size);
             validate_rect(destination, "draw_texture: destination geometry must be finite");
             positions = corners(destination);
@@ -54,11 +52,9 @@ namespace alia {
             destination_size = destination->size();
         } else {
             const auto &rotated = std::get<rotated_rect_f>(params.destination);
-            if (!is_finite(rotated.center) || !is_finite(rotated.size) ||
-                !std::isfinite(rotated.angle_rad) ||
+            if (!is_finite(rotated.center) || !is_finite(rotated.size) || !std::isfinite(rotated.angle_rad) ||
                 rotated.size.x < 0.0f || rotated.size.y < 0.0f)
-                throw std::invalid_argument(
-                    "draw_texture: rotated destination must be finite with non-negative size");
+                throw std::invalid_argument("draw_texture: rotated destination must be finite with non-negative size");
 
             const vec2f half_size = rotated.size * 0.5f;
             positions = corners({{-half_size.x, -half_size.y}, half_size});

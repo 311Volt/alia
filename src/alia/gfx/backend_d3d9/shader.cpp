@@ -18,13 +18,15 @@ namespace alia {
         class com_ptr {
         public:
             com_ptr() = default;
+
             ~com_ptr() {
                 reset();
             }
-            com_ptr(com_ptr &&other) noexcept
-                : ptr_(other.ptr_) {
+
+            com_ptr(com_ptr &&other) noexcept : ptr_(other.ptr_) {
                 other.ptr_ = nullptr;
             }
+
             com_ptr &operator=(com_ptr &&other) noexcept {
                 if (this != &other) {
                     reset();
@@ -33,6 +35,7 @@ namespace alia {
                 }
                 return *this;
             }
+
             com_ptr(const com_ptr &) = delete;
             com_ptr &operator=(const com_ptr &) = delete;
 
@@ -40,14 +43,17 @@ namespace alia {
                 reset();
                 return &ptr_;
             }
+
             T *get() const noexcept {
                 return ptr_;
             }
+
             T *detach() noexcept {
                 T *p = ptr_;
                 ptr_ = nullptr;
                 return p;
             }
+
             void reset(T *p = nullptr) noexcept {
                 if (ptr_)
                     ptr_->Release();
@@ -74,8 +80,7 @@ namespace alia {
             if (!blob || !blob->GetBufferPointer() || blob->GetBufferSize() == 0)
                 return {};
             return std::string(
-                static_cast<const char *>(blob->GetBufferPointer()),
-                static_cast<std::size_t>(blob->GetBufferSize())
+                static_cast<const char *>(blob->GetBufferPointer()), static_cast<std::size_t>(blob->GetBufferSize())
             );
         }
 
@@ -89,10 +94,7 @@ namespace alia {
         }
 
         com_ptr<ID3DBlob> compile_shader_source(
-            const d3d9_device &dev,
-            const shader_stage_source &source,
-            shader_type type,
-            std::string_view program_name
+            const d3d9_device &dev, const shader_stage_source &source, shader_type type, std::string_view program_name
         ) {
             const std::string source_text(source.source);
             const std::string entry = source.entry_point.empty() ? "main" : std::string(source.entry_point);
@@ -108,16 +110,20 @@ namespace alia {
             com_ptr<ID3DBlob> code;
             com_ptr<ID3DBlob> errors;
             const HRESULT hr = D3DCompile(
-                source_text.data(), source_text.size(),
+                source_text.data(),
+                source_text.size(),
                 debug_name.c_str(),
-                nullptr, nullptr,
-                entry.c_str(), profile.c_str(),
-                flags, 0,
-                code.put(), errors.put()
+                nullptr,
+                nullptr,
+                entry.c_str(),
+                profile.c_str(),
+                flags,
+                0,
+                code.put(),
+                errors.put()
             );
             if (FAILED(hr)) {
-                std::string message = "D3D9 shader compile failed for " + debug_name +
-                    " (" + profile + ")";
+                std::string message = "D3D9 shader compile failed for " + debug_name + " (" + profile + ")";
                 const std::string log = blob_text(errors.get());
                 if (!log.empty())
                     message += ":\n" + log;
@@ -127,17 +133,16 @@ namespace alia {
         }
 
         std::vector<DWORD> load_shader_code(
-            const d3d9_device &dev,
-            const shader_stage_source &source,
-            shader_type type,
-            std::string_view program_name
+            const d3d9_device &dev, const shader_stage_source &source, shader_type type, std::string_view program_name
         ) {
             com_ptr<ID3DBlob> compiled;
             std::span<const std::byte> bytes = source.bytecode;
             if (bytes.empty()) {
                 compiled = compile_shader_source(dev, source, type, program_name);
-                bytes = {static_cast<const std::byte *>(compiled.get()->GetBufferPointer()),
-                         static_cast<std::size_t>(compiled.get()->GetBufferSize())};
+                bytes = {
+                    static_cast<const std::byte *>(compiled.get()->GetBufferPointer()),
+                    static_cast<std::size_t>(compiled.get()->GetBufferSize())
+                };
             }
             if (bytes.empty() || bytes.size() % sizeof(DWORD) != 0)
                 throw shader_error("D3D9 shader bytecode size must be a non-zero multiple of 4");
@@ -154,34 +159,49 @@ namespace alia {
         struct ctab_header {
             std::uint32_t size, creator, version, constants, constant_info, flags, target;
         };
+
         struct ctab_constant_info {
             std::uint32_t name;
             std::uint16_t register_set, register_index, register_count, reserved;
             std::uint32_t type_info, default_value;
         };
+
         struct ctab_type_info {
             std::uint16_t class_, type, rows, columns, elements, struct_members;
             std::uint32_t struct_member_info;
         };
+
         struct ctab_struct_member_info {
             std::uint32_t name, type_info;
         };
+
         static_assert(sizeof(ctab_header) == 28);
         static_assert(sizeof(ctab_constant_info) == 20);
         static_assert(sizeof(ctab_type_info) == 16);
         static_assert(sizeof(ctab_struct_member_info) == 8);
 
         enum class ctab_class : std::uint16_t {
-            scalar = 0, vector = 1, matrix_rows = 2, matrix_columns = 3, object = 4, struct_ = 5
+            scalar = 0,
+            vector = 1,
+            matrix_rows = 2,
+            matrix_columns = 3,
+            object = 4,
+            struct_ = 5
         };
         enum class ctab_type : std::uint16_t {
-            int_ = 2, float_ = 3,
-            sampler = 10, sampler_1d = 11, sampler_2d = 12, sampler_3d = 13, sampler_cube = 14
+            int_ = 2,
+            float_ = 3,
+            sampler = 10,
+            sampler_1d = 11,
+            sampler_2d = 12,
+            sampler_3d = 13,
+            sampler_cube = 14
         };
 
         class ctab_reader {
         public:
-            explicit ctab_reader(std::span<const std::byte> data) : data_(data) {}
+            explicit ctab_reader(std::span<const std::byte> data) : data_(data) {
+            }
 
             void check_range(std::size_t offset, std::size_t count, std::size_t stride = 1) const {
                 if (offset > data_.size() || count > (data_.size() - offset) / stride)
@@ -214,8 +234,7 @@ namespace alia {
             ctab_type_info read_type(std::size_t offset, std::vector<std::size_t> &ancestors) const {
                 // Structs are unsupported constants, but their referenced data
                 // still needs validation before accepting the bytecode.
-                if (ancestors.size() >= 64 ||
-                    std::find(ancestors.begin(), ancestors.end(), offset) != ancestors.end())
+                if (ancestors.size() >= 64 || std::find(ancestors.begin(), ancestors.end(), offset) != ancestors.end())
                     throw shader_error("D3D9 shader has malformed CTAB data: recursive type information");
                 const auto type = read<ctab_type_info>(offset);
                 if (type.struct_member_info || type.struct_members) {
@@ -223,7 +242,8 @@ namespace alia {
                     ancestors.push_back(offset);
                     for (std::size_t i = 0; i < type.struct_members; ++i) {
                         const auto member = read<ctab_struct_member_info>(
-                            type.struct_member_info + i * sizeof(ctab_struct_member_info));
+                            type.struct_member_info + i * sizeof(ctab_struct_member_info)
+                        );
                         string(member.name);
                         read_type(member.type_info, ancestors);
                     }
@@ -235,28 +255,31 @@ namespace alia {
             std::span<const std::byte> data_;
         };
 
-        std::optional<shader_constant_value_type> reflected_type(
-            const ctab_type_info &type, d3d9_shader_register_set register_set
-        ) {
+        std::optional<shader_constant_value_type>
+        reflected_type(const ctab_type_info &type, d3d9_shader_register_set register_set) {
             if (type.elements != 1 || type.struct_members != 0)
                 return {};
             const auto class_ = static_cast<ctab_class>(type.class_);
             const auto scalar_type = static_cast<ctab_type>(type.type);
-            if ((class_ == ctab_class::scalar || class_ == ctab_class::vector) &&
-                type.rows == 1 && type.columns >= 1 && type.columns <= 4 &&
-                (class_ != ctab_class::scalar || type.columns == 1)) {
+            if ((class_ == ctab_class::scalar || class_ == ctab_class::vector) && type.rows == 1 && type.columns >= 1 &&
+                type.columns <= 4 && (class_ != ctab_class::scalar || type.columns == 1)) {
                 if (scalar_type == ctab_type::float_ && register_set == d3d9_shader_register_set::float4) {
                     constexpr std::array types{
-                        shader_constant_value_type::float_1, shader_constant_value_type::float_2,
-                        shader_constant_value_type::float_3, shader_constant_value_type::float_4};
+                        shader_constant_value_type::float_1,
+                        shader_constant_value_type::float_2,
+                        shader_constant_value_type::float_3,
+                        shader_constant_value_type::float_4
+                    };
                     return types[type.columns - 1];
                 }
-                if (scalar_type == ctab_type::int_ &&
-                    (register_set == d3d9_shader_register_set::int4 ||
-                     register_set == d3d9_shader_register_set::float4)) {
+                if (scalar_type == ctab_type::int_ && (register_set == d3d9_shader_register_set::int4 ||
+                                                       register_set == d3d9_shader_register_set::float4)) {
                     constexpr std::array types{
-                        shader_constant_value_type::int_1, shader_constant_value_type::int_2,
-                        shader_constant_value_type::int_3, shader_constant_value_type::int_4};
+                        shader_constant_value_type::int_1,
+                        shader_constant_value_type::int_2,
+                        shader_constant_value_type::int_3,
+                        shader_constant_value_type::int_4
+                    };
                     return types[type.columns - 1];
                 }
             }
@@ -282,21 +305,26 @@ namespace alia {
             reflection.reflected = true;
             reflection.constants.reserve(header.constants);
             for (std::size_t i = 0; i < header.constants; ++i) {
-                const auto info = reader.read<ctab_constant_info>(
-                    header.constant_info + i * sizeof(ctab_constant_info));
+                const auto info =
+                    reader.read<ctab_constant_info>(header.constant_info + i * sizeof(ctab_constant_info));
                 if (info.register_set > static_cast<std::uint16_t>(d3d9_shader_register_set::sampler))
                     throw shader_error("D3D9 shader has malformed CTAB data: invalid register set");
                 const auto register_set = static_cast<d3d9_shader_register_set>(info.register_set);
                 const auto type = reader.read_type(info.type_info);
                 if (info.default_value) {
-                    const std::size_t register_bytes =
-                        register_set == d3d9_shader_register_set::bool_ ||
-                        register_set == d3d9_shader_register_set::sampler ? 4 : 16;
+                    const std::size_t register_bytes = register_set == d3d9_shader_register_set::bool_ ||
+                                                               register_set == d3d9_shader_register_set::sampler
+                                                           ? 4
+                                                           : 16;
                     reader.check_range(info.default_value, info.register_count, register_bytes);
                 }
-                reflection.constants.push_back({
-                    reader.string(info.name), register_set,
-                    info.register_index, info.register_count, reflected_type(type, register_set)});
+                reflection.constants.push_back(
+                    {reader.string(info.name),
+                     register_set,
+                     info.register_index,
+                     info.register_count,
+                     reflected_type(type, register_set)}
+                );
             }
             return reflection;
         }
@@ -334,10 +362,7 @@ namespace alia {
         }
 
         void apply_d3d9_sampler_state(
-            IDirect3DDevice9 *device,
-            DWORD stage,
-            const d3d9_texture &texture,
-            const sampler_state &s
+            IDirect3DDevice9 *device, DWORD stage, const d3d9_texture &texture, const sampler_state &s
         ) {
             auto filt = [](texture_filter f) -> DWORD {
                 return f == texture_filter::nearest ? D3DTEXF_POINT : D3DTEXF_LINEAR;
@@ -372,8 +397,9 @@ namespace alia {
                 if (!c.floats.empty())
                     std::copy(c.floats.begin(), c.floats.end(), data.begin());
                 else
-                    std::transform(c.ints.begin(), c.ints.end(), data.begin(),
-                                   [](int value) { return static_cast<float>(value); });
+                    std::transform(c.ints.begin(), c.ints.end(), data.begin(), [](int value) {
+                        return static_cast<float>(value);
+                    });
                 if (c.slot.stage == shader_type::vertex)
                     device->SetVertexShaderConstantF(start, data.data(), count);
                 else
@@ -390,14 +416,9 @@ namespace alia {
 
         void bind_texture_slot(IDirect3DDevice9 *device, int slot, texture_handle *texture) {
             auto *d3d_texture = texture ? as_d3d9_texture(texture) : nullptr;
-            device->SetTexture(
-                static_cast<DWORD>(slot),
-                d3d_texture ? d3d9_base_texture(*d3d_texture) : nullptr
-            );
+            device->SetTexture(static_cast<DWORD>(slot), d3d_texture ? d3d9_base_texture(*d3d_texture) : nullptr);
             if (d3d_texture)
-                apply_d3d9_sampler_state(
-                    device, static_cast<DWORD>(slot), *d3d_texture,
-                    d3d_texture->sampler);
+                apply_d3d9_sampler_state(device, static_cast<DWORD>(slot), *d3d_texture, d3d_texture->sampler);
         }
 
     } // namespace
@@ -414,17 +435,11 @@ namespace alia {
         auto pixel_reflection = reflect_shader(pixel_code);
 
         com_ptr<IDirect3DVertexShader9> vertex_shader;
-        if (FAILED(dev->device->CreateVertexShader(
-                vertex_code.data(),
-                vertex_shader.put()
-            )))
+        if (FAILED(dev->device->CreateVertexShader(vertex_code.data(), vertex_shader.put())))
             throw shader_error("D3D9 shader program failed to create vertex shader");
 
         com_ptr<IDirect3DPixelShader9> pixel_shader;
-        if (FAILED(dev->device->CreatePixelShader(
-                pixel_code.data(),
-                pixel_shader.put()
-            )))
+        if (FAILED(dev->device->CreatePixelShader(pixel_code.data(), pixel_shader.put())))
             throw shader_error("D3D9 shader program failed to create pixel shader");
 
         auto program = std::make_unique<d3d9_shader_program>();
@@ -446,51 +461,55 @@ namespace alia {
         delete program;
     }
 
-    shader_constant_slot
-    d3d9_shader_lookup_constant(
-        shader_program_handle *h,
-        std::string_view name,
-        shader_type stage,
+    shader_constant_slot d3d9_shader_lookup_constant(
+        shader_program_handle *h, std::string_view name, shader_type stage,
         std::optional<shader_register> explicit_register
     ) {
         auto *program = as_d3d9_shader_program(h);
         auto &reflection = stage_reflection(*program, stage);
         if (reflection.reflected) {
             auto it = std::find_if(
-                reflection.constants.begin(), reflection.constants.end(),
+                reflection.constants.begin(),
+                reflection.constants.end(),
                 [&](const d3d9_reflected_constant &constant) {
                     return constant.name == name && constant.register_set != d3d9_shader_register_set::sampler;
-                });
+                }
+            );
             if (it == reflection.constants.end() || it->register_count == 0)
                 return {};
             if (!it->type || it->register_set == d3d9_shader_register_set::bool_)
-                throw shader_error("D3D9 shader constant '" + std::string(name) +
-                                   "' has an unsupported declared type");
+                throw shader_error("D3D9 shader constant '" + std::string(name) + "' has an unsupported declared type");
             if (explicit_register) {
                 const auto register_set = explicit_register->kind == shader_register::kind::float4
-                    ? d3d9_shader_register_set::float4 : d3d9_shader_register_set::int4;
+                                              ? d3d9_shader_register_set::float4
+                                              : d3d9_shader_register_set::int4;
                 if (register_set != it->register_set || explicit_register->index != it->register_index)
-                    throw shader_error("D3D9 shader constant '" + std::string(name) +
-                                       "': explicit register disagrees with reflection: shader declares " +
-                                       (it->register_set == d3d9_shader_register_set::float4 ? "c" : "i") +
-                                       std::to_string(it->register_index) + ", requested " +
-                                       (explicit_register->kind == shader_register::kind::float4 ? "c" : "i") +
-                                       std::to_string(explicit_register->index));
+                    throw shader_error(
+                        "D3D9 shader constant '" + std::string(name) +
+                        "': explicit register disagrees with reflection: shader declares " +
+                        (it->register_set == d3d9_shader_register_set::float4 ? "c" : "i") +
+                        std::to_string(it->register_index) + ", requested " +
+                        (explicit_register->kind == shader_register::kind::float4 ? "c" : "i") +
+                        std::to_string(explicit_register->index)
+                    );
             }
             return {true, stage, static_cast<int>(it - reflection.constants.begin()), it->type};
         }
 
         if (!explicit_register)
-            throw shader_error("D3D9 shader constant '" + std::string(name) +
-                               "': no reflection data; pass an explicit shader_register");
+            throw shader_error(
+                "D3D9 shader constant '" + std::string(name) + "': no reflection data; pass an explicit shader_register"
+            );
         const auto register_set = explicit_register->kind == shader_register::kind::float4
-            ? d3d9_shader_register_set::float4 : d3d9_shader_register_set::int4;
+                                      ? d3d9_shader_register_set::float4
+                                      : d3d9_shader_register_set::int4;
         auto it = std::find_if(
-            reflection.constants.begin(), reflection.constants.end(),
+            reflection.constants.begin(),
+            reflection.constants.end(),
             [&](const d3d9_reflected_constant &constant) {
-                return constant.register_set == register_set &&
-                       constant.register_index == explicit_register->index;
-            });
+                return constant.register_set == register_set && constant.register_index == explicit_register->index;
+            }
+        );
         if (it == reflection.constants.end()) {
             reflection.constants.push_back({std::string(name), register_set, explicit_register->index, 0, {}});
             it = std::prev(reflection.constants.end());
@@ -499,9 +518,7 @@ namespace alia {
     }
 
     void d3d9_shader_set_constant(
-        shader_program_handle *h,
-        const shader_constant_slot &slot,
-        const shader_constant_payload &payload
+        shader_program_handle *h, const shader_constant_slot &slot, const shader_constant_payload &payload
     ) {
         auto *program = as_d3d9_shader_program(h);
         auto &reflection = stage_reflection(*program, slot.stage);
@@ -537,10 +554,12 @@ namespace alia {
         if (!reflection.reflected)
             return {true, stage, unit, unit};
         auto it = std::find_if(
-            reflection.constants.begin(), reflection.constants.end(),
+            reflection.constants.begin(),
+            reflection.constants.end(),
             [&](const d3d9_reflected_constant &constant) {
                 return constant.name == name && constant.register_set == d3d9_shader_register_set::sampler;
-            });
+            }
+        );
         if (it == reflection.constants.end() || it->register_count == 0)
             return {};
         return {true, stage, it->register_index, it->register_index};

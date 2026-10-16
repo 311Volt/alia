@@ -4,7 +4,7 @@ AlignAfterOpenBracket: BlockIndent
 BreakBeforeBraces: Attach
 BinPackArguments: false
 NamespaceIndentation: All
-ColumnLimit: 140
+ColumnLimit: 120
 BreakTemplateDeclarations: Yes
 AllowShortCaseExpressionOnASingleLine: true
 AllowShortCaseLabelsOnASingleLine: true
@@ -13,6 +13,7 @@ AllowShortEnumsOnASingleLine: false
 AccessModifierOffset: -4
 AlignConsecutiveShortCaseStatements:
   Enabled: true
+SeparateDefinitionBlocks: Always
 
 IndentCaseLabels: false
 SortIncludes: false
