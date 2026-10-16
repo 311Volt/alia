@@ -1,5 +1,5 @@
-#ifndef ALIA_OS_BACKEND_INTERFACE_HPP
-#define ALIA_OS_BACKEND_INTERFACE_HPP
+#ifndef OS_BACKEND_INTERFACE_C8029759_06C4_43E1_87B9_4BDCD3453764
+#define OS_BACKEND_INTERFACE_C8029759_06C4_43E1_87B9_4BDCD3453764
 
 #include "../core/backend_op.hpp"
 #include "../io/keyboard.hpp"
@@ -106,4 +106,4 @@ struct os_backend_factory {
 // Thread-safe registration. An existing id is replaced.
 void register_os_backend(os_backend_factory);
 }
-#endif
+#endif /* OS_BACKEND_INTERFACE_C8029759_06C4_43E1_87B9_4BDCD3453764 */

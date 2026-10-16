@@ -48,7 +48,7 @@ sample frame contains all channel points at that instant (AIFF terminology).
 
 | Layer | Location | Role |
 |-------|----------|------|
-| L1 | `audio/*.hpp` public | Sample concepts/formats, clips/views, ring buffer, context and streams |
+| L1 | `audio/*.hpp` public | Sample concepts/formats, clips/views, ring buffer, effects, context and streams |
 | L2 | `audio/*.hpp` templates | Typed-to-erased clip views and callback shims |
 | L3 | `audio/*.cpp` | Registry, lifetime, negotiation, format fallback and conversion trampolines |
 | L4 | `audio_backend_interface` | Per-context table of `audio_backend_op` slots |
@@ -60,7 +60,9 @@ sample frame contains all channel points at that instant (AIFF terminology).
   `gfx_backend_op` and `audio_backend_op` are aliases.
 - Backends never substitute formats or rates. Create delivers exactly the
   requested callback format or returns null. Host conversion (e.g. WASAPI
-  AUTOCONVERTPCM) is allowed; fallback belongs to L3. L3 does not resample.
+  AUTOCONVERTPCM) is allowed; fallback belongs to L3. L3 does not resample when opening streams.
+  Rate conversion is an explicit effect (`hermite_resampler`) for use by mixers.
+  It does no band limiting; downsamplers chain `chebyshev2_lowpass` before it.
 - A null slot means hardware/platform support is absent, with an explanatory
   `reason_unsupported`; it never denotes unfinished implementation.
 - Callbacks run on backend-owned threads with at most `max_callback_frames`.
@@ -75,9 +77,24 @@ sample frame contains all channel points at that instant (AIFF terminology).
   Moves preserve the heap-allocated backend table and stream runtime addresses.
 - `ring_buffer` has fixed capacity and no synchronization. Only construction and
   explicit `reserve` allocate. Use external synchronization between threads.
+- Effects are float32-only extension points, not backends. They provision state
+  at construction and never allocate or lock in `process`, following the callback
+  path rules. They use push semantics with exact frame queries; empty input may
+  drain buffered output, and empty output never advances state.
 - WASAPI uses shared mode and a worker-owned COM apartment for each stream.
   Optional MMCSS functions are loaded dynamically; no avrt/mmdevapi imports are
   required just to start a program on systems without WASAPI.
+- Audio file codecs use the extension registry in `audio_io.hpp` and the
+  single-threaded `audio_decoder` pull contract. Decoders return their constant
+  native format; typed reader reads require an exact match. Readers never resample.
+- Vorbis readers reorder channels into the SMPTE order documented in `sample.hpp`.
+  The dr_libs dependency is a private submodule; codec types stay out of public APIs.
+- Each `audio_player` owns an output stream. Streamed players decode and convert
+  on a polling worker into a private SPSC float ring. The callback never locks,
+  allocates or notifies; seek/quit commands and acknowledgements stay on control
+  and worker threads. Quiesce the device before joining the decoder worker.
+- Players open streams at the source rate and reject a different requested rate.
+  TODO: a future mixer should resample sources to its mix rate.
 
 ## OS subsystem
 

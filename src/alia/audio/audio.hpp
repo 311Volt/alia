@@ -6,4 +6,10 @@
 #include "ring_buffer.hpp"
 #include "audio_context.hpp"
 #include "audio_stream.hpp"
+#include "audio_effect.hpp"
+#include "hermite_resampler.hpp"
+#include "chebyshev2_lowpass.hpp"
+#include "audio_reader.hpp"
+#include "audio_io.hpp"
+#include "audio_player.hpp"
 #endif

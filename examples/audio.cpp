@@ -1,9 +1,6 @@
-/* Streamed music, a triggered sound effect, and a simple text prompt.
- * Not implementable yet: alia has no audio mixers or decoders. The program below is
- * written against a hypothetical API; its shape is intentionally kept here
- * so that the proposed interface can be reviewed. The expected assets are
- * ./resources/audio/spring_in_my_step.ogg and ./resources/audio/uuhhh.ogg. */
-#if 0
+/* Streamed music and an in-memory sound effect, each with its own output stream.
+ * Supply ./resources/audio/spring_in_my_step.ogg and ./resources/audio/uuhhh.ogg
+ * as described in resources/audio/README.md. No mixer or resampling is used. */
 #include "alia/audio/audio.hpp"
 #include "alia/events/event_queue.hpp"
 #include "alia/gfx/frame.hpp"
@@ -19,15 +16,12 @@ int main() {
         alia::gfx_device device = alia::gfx_device::create();
         auto swapchain = device.create_swapchain({.target = win});
 
-        // HYPOTHETICAL alia API: decoded streams and clips share a mixer.
         alia::audio_context audio = alia::audio_context::create();
-        alia::any_output_stream music = alia::load_audio_stream(
-            "./resources/audio/spring_in_my_step.ogg");
-        audio.default_mixer().attach(music);
-        music.set_gain(0.6f);
-        music.set_play_mode(alia::play_mode::loop);
+        alia::audio_player music(audio, alia::open_audio_reader("./resources/audio/spring_in_my_step.ogg"),
+                                 {.gain = 0.6f, .mode = alia::play_mode::loop});
         music.play();
-        alia::audio_clip sfx = alia::load_audio_clip("./resources/audio/uuhhh.ogg");
+        alia::audio_clip sfx_clip = alia::load_audio_clip("./resources/audio/uuhhh.ogg");
+        alia::audio_player sfx(audio, sfx_clip.view());
 
         alia::ttf_font font = alia::load_ttf_font("./resources/roboto.ttf", 36);
         alia::hardware_glyph_buffer glyphs(device, font);
@@ -47,9 +41,14 @@ int main() {
                     if (key->key == alia::key::escape)
                         running = false;
                     else if (key->key == alia::key::F)
-                        audio.play(sfx);
+                        sfx.restart();
                 }
             }
+
+            if (music.state() == alia::audio_player_state::failed)
+                music.play(); // Rethrow the stored decoder/device error.
+            if (sfx.state() == alia::audio_player_state::failed)
+                sfx.play();
 
             auto frame = swapchain.begin_frame();
             frame.clear(alia::blue);
@@ -68,11 +67,4 @@ int main() {
     }
     return 0;
 }
-#endif
 
-#include <iostream>
-
-int main() {
-    std::cout << "audio example: requires audio mixers and decoders. See the #if 0 block in examples/audio.cpp\n";
-    return 0;
-}

@@ -9,12 +9,12 @@ namespace alia {
             // GL has no disabled equation; render_state controls GL_FOG.
             case fog_mode::none:
             case fog_mode::linear: return GL_LINEAR;
-            case fog_mode::exp: return GL_EXP;
-            case fog_mode::exp2: return GL_EXP2;
+            case fog_mode::exp:    return GL_EXP;
+            case fog_mode::exp2:   return GL_EXP2;
             }
             return GL_LINEAR;
         }
-    }
+    } // namespace
 
     void ogl_set_fog(device_handle *h, const fog_state &fog) {
         const auto &device = *as_ogl_device(h);

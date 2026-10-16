@@ -69,6 +69,12 @@ target_link_libraries(alia PRIVATE Freetype::Freetype)
 find_package(Threads REQUIRED)
 target_link_libraries(alia PRIVATE Threads::Threads)
 
+set(ALIA_DR_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/dr_libs")
+if(NOT EXISTS "${ALIA_DR_LIBS_DIR}/dr_wav.h")
+  message(FATAL_ERROR "dr_libs submodule missing: run 'git submodule update --init external/dr_libs'")
+endif()
+target_include_directories(alia SYSTEM PRIVATE "${ALIA_DR_LIBS_DIR}")
+
 target_include_directories(alia PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:include>)

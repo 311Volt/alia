@@ -266,6 +266,7 @@ namespace alia {
         }
 
     private:
+        friend class audio_reader;
         audio_clip(sample_frame_format, int rate, std::size_t count);
         sample_frame_format format_{};
         int rate_ = 0;
