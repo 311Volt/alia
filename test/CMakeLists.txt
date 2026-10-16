@@ -133,7 +133,7 @@ target_link_libraries(vertex_definition_registry_tests
 # Register tests with CTest
 include(GoogleTest)
 
-foreach(audio_test IN ITEMS audio_sample audio_clip ring_buffer audio_stream audio_io audio_player hermite_resampler chebyshev2_lowpass)
+foreach(audio_test IN ITEMS audio_sample audio_clip ring_buffer audio_stream audio_io audio_player audio_mixer hermite_resampler chebyshev2_lowpass)
     add_executable(${audio_test}_tests ${audio_test}_test.cpp)
     target_link_libraries(${audio_test}_tests PRIVATE alia GTest::gtest GTest::gtest_main)
     gtest_discover_tests(${audio_test}_tests)

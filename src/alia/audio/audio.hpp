@@ -12,4 +12,5 @@
 #include "audio_reader.hpp"
 #include "audio_io.hpp"
 #include "audio_player.hpp"
+#include "audio_mixer.hpp"
 #endif

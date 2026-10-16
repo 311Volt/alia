@@ -1,5 +1,6 @@
 #include "audio_player.hpp"
 #include "audio_reader_access.hpp"
+#include "audio_mixer_access.hpp"
 #include "sample_conversions.hpp"
 #include <atomic>
 #include <bit>
@@ -35,6 +36,11 @@ namespace alia::detail {
                 throw std::invalid_argument("invalid audio play mode");
         }
 
+        void validate_pan(float pan) {
+            if (!std::isfinite(pan) || pan < -1 || pan > 1)
+                throw std::invalid_argument("audio player pan must be in [-1, 1]");
+        }
+
         // These are the only atomic types used on the callback path.
         static_assert(std::atomic<std::size_t>::is_always_lock_free);
         static_assert(std::atomic<float>::is_always_lock_free);
@@ -42,13 +48,14 @@ namespace alia::detail {
         static_assert(std::atomic<bool>::is_always_lock_free);
     } // namespace
 
-    struct player_runtime {
+    struct player_runtime final : mixer_source {
         audio_stream_format source_format;
         bool streamed;
         const_audio_clip_view clip;
         audio_reader reader;
         audio_conversion_fn convert = nullptr;
         std::atomic<float> volume;
+        std::atomic<float> balance;
         std::atomic<play_mode> repeat;
         // The generation prevents a finishing callback from overwriting a
         // concurrent clip restart/seek. Only callbacks publish ended_bit.
@@ -76,25 +83,30 @@ namespace alia::detail {
         std::optional<std::size_t> prepared_end;
         std::stop_token worker_stop;
         std::jthread worker;
-        // Last member: even constructor unwinding quiesces callbacks before the
+        // Last members: even constructor unwinding quiesces callbacks before the
         // worker and before any memory referenced by the callback is destroyed.
         std::unique_ptr<any_output_stream> stream;
+        std::unique_ptr<mixer_voice> voice;
 
         player_runtime(
-            audio_context &context, audio_reader source, const_audio_clip_view view, bool use_reader,
-            const audio_player_config &config
+            audio_context *context, audio_mixer *mixer, audio_reader source, const_audio_clip_view view,
+            bool use_reader, const audio_player_config &config
         )
             : source_format(use_reader ? source.format() : audio_stream_format{view.format(), view.sample_rate()}),
-              streamed(use_reader), clip(view), reader(std::move(source)), volume(config.gain), repeat(config.mode) {
+              streamed(use_reader), clip(view), reader(std::move(source)), volume(config.gain), balance(config.pan),
+              repeat(config.mode) {
             validate_erased_audio_format(source_format.frame);
             validate_gain(config.gain);
+            validate_pan(config.pan);
             validate_mode(config.mode);
             if (source_format.sample_rate <= 0 || config.sample_rate < 0 || config.period_frames < 0)
                 throw std::invalid_argument("invalid audio player rate or period");
-            if (config.sample_rate && config.sample_rate != source_format.sample_rate) {
-                // TODO: a future mixer should resample sources to the mix rate instead of rejecting.
+            if (mixer && (config.device || config.sample_rate != 0 || config.period_frames != 0))
+                throw std::invalid_argument("mixer-attached players require default device, rate and period");
+            if (!mixer && config.sample_rate && config.sample_rate != source_format.sample_rate) {
+                // Mixers resample; standalone output stays at the source rate.
                 throw std::invalid_argument(
-                    "audio player sample rate must equal the source rate; resampling is unavailable"
+                    "standalone audio player sample rate must equal the source rate; attach to a mixer to resample"
                 );
             }
             const sample_frame_format output_format{sample_point_formats::f32, source_format.frame.channels};
@@ -122,12 +134,20 @@ namespace alia::detail {
                     std::chrono::milliseconds(20)
                 );
             }
-            stream = std::make_unique<any_output_stream>(
-                context,
-                output_format,
-                output_stream_config{config.device, source_format.sample_rate, config.period_frames, false},
-                [this](any_audio_clip_view output, const audio_callback_info &) noexcept { render(output); }
-            );
+            if (mixer) {
+                voice = std::make_unique<mixer_voice>(
+                    audio_mixer_access::get(*mixer), *this,
+                    audio_stream_format{output_format, source_format.sample_rate}, config.pan
+                );
+            } else {
+                stream = std::make_unique<any_output_stream>(
+                    *context, output_format,
+                    output_stream_config{config.device, source_format.sample_rate, config.period_frames, false},
+                    [this](any_audio_clip_view output, const audio_callback_info &) noexcept {
+                        render_block(output.bytes().data(), output.frame_count());
+                    }
+                );
+            }
             if (streamed) {
                 worker = std::jthread([this](std::stop_token token) { worker_main(token); });
                 // A decoder failure latches failed and is rethrown by play().
@@ -137,6 +157,7 @@ namespace alia::detail {
 
         ~player_runtime() {
             stream.reset();
+            voice.reset();
             if (worker.joinable()) {
                 {
                     std::lock_guard lock(command_mutex);
@@ -173,8 +194,8 @@ namespace alia::detail {
         void rethrow_failure() const {
             if (failed.load(std::memory_order_acquire))
                 std::rethrow_exception(worker_error);
-            if (stream_failed.load(std::memory_order_acquire) || stream->state() == audio_stream_state::failed)
-                throw std::runtime_error("audio player output stream failed");
+            if (output_failed())
+                throw std::runtime_error(voice ? "audio mixer output stream failed" : "audio player output stream failed");
         }
 
         void latch_failure(std::exception_ptr error) noexcept {
@@ -197,23 +218,39 @@ namespace alia::detail {
             }
         }
 
-        void render(any_audio_clip_view output) noexcept {
-            const auto bytes = output.bytes();
+        bool active() const noexcept override {
+            return !failed.load(std::memory_order_acquire) &&
+                   decode_state(transport.load(std::memory_order_acquire)) == audio_player_state::playing;
+        }
+
+        bool discontinuity_pending() const noexcept override {
+            return failed.load(std::memory_order_acquire) || pending_seek.load(std::memory_order_acquire) != no_seek;
+        }
+
+        source_block render(std::byte *output, std::size_t frames) noexcept override {
+            return render_block(output, frames);
+        }
+
+        source_block render_block(std::byte *output, std::size_t frames) noexcept {
+            const std::span<std::byte> bytes(output, frames * source_format.frame.channels * sizeof(float));
             if (!bytes.empty())
                 std::memset(bytes.data(), 0, bytes.size());
             const auto word = transport.load(std::memory_order_acquire);
             if (failed.load(std::memory_order_acquire) || decode_state(word) != audio_player_state::playing)
-                return;
+                return {0, true, false};
             const auto mode = repeat.load(std::memory_order_relaxed);
             const auto channels = source_format.frame.channels;
             const auto float_stride = static_cast<std::size_t>(channels) * sizeof(float);
             std::size_t done = 0;
             bool ended = false;
+            bool discontinuity = false;
             if (!streamed) {
                 const auto seek = pending_seek.exchange(no_seek, std::memory_order_acq_rel);
-                if (seek != no_seek)
+                if (seek != no_seek) {
                     clip_position = seek;
-                while (done < output.frame_count()) {
+                    discontinuity = true;
+                }
+                while (done < frames) {
                     if (clip_position == clip.frame_count()) {
                         if (mode == play_mode::once || !clip.frame_count()) {
                             ended = true;
@@ -221,7 +258,7 @@ namespace alia::detail {
                         }
                         clip_position = 0;
                     }
-                    const auto n = (std::min)(output.frame_count() - done, clip.frame_count() - clip_position);
+                    const auto n = (std::min)(frames - done, clip.frame_count() - clip_position);
                     const auto *src = clip.bytes().data() + clip_position * source_format.frame.bytes_per_frame();
                     if (convert)
                         convert(bytes.data() + done * float_stride, src, n, channels, channels);
@@ -237,7 +274,7 @@ namespace alia::detail {
             } else {
                 auto cursor = position.load(std::memory_order_relaxed);
                 auto read = read_index.load(std::memory_order_relaxed);
-                while (done < output.frame_count()) {
+                while (done < frames) {
                     const auto count = frame_count();
                     if (mode == play_mode::once && count && cursor >= *count) {
                         ended = true;
@@ -248,7 +285,7 @@ namespace alia::detail {
                     if (!available)
                         break;
                     const auto slot = read & (capacity - 1);
-                    auto n = (std::min)({output.frame_count() - done, available, capacity - slot});
+                    auto n = (std::min)({frames - done, available, capacity - slot});
                     if (mode == play_mode::once && count)
                         n = (std::min)(n, *count - cursor);
                     std::memcpy(bytes.data() + done * float_stride, ring.data() + slot * channels, n * float_stride);
@@ -279,6 +316,7 @@ namespace alia::detail {
                 std::memset(bytes.data(), 0, bytes.size());
             if (ended)
                 mark_end(word); // Last publication: the worker may now rewind/refill.
+            return {done, ended, discontinuity};
         }
 
         void reset_source(std::size_t frame) {
@@ -407,7 +445,29 @@ namespace alia::detail {
                 std::rethrow_exception(error);
         }
 
-        void start_device() {
+        void quiesce_output() {
+            if (voice)
+                voice->suspend();
+            else
+                stream->stop();
+        }
+
+        bool output_failed() const {
+            return voice ? voice->output_failed()
+                         : stream_failed.load(std::memory_order_acquire) || stream->state() == audio_stream_state::failed;
+        }
+
+        void reset_voice() noexcept {
+            if (voice)
+                voice->reset();
+        }
+
+        void resume_output() {
+            if (voice) {
+                rethrow_failure();
+                voice->resume();
+                return;
+            }
             try {
                 stream->start();
             } catch (...) {
@@ -431,12 +491,22 @@ namespace alia {
 
     audio_player::audio_player(audio_context &context, audio_reader source, const audio_player_config &config)
         : runtime_(std::make_unique<detail::player_runtime>(
-              context, std::move(source), const_audio_clip_view{}, true, config
+              &context, nullptr, std::move(source), const_audio_clip_view{}, true, config
           )) {
     }
 
     audio_player::audio_player(audio_context &context, const_audio_clip_view clip, const audio_player_config &config)
-        : runtime_(std::make_unique<detail::player_runtime>(context, audio_reader{}, clip, false, config)) {
+        : runtime_(std::make_unique<detail::player_runtime>(&context, nullptr, audio_reader{}, clip, false, config)) {
+    }
+
+    audio_player::audio_player(audio_mixer &mixer, audio_reader source, const audio_player_config &config)
+        : runtime_(std::make_unique<detail::player_runtime>(
+              nullptr, &mixer, std::move(source), const_audio_clip_view{}, true, config
+          )) {
+    }
+
+    audio_player::audio_player(audio_mixer &mixer, const_audio_clip_view clip, const audio_player_config &config)
+        : runtime_(std::make_unique<detail::player_runtime>(nullptr, &mixer, audio_reader{}, clip, false, config)) {
     }
 
     audio_player::~audio_player() = default;
@@ -450,20 +520,20 @@ namespace alia {
         if (detail::decode_state(word) == audio_player_state::playing)
             return;
         if (r.streamed) {
-            r.stream->stop();
+            r.quiesce_output();
             r.submit_command(std::nullopt);
         } else if (word & detail::ended_bit) {
             r.pending_seek.store(0, std::memory_order_release);
         }
         r.set_state(audio_player_state::playing);
-        r.start_device();
+        r.resume_output();
     }
 
     void audio_player::pause() {
         if (!runtime_)
             return;
         auto &r = *runtime_;
-        r.stream->stop();
+        r.quiesce_output();
         if (detail::decode_state(r.transport.load(std::memory_order_acquire)) == audio_player_state::playing)
             r.set_state(audio_player_state::paused);
     }
@@ -472,13 +542,14 @@ namespace alia {
         if (!runtime_)
             return;
         auto &r = *runtime_;
-        r.stream->stop();
+        r.quiesce_output();
         r.set_state(audio_player_state::stopped);
         r.rethrow_failure();
         if (r.streamed)
             r.submit_command(0);
         else
             r.pending_seek.store(0, std::memory_order_release);
+        r.reset_voice();
     }
 
     void audio_player::restart() {
@@ -490,7 +561,7 @@ namespace alia {
         } else {
             r.pending_seek.store(0, std::memory_order_release);
             r.set_state(audio_player_state::playing);
-            r.start_device();
+            r.resume_output();
         }
     }
 
@@ -506,20 +577,21 @@ namespace alia {
             r.set_state(previous);
             return;
         }
-        r.stream->stop();
+        r.quiesce_output();
         r.set_state(previous == audio_player_state::playing ? audio_player_state::paused : previous);
         try {
             r.submit_command(frame);
         } catch (const std::out_of_range &) {
             if (previous == audio_player_state::playing) {
                 r.set_state(previous);
-                r.start_device();
+                r.resume_output();
             }
             throw;
         }
+        r.reset_voice();
         if (previous == audio_player_state::playing) {
             r.set_state(previous);
-            r.start_device();
+            r.resume_output();
         }
     }
 
@@ -530,6 +602,18 @@ namespace alia {
 
     float audio_player::gain() const {
         return runtime_ ? runtime_->volume.load(std::memory_order_relaxed) : 1.0f;
+    }
+
+    void audio_player::set_pan(float pan) {
+        detail::validate_pan(pan);
+        auto &r = require_player(runtime_);
+        r.balance.store(pan, std::memory_order_relaxed);
+        if (r.voice)
+            r.voice->set_pan(pan);
+    }
+
+    float audio_player::pan() const {
+        return runtime_ ? runtime_->balance.load(std::memory_order_relaxed) : 0.0f;
     }
 
     void audio_player::set_play_mode(play_mode mode) {
@@ -545,8 +629,7 @@ namespace alia {
         if (!runtime_)
             return audio_player_state::stopped;
         const auto &r = *runtime_;
-        if (r.failed.load(std::memory_order_acquire) || r.stream_failed.load(std::memory_order_acquire) ||
-            r.stream->state() == audio_stream_state::failed)
+        if (r.failed.load(std::memory_order_acquire) || r.output_failed())
             return audio_player_state::failed;
         return detail::decode_state(r.transport.load(std::memory_order_acquire));
     }

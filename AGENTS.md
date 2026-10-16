@@ -89,12 +89,32 @@ sample frame contains all channel points at that instant (AIFF terminology).
   native format; typed reader reads require an exact match. Readers never resample.
 - Vorbis readers reorder channels into the SMPTE order documented in `sample.hpp`.
   The dr_libs dependency is a private submodule; codec types stay out of public APIs.
-- Each `audio_player` owns an output stream. Streamed players decode and convert
-  on a polling worker into a private SPSC float ring. The callback never locks,
+- An `audio_player` either owns an output stream or attaches to an `audio_mixer`.
+  Streamed players decode and convert on a polling worker into a private SPSC
+  float ring. The callback never locks,
   allocates or notifies; seek/quit commands and acknowledgements stay on control
-  and worker threads. Quiesce the device before joining the decoder worker.
-- Players open streams at the source rate and reject a different requested rate.
-  TODO: a future mixer should resample sources to its mix rate.
+  and worker threads. Quiesce the stream or detach the voice before joining the worker.
+- Standalone players open streams at the source rate and reject a different
+  requested rate. Attached players are resampled by their mixer.
+- Mixers are flat: each owns one stream, with player slots and a one-shot pool.
+  Slot ownership uses lock-free free/suspended/enabled/rendering/suspend-requested
+  states. Control suspends with CAS and spin/yield; the callback releases ownership
+  with release stores/CAS, including on exceptions. It never waits or notifies.
+- Mixer provisioning happens on the control thread while a slot is free or
+  suspended. Only the rendering callback may mutate enabled voice processing.
+  Downsampling chains `chebyshev2_lowpass::for_downsampling` before
+  `hermite_resampler`, using separate buffers and preserving unconsumed input.
+  At EOF feed exactly three lookahead frames after the real input, then drain;
+  the output length is ceil(source_frames * mix_rate / source_rate).
+- Mixer channel order follows SMPTE. Stereo downmix adds centre and matching
+  rear/side channels at 1/sqrt(2), back centre at 0.5, and drops LFE. Mono buses
+  average that stereo downmix. Mono/stereo can feed FL/FR on larger buses;
+  other unequal multichannel mappings are rejected. Downmixes are not normalized.
+- Pan only affects stereo buses: mono uses constant power with unity at centre
+  and sqrt(2) at hard pan; other sources use the same gains clamped to unity.
+  Centre and hard-pan zeros are exact. There is no limiter or transport ramp.
+- Contexts outlive mixers; mixers outlive attached players. One-shot clip storage
+  outlives the mixer or the next synchronous `stop_one_shots()` call.
 
 ## OS subsystem
 
