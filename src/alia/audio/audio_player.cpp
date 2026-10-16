@@ -66,6 +66,8 @@ namespace alia::detail {
         std::exception_ptr worker_error; // Published once through failed (release/acquire).
         std::size_t clip_position = 0;   // Callback-owned; controls only post pending_seek.
 
+        // Streamed only: SPSC ring of f32 frames, written by the polling decoder
+        // worker and read by the callback.
         std::vector<float> ring;
         std::size_t capacity = 0, scratch_frames = 4096;
         std::unique_ptr<std::byte[]> scratch;

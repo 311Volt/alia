@@ -45,6 +45,8 @@ namespace alia {
         std::chrono::steady_clock::time_point deadline;
     };
 
+    // One Display connection per context. Polling dispatches events for all of
+    // its windows and text logs, and serves clipboard selection requests.
     struct x11_context : os_context_handle {
         Display *display = nullptr;
         int screen = 0;
@@ -150,6 +152,8 @@ namespace alia {
     void x11_state(x11_window &, bool add, const char *first, const char *second = nullptr);
     bool x11_supports(const x11_context &, const char *);
     void x11_set_fullscreen(os_window_handle *, alia::window_fullscreen_mode, const display_mode *);
+    // Restores the CRTC configuration saved by x11_apply_display. Called when
+    // leaving exclusive fullscreen, losing focus, and destroying the window.
     void x11_restore_display(x11_window &) noexcept;
     void x11_apply_display(x11_window &, const display_mode &);
     void x11_update_hints(x11_window &);

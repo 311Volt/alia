@@ -11,6 +11,7 @@ class os_context;
 namespace clipboard {
     // Overloads without a context use get_os_context(). X11 selection owners
     // must keep polling their context to serve other applications. Text is UTF-8.
+    // X11 transfers time out after two seconds and are limited to 16 MiB.
     [[nodiscard]] bool has_text(os_context &);
     [[nodiscard]] std::string get_text(os_context &);
     bool set_text(os_context &, std::string_view text);

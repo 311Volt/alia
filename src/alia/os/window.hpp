@@ -53,6 +53,8 @@ struct window_options {
 
 // Move-only window. Its OS context must outlive it. Calls belong to the
 // context's creating thread. Dimensions and constraints are client pixels.
+// Moves keep the native window and event source; the backend's owner pointer
+// and mouse/current-window tracking follow the new object.
 class window {
 public:
     window(vec2i size, window_options opts = {});

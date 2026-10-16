@@ -17,6 +17,13 @@
 namespace alia::detail {
     namespace {
         constexpr std::size_t chunk_frames = 256, pull_frames = 512;
+        // Lock-free slot ownership. Player slots start free, one-shot slots
+        // suspended. Control threads provision a slot only while it is free or
+        // suspended; suspending an enabled slot uses CAS, and spins (yielding)
+        // while a render is in progress. The callback claims enabled -> rendering
+        // and releases with a release store/CAS, also when unwinding: back to
+        // enabled, or to suspended if a suspend was requested or a one-shot
+        // finished. It never waits or notifies.
         enum class slot_state : std::uint8_t { free, suspended, enabled, rendering, rendering_suspend_requested };
         static_assert(std::atomic<slot_state>::is_always_lock_free);
         static_assert(std::atomic<float>::is_always_lock_free);
@@ -35,6 +42,11 @@ namespace alia::detail {
                 throw std::invalid_argument("unsupported audio mixer channel mapping");
         }
 
+        // Per-voice pipeline: pull f32 source frames, low-pass when downsampling,
+        // resample, then map channels and pan into the accumulator. Built on the
+        // control thread; only the rendering callback mutates it while enabled.
+        // Filter and resampler use separate buffers, and input the resampler
+        // has not consumed carries over to the next call.
         struct voice_processor {
             audio_stream_format source_format;
             int bus_channels;
@@ -71,6 +83,9 @@ namespace alia::detail {
                     return;
                 }
                 // Construct the stereo downmix first, then average it for mono.
+                // Layouts are SMPTE: 3 = FL FR FC, 4 = FL FR BL BR, 5 = FL FR FC
+                // BL BR, 6 = 5.1, 7 = 5.1 + BC, 8 = 7.1. FC and rear/side pairs
+                // mix at 1/sqrt(2), BC at 0.5 to each side; LFE is dropped.
                 float left[8]{}, right[8]{};
                 left[0] = 1;
                 right[channels == 1 ? 0 : 1] = 1;
@@ -108,6 +123,8 @@ namespace alia::detail {
             }
             bool idle() const noexcept { return current == phase::idle; }
 
+            // Constant power, scaled for unity at centre. Centre and hard pan are
+            // special-cased so their unity and zero gains are exact.
             void update_pan(float pan) noexcept {
                 if (pan == cached_pan || bus_channels != 2)
                     return;
@@ -185,6 +202,9 @@ namespace alia::detail {
                             const auto block = source.render(reinterpret_cast<std::byte *>(pulled.data()), count);
                             if (block.discontinuity)
                                 reset();
+                            // At EOF, feed exactly lookahead_frames of silence and
+                            // drain, so the voice produces ceil(source_frames *
+                            // bus_rate / source_rate) frames.
                             if (block.ended) {
                                 const auto keep = block.frames + hermite_resampler::lookahead_frames;
                                 flush_remaining = keep > count ? keep - count : 0;

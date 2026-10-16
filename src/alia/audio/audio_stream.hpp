@@ -9,7 +9,7 @@
 namespace alia {
     struct output_stream_config {
         std::optional<audio_output_device> device;
-        int sample_rate = 0;       // Zero chooses the endpoint's preferred rate.
+        int sample_rate = 0;       // Zero chooses the endpoint's preferred rate. Streams never resample.
         int period_frames = 0;     // Hint; properties() reports the actual period.
         bool exact_format = false; // Throw rather than converting point/channel formats in L3.
     };
@@ -31,6 +31,8 @@ namespace alia {
     /// views expire on return. Callbacks must not allocate, block, lock, emit
     /// events, or stop/destroy the stream. Control methods require external
     /// synchronization; state()/position_frames() may be read while running.
+    /// Device loss or a throwing callback latches failed and silences output;
+    /// the stream is never rerouted to another endpoint.
     class any_output_stream {
     public:
         using callback_type = std::move_only_function<void(any_audio_clip_view, const audio_callback_info &)>;

@@ -147,6 +147,9 @@ namespace alia::detail {
         quit
     };
 
+    // Shared-mode, event-driven stream. Its worker thread owns an MTA apartment
+    // and every COM object; control calls reach it through command/ready events.
+    // The worker registers with MMCSS when the context loaded avrt.dll.
     struct wasapi_stream : audio_stream_handle {
         wasapi_context *context = nullptr;
         std::string device_id;

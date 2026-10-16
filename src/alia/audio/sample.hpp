@@ -12,6 +12,9 @@
 #include <type_traits>
 
 namespace alia {
+    /// A sample point is one channel's value at one instant; a sample frame
+    /// holds every channel's point for that instant (AIFF terminology). Audio
+    /// counts and positions are in frames unless a name says otherwise.
     template <class T>
     concept sample_point = (std::integral<T> && !std::same_as<std::remove_cv_t<T>, bool>) || std::floating_point<T>;
 

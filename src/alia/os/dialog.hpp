@@ -33,6 +33,9 @@ struct file_dialog_options {
     bool show_hidden = false;
 };
 
+// On X11, file and folder dialogs run zenity from PATH; without it they throw
+// unsupported_operation_exception.
+
 // Open file dialog
 [[nodiscard]] std::optional<std::string> show_open_file_dialog(
     const window* parent = nullptr,

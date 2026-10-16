@@ -28,8 +28,13 @@ namespace alia {
     /// The context must outlive the mixer; the mixer must outlive its players.
     /// Control methods require external synchronization and must not run in an
     /// audio callback. Attach/detach and one-shot calls are serialized internally.
-    /// Sources are resampled and mapped to the bus. Downmixing is not normalized
-    /// and there is no limiter: summed peaks may exceed 1.
+    /// Sources are resampled and mapped to the bus: equal channel counts pass
+    /// through, sources of up to 8 channels downmix to mono/stereo buses, and
+    /// mono/stereo sources feed FL/FR of larger buses. Other mappings throw
+    /// invalid_argument. Downmixing is not normalized and there is no limiter
+    /// or start/stop ramp: summed peaks may exceed 1.
+    /// Pan uses a constant-power law with unity gain at centre. Mono sources
+    /// reach sqrt(2) at hard pan; other sources have gains clamped to unity.
     /// A default/moved-from mixer is invalid: controls throw logic_error and
     /// state/rate/channel queries return stopped/zero (gain returns unity).
     class audio_mixer {

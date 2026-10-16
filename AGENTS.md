@@ -1,29 +1,69 @@
-# Graphics subsystem architecture
+# Architecture
 
-API-level behaviour is documented next to the declarations in `src/alia/gfx/`. This file records only the rules that span the subsystem.
+## Scope of this file
 
-## Layers
+This file holds high-level design only: layering, ownership, threading and conventions that apply across a whole subsystem or the library. When editing it:
+
+- Document the behaviour of one type, function, backend or algorithm in a comment next to its declaration or definition, not here. This includes limits, constants, formulas and platform quirks.
+- Prefer extending or generalizing an existing rule over adding a new one. If a rule now holds for every subsystem, move it to "All subsystems".
+- Keep each rule to one or two sentences. If a rule needs more, the detail belongs in the code.
+
+## All subsystems
+
+### Layers
+
+Every subsystem is split into the same four layers:
 
 | Layer | Location | Role |
 |-------|----------|------|
-| L1 | `*.hpp` (public) | User-facing API: device, swapchain, frame render state, textures, buffers, shaders, and draw helpers |
-| L2 | `*.hpp` (detail/templates) | Type-erasure shims from typed templates (texture locks, `frame::draw<TVertex>` and its vertex layout) to L3 |
-| L3 | `*.cpp` (backend-agnostic) | Object lifetime and validation, format dispatch, vertex-definition registry; calls into L4 |
-| L4 | `graphics_backend_interface` | One function-pointer table per device, one `gfx_backend_op` slot per backend operation |
+| L1 | `*.hpp` (public) | User-facing API |
+| L2 | `*.hpp` (detail/templates) | Type-erasure shims from typed templates to L3 |
+| L3 | `*.cpp` (backend-agnostic) | Object lifetime and validation, selection and fallback, registries; calls into L4 |
+| L4 | `*_backend_interface` | One function-pointer table per root object, one op slot per backend operation |
 
-## Backends
+Each subsystem has one root object, which owns its L4 table:
 
-- Each backend lives in `backend_<name>/`. `<name>_ops.hpp` holds its concrete structs, `as_<name>_*` cast helpers and op declarations; `register_<name>_backend.cpp` creates the device, probes capabilities and fills the interface.
-- Backend objects inherit the opaque `*_handle` bases and are downcast with `static_cast` only inside that backend. Concrete backend types never appear in public headers.
-- Backends never substitute pixel formats. `create_*texture` stores the format it is given; fallback lives in L3 (`detail::closest_texture_format`).
-- A null op slot means the **hardware** lacks the feature, as probed at device creation, with `reason_unsupported` saying why. Never use it for "this backend doesn't implement X yet".
+| Subsystem | Root object | L4 table | Op slot type | Registration file |
+|-----------|-------------|----------|--------------|-------------------|
+| `gfx/` | `gfx_device` | `graphics_backend_interface` | `gfx_backend_op` | `register_<name>_backend.cpp` |
+| `audio/` | `audio_context` | `audio_backend_interface` | `audio_backend_op` | `register_<name>_audio_backend.cpp` |
+| `os/` | `os_context` | `os_backend_interface` | `os_backend_op` | `register_<name>_os_backend.cpp` |
+
+### Backends
+
+- Each backend lives in `<subsystem>/backend_<name>/`. `<name>_ops.hpp` holds its concrete structs, `as_<name>_*` cast helpers and op declarations; the registration file creates the root object, probes capabilities and fills the L4 table.
+- Backend objects inherit the opaque `*_handle` bases and are downcast with `static_cast` only inside that backend. Concrete backend types and third-party library types never appear in public headers.
+- `backend_op` and `unsupported_operation_exception` live in `core/backend_op.hpp`; the op slot types are aliases of `backend_op`. L3 calls every op through `.get_or_throw()`.
+- A null op slot means the **hardware or platform** lacks the feature, as probed at root creation, with `reason_unsupported` saying why. Never use it for "this backend doesn't implement X yet".
+- Backends never substitute formats or modes. They deliver exactly what was requested or fail; fallback lives in L3 (`detail::closest_texture_format`, `detail::audio_format_fallbacks`, `choose_closest_mode`).
 - Never name anything `interface`; it is a macro in MinGW's COM headers.
 
-## Ownership
+### Ownership
 
-Everything created from a `gfx_device` holds raw pointers into it, so the device must outlive all of them. A shader selected on a frame must remain valid while selected or saved in a state scope.
+Everything created from a root object holds raw pointers into it, so the root must outlive all of them. Moving a root keeps its heap-allocated L4 table and native handles in place, so its children stay valid.
 
-## Draw helpers
+### Adding a new backend operation
+
+1. Add an op slot (e.g. `gfx_backend_op<R(Args...)>`) to the subsystem's L4 table.
+2. Implement the function in each backend's appropriate `.cpp` file and declare it in `<name>_ops.hpp`.
+3. Wire the slot in the registration file: set the `operation` pointer, or if the op is hardware-conditional, leave it null and set `reason_unsupported`.
+4. Add the L3 free function or method that calls `.get_or_throw()`.
+
+## Graphics
+
+### Layers
+
+| Layer | Contents |
+|-------|----------|
+| L1 | Device, swapchain, frame render state, textures, buffers, shaders, and draw helpers |
+| L2 | Texture locks, `frame::draw<TVertex>` and its vertex layout |
+| L3 | Format dispatch, vertex-definition registry |
+
+### Ownership
+
+A shader selected on a frame must remain valid while selected or saved in a state scope.
+
+### Draw helpers
 
 Draw helpers (`draw_texture`, text drawing, primitive renderers) follow these rules:
 
@@ -33,118 +73,46 @@ Draw helpers (`draw_texture`, text drawing, primitive renderers) follow these ru
 - Invalid input throws `std::invalid_argument` before anything is bound. Empty input returns without binding or drawing.
 - They submit immediately, except batching types, which say so on the type.
 
-## Adding a new backend operation
+## Audio
 
-1. Add a `gfx_backend_op<R(Args...)>` slot to `graphics_backend_interface` in `graphics_backend_interface.hpp`.
-2. Implement the function in each backend's appropriate `.cpp` file and declare it in `*_ops.hpp`.
-3. Wire the slot in `register_*_backend.cpp`: set the `operation` pointer, or if the op is hardware-conditional, leave it null and set `reason_unsupported`.
-4. Add the L3 free function or method that calls `.get_or_throw()`.
+### Layers
 
-## Audio subsystem
+| Layer | Contents |
+|-------|----------|
+| L1 | Sample formats, clips, ring buffer, effects, codecs, context, streams, player and mixer |
+| L2 | Typed-to-erased clip views and stream callback shims |
+| L3 | Format negotiation and fallback, conversion trampolines, codec registry |
 
-API-level behaviour is documented in `src/alia/audio/`. Counts are sample-frame
-counts (`frame_count`): a sample point is one channel value at one instant; a
-sample frame contains all channel points at that instant (AIFF terminology).
+### Terms
 
-| Layer | Location | Role |
-|-------|----------|------|
-| L1 | `audio/*.hpp` public | Sample concepts/formats, clips/views, ring buffer, effects, context and streams |
-| L2 | `audio/*.hpp` templates | Typed-to-erased clip views and callback shims |
-| L3 | `audio/*.cpp` | Registry, lifetime, negotiation, format fallback and conversion trampolines |
-| L4 | `audio_backend_interface` | Per-context table of `audio_backend_op` slots |
+- Counts are sample-frame counts (`frame_count`), never sample-point counts; see `sample.hpp`.
+- Multichannel data uses SMPTE channel order everywhere. Codecs reorder into it when decoding.
 
-- Backend files live in `audio/backend_<name>/`; concrete handles and casts live
-  in `<name>_ops.hpp`, and registration in `register_<name>_audio_backend.cpp`.
-  The operation-adding recipe above applies with these audio names.
-- `backend_op` and `unsupported_operation_exception` live in `core/backend_op.hpp`;
-  `gfx_backend_op` and `audio_backend_op` are aliases.
-- Backends never substitute formats or rates. Create delivers exactly the
-  requested callback format or returns null. Host conversion (e.g. WASAPI
-  AUTOCONVERTPCM) is allowed; fallback belongs to L3. L3 does not resample when opening streams.
-  Rate conversion is an explicit effect (`hermite_resampler`) for use by mixers.
-  It does no band limiting; downsamplers chain `chebyshev2_lowpass` before it.
-- A null slot means hardware/platform support is absent, with an explanatory
-  `reason_unsupported`; it never denotes unfinished implementation.
-- Callbacks run on backend-owned threads with at most `max_callback_frames`.
-  Provision all buffers/converters at open. The callback path must not allocate,
-  take blocking locks, or emit events. Best-effort `try_lock` is used only by the
-  microphone example; the audio runtime itself takes no callback-path locks.
-- Stop and destroy synchronously quiesce callbacks. Neither may be called from
-  a callback. Join the worker before destroying callback objects or buffers.
-- Device loss latches `failed`, ends callbacks, and never reroutes automatically.
-  A throwing user callback also latches failure and silences subsequent output.
-- Contexts must outlive their streams, which hold raw pointers into the context.
-  Moves preserve the heap-allocated backend table and stream runtime addresses.
-- `ring_buffer` has fixed capacity and no synchronization. Only construction and
-  explicit `reserve` allocate. Use external synchronization between threads.
-- Effects are float32-only extension points, not backends. They provision state
-  at construction and never allocate or lock in `process`, following the callback
-  path rules. They use push semantics with exact frame queries; empty input may
-  drain buffered output, and empty output never advances state.
-- WASAPI uses shared mode and a worker-owned COM apartment for each stream.
-  Optional MMCSS functions are loaded dynamically; no avrt/mmdevapi imports are
-  required just to start a program on systems without WASAPI.
-- Audio file codecs use the extension registry in `audio_io.hpp` and the
-  single-threaded `audio_decoder` pull contract. Decoders return their constant
-  native format; typed reader reads require an exact match. Readers never resample.
-- Vorbis readers reorder channels into the SMPTE order documented in `sample.hpp`.
-  The dr_libs dependency is a private submodule; codec types stay out of public APIs.
-- An `audio_player` either owns an output stream or attaches to an `audio_mixer`.
-  Streamed players decode and convert on a polling worker into a private SPSC
-  float ring. The callback never locks,
-  allocates or notifies; seek/quit commands and acknowledgements stay on control
-  and worker threads. Quiesce the stream or detach the voice before joining the worker.
-- Standalone players open streams at the source rate and reject a different
-  requested rate. Attached players are resampled by their mixer.
-- Mixers are flat: each owns one stream, with player slots and a one-shot pool.
-  Slot ownership uses lock-free free/suspended/enabled/rendering/suspend-requested
-  states. Control suspends with CAS and spin/yield; the callback releases ownership
-  with release stores/CAS, including on exceptions. It never waits or notifies.
-- Mixer provisioning happens on the control thread while a slot is free or
-  suspended. Only the rendering callback may mutate enabled voice processing.
-  Downsampling chains `chebyshev2_lowpass::for_downsampling` before
-  `hermite_resampler`, using separate buffers and preserving unconsumed input.
-  At EOF feed exactly three lookahead frames after the real input, then drain;
-  the output length is ceil(source_frames * mix_rate / source_rate).
-- Mixer channel order follows SMPTE. Stereo downmix adds centre and matching
-  rear/side channels at 1/sqrt(2), back centre at 0.5, and drops LFE. Mono buses
-  average that stereo downmix. Mono/stereo can feed FL/FR on larger buses;
-  other unequal multichannel mappings are rejected. Downmixes are not normalized.
-- Pan only affects stereo buses: mono uses constant power with unity at centre
-  and sqrt(2) at hard pan; other sources use the same gains clamped to unity.
-  Centre and hard-pan zeros are exact. There is no limiter or transport ramp.
-- Contexts outlive mixers; mixers outlive attached players. One-shot clip storage
-  outlives the mixer or the next synchronous `stop_one_shots()` call.
+### Realtime path
 
-## OS subsystem
+The realtime path is everything that runs inside a stream callback: user callbacks, `audio_effect::process`, and player and mixer rendering.
 
-API-level behaviour is documented in `src/alia/os/`.
+- Callbacks run on backend-owned threads with at most `max_callback_frames`. Everything they touch is provisioned on a control thread before they can run.
+- The realtime path never allocates, takes blocking locks, waits, notifies or emits events. It shares state with control threads through lock-free atomics.
+- Stop and destroy quiesce callbacks synchronously and must not be called from a callback. Objects that own a stream declare it as their last member, so it is quiesced before workers are joined or callback memory is freed.
 
-| Layer | Location | Role |
-|-------|----------|------|
-| L1 | `os/*.hpp` public | Contexts, windows, displays, monitors, clipboard and dialogs |
-| L2 | Header templates/overloads | Typed bitmap views erase to `any_bitmap_view`; text-log formatting erases to text |
-| L3 | `os/*.cpp`, common `io/*.cpp` | Registry, ownership, validation, default-context dispatch and closest-mode selection |
-| L4 | `os_backend_interface` | One stable table of `os_backend_op` slots per context |
+### Rates
 
-- Backends live in `os/backend_<name>/`, with concrete handles, casts and operation
-  declarations in `<name>_ops.hpp` and registration in `register_<name>_os_backend.cpp`.
-  There is no virtual window/cursor implementation in public headers.
-- Contexts outlive their windows, cursors and text logs. Moving contexts preserves
-  backend-table addresses. Moving windows preserves native handles and event sources
-  and updates their owner pointers and tracked input associations.
-- Create, use, poll and destroy a context and its children on the same thread.
-  Convenience APIs use the lazily created thread-local `get_os_context()`.
-- All native operations use `.get_or_throw()`. Null slots describe absent platform
-  services, with `reason_unsupported`; they never represent unfinished code.
-- L3 selects closest display modes. Backends apply an explicitly requested mode
-  exactly or fail. X11 restores its saved RandR configuration when leaving exclusive
-  fullscreen, losing focus, or destroying a window.
-- X11 owns one Display connection per context. Polling dispatches all its windows
-  and clipboard selections. Clipboard owners must keep polling to serve requests;
-  transfers have a two-second timeout and a 16 MiB text limit.
-- X11 probes RandR, XInput2, XKB, screen-saver and EWMH support at context creation.
-  File pickers use the optional Zenity service; missing services have explicit reasons.
+Streams convert point and channel formats in L3 but never resample. Rate conversion only happens through effects (`chebyshev2_lowpass::for_downsampling`, then `hermite_resampler`), as the mixer does.
+
+## OS
+
+### Layers
+
+| Layer | Contents |
+|-------|----------|
+| L1 | Contexts, windows, displays, monitors, clipboard and dialogs |
+| L2 | Typed bitmap views erase to `any_bitmap_view`; text-log formatting erases to text |
+| L3 | Default-context dispatch and closest-mode selection; keyboard and mouse L3 lives in `io/*.cpp` |
+
+### Threading
+
+A context and everything created from it are created, used, polled and destroyed on one thread. Overloads without a context argument use the lazily created, thread-local `get_os_context()`.
 
 ## The `slop` folder
 
