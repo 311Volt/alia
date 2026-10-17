@@ -110,7 +110,7 @@ namespace alia {
         auto result = std::make_shared<detail::mouse_cursor_impl>();
         result->context = context.handle();
         result->backend = context.backend();
-        result->handle = result->backend->create_cursor.get_or_throw()(result->context, bitmap, hotspot);
+        result->handle = result->backend->create_cursor(result->context, bitmap, hotspot);
         if (!result->handle)
             throw std::runtime_error("mouse_cursor: native cursor creation failed");
         impl_ = std::move(result);
@@ -118,11 +118,11 @@ namespace alia {
 
     detail::mouse_cursor_impl::~mouse_cursor_impl() {
         if (handle)
-            backend->destroy_cursor.get_or_throw()(handle);
+            backend->destroy_cursor(handle);
     }
 
     void *detail::mouse_cursor_impl::native_handle() const {
-        return backend->cursor_native_handle.get_or_throw()(handle);
+        return backend->cursor_native_handle(handle);
     }
 
     mouse_cursor::~mouse_cursor() = default;
@@ -202,21 +202,17 @@ namespace alia {
 
     unsigned get_mouse_num_axes() {
         auto &c = get_os_context();
-        return c.backend()->mouse_num_axes.get_or_throw()(c.handle());
+        return c.backend()->mouse_num_axes(c.handle());
     }
 
     unsigned get_mouse_num_buttons() {
         auto &c = get_os_context();
-        return c.backend()->mouse_num_buttons.get_or_throw()(c.handle());
-    }
-
-    bool can_get_mouse_cursor_position() {
-        return get_os_context().backend()->mouse_cursor_position.is_supported();
+        return c.backend()->mouse_num_buttons(c.handle());
     }
 
     std::optional<vec2i> get_mouse_cursor_position() {
         auto &c = get_os_context();
-        return c.backend()->mouse_cursor_position.get_or_throw()(c.handle());
+        return c.backend()->mouse_cursor_position(c.handle());
     }
 
     namespace {
@@ -268,7 +264,7 @@ namespace alia {
 
     bool ungrab_mouse() {
         auto &c = get_os_context();
-        return c.backend()->ungrab_mouse.get_or_throw()(c.handle());
+        return c.backend()->ungrab_mouse(c.handle());
     }
 
     namespace detail {

@@ -10,7 +10,7 @@
 namespace alia {
     std::vector<display_mode> get_display_modes(int index) {
         auto &c = get_os_context();
-        return c.backend()->display_modes.get_or_throw()(c.handle(), index);
+        return c.backend()->display_modes(c.handle(), index);
     }
 
     std::vector<display_mode> get_display_modes() {
@@ -19,7 +19,7 @@ namespace alia {
 
     display_mode get_desktop_mode(int index) {
         auto &c = get_os_context();
-        return c.backend()->desktop_mode.get_or_throw()(c.handle(), index);
+        return c.backend()->desktop_mode(c.handle(), index);
     }
 
     display_mode get_desktop_mode() {

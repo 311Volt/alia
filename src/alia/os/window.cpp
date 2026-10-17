@@ -39,7 +39,7 @@ namespace alia {
         context_ = context.handle();
         backend_ = context.backend();
         if (options.monitor >= 0) {
-            const auto monitors = backend_->monitors.get_or_throw()(context_);
+            const auto monitors = backend_->monitors(context_);
             if (options.monitor >= static_cast<int>(monitors.size()))
                 throw std::out_of_range("window monitor index out of range");
         }
@@ -48,11 +48,11 @@ namespace alia {
         windowed_size_ = size;
         const auto mode = options.mode;
         options.mode = window_fullscreen_mode::windowed;
-        handle_ = backend_->create_window.get_or_throw()(context_, size, options);
+        handle_ = backend_->create_window(context_, size, options);
         if (!handle_)
             throw std::runtime_error("window: native window creation failed");
         try {
-            backend_->window_set_owner.get_or_throw()(handle_, this);
+            backend_->window_set_owner(handle_, this);
             if (mode != window_fullscreen_mode::windowed)
                 set_fullscreen_mode(mode);
         } catch (...) {
@@ -71,7 +71,7 @@ namespace alia {
         if (current_window == this)
             current_window = nullptr;
         if (handle_)
-            backend_->destroy_window.get_or_throw()(std::exchange(handle_, nullptr));
+            backend_->destroy_window(std::exchange(handle_, nullptr));
     }
     
     window::~window() {
@@ -83,7 +83,7 @@ namespace alia {
           preferred_monitor_(other.preferred_monitor_), preferred_refresh_rate_(other.preferred_refresh_rate_),
           windowed_size_(other.windowed_size_) {
         if (handle_)
-            backend_->window_set_owner.get_or_throw()(handle_, this);
+            backend_->window_set_owner(handle_, this);
         detail::mouse_window_moved(&other, this);
         if (current_window == &other)
             current_window = this;
@@ -99,7 +99,7 @@ namespace alia {
             preferred_refresh_rate_ = other.preferred_refresh_rate_;
             windowed_size_ = other.windowed_size_;
             if (handle_)
-                backend_->window_set_owner.get_or_throw()(handle_, this);
+                backend_->window_set_owner(handle_, this);
             detail::mouse_window_moved(&other, this);
             if (current_window == &other)
                 current_window = this;
@@ -109,92 +109,92 @@ namespace alia {
     
     vec2i window::size() const {
         require_valid();
-        return backend_->window_size.get_or_throw()(handle_);
+        return backend_->window_size(handle_);
     }
     
     vec2i window::position() const {
         require_valid();
-        return backend_->window_position.get_or_throw()(handle_);
+        return backend_->window_position(handle_);
     }
     
     cstring_view window::title() const {
         require_valid();
-        return backend_->window_title.get_or_throw()(handle_);
+        return backend_->window_title(handle_);
     }
     
     bool window::is_focused() const {
         require_valid();
-        return backend_->window_is_focused.get_or_throw()(handle_);
+        return backend_->window_is_focused(handle_);
     }
     
     bool window::is_minimized() const {
         require_valid();
-        return backend_->window_is_minimized.get_or_throw()(handle_);
+        return backend_->window_is_minimized(handle_);
     }
     
     bool window::is_maximized() const {
         require_valid();
-        return backend_->window_is_maximized.get_or_throw()(handle_);
+        return backend_->window_is_maximized(handle_);
     }
     
     window_fullscreen_mode window::fullscreen_mode() const {
         require_valid();
-        return backend_->window_fullscreen_mode.get_or_throw()(handle_);
+        return backend_->window_fullscreen_mode(handle_);
     }
     
     bool window::is_resizable() const {
         require_valid();
-        return backend_->window_is_resizable.get_or_throw()(handle_);
+        return backend_->window_is_resizable(handle_);
     }
     
     bool window::is_borderless() const {
         require_valid();
-        return backend_->window_is_borderless.get_or_throw()(handle_);
+        return backend_->window_is_borderless(handle_);
     }
     
     bool window::generates_expose_events() const {
         require_valid();
-        return backend_->window_generates_expose_events.get_or_throw()(handle_);
+        return backend_->window_generates_expose_events(handle_);
     }
     
     int window::refresh_rate() const {
         require_valid();
-        return backend_->window_refresh_rate.get_or_throw()(handle_);
+        return backend_->window_refresh_rate(handle_);
     }
     
     int window::monitor() const {
         require_valid();
-        return backend_->window_monitor.get_or_throw()(handle_);
+        return backend_->window_monitor(handle_);
     }
     
     window_size_constraints window::size_constraints() const {
         require_valid();
-        return backend_->window_constraints.get_or_throw()(handle_);
+        return backend_->window_constraints(handle_);
     }
     
     bool window::is_cursor_visible() const {
         require_valid();
-        return backend_->window_is_cursor_visible.get_or_throw()(handle_);
+        return backend_->window_is_cursor_visible(handle_);
     }
     
     mouse_mode window::requested_mouse_mode() const {
         require_valid();
-        return backend_->window_requested_mouse_mode.get_or_throw()(handle_);
+        return backend_->window_requested_mouse_mode(handle_);
     }
     
     mouse_mode window::active_mouse_mode() const {
         require_valid();
-        return backend_->window_active_mouse_mode.get_or_throw()(handle_);
+        return backend_->window_active_mouse_mode(handle_);
     }
     
     void *window::native_handle() const {
         require_valid();
-        return backend_->window_native_handle.get_or_throw()(handle_);
+        return backend_->window_native_handle(handle_);
     }
     
     void window::minimize() {
         require_valid();
-        backend_->window_minimize.get_or_throw()(handle_);
+        backend_->window_minimize(handle_);
     }
     
     void window::maximize() {
@@ -204,37 +204,37 @@ namespace alia {
     
     void window::restore() {
         require_valid();
-        backend_->window_restore.get_or_throw()(handle_);
+        backend_->window_restore(handle_);
     }
     
     void window::set_title(cstring_view value) {
         require_valid();
-        backend_->window_set_title.get_or_throw()(handle_, value);
+        backend_->window_set_title(handle_, value);
     }
     
     void window::set_position(vec2i value) {
         require_valid();
-        backend_->window_set_position.get_or_throw()(handle_, value);
+        backend_->window_set_position(handle_, value);
     }
     
     void window::set_resizable(bool value) {
         require_valid();
-        backend_->window_set_resizable.get_or_throw()(handle_, value);
+        backend_->window_set_resizable(handle_, value);
     }
     
     void window::set_borderless(bool value) {
         require_valid();
-        backend_->window_set_borderless.get_or_throw()(handle_, value);
+        backend_->window_set_borderless(handle_, value);
     }
     
     void window::apply_size_constraints(bool value) {
         require_valid();
-        backend_->window_apply_constraints.get_or_throw()(handle_, value);
+        backend_->window_apply_constraints(handle_, value);
     }
     
     void window::show_cursor(bool value) {
         require_valid();
-        backend_->window_show_cursor.get_or_throw()(handle_, value);
+        backend_->window_show_cursor(handle_, value);
     }
     
     float window::aspect_ratio() const {
@@ -245,13 +245,13 @@ namespace alia {
     void window::resize(vec2i value) {
         require_valid();
         validate_size(value);
-        backend_->window_resize.get_or_throw()(handle_, value);
+        backend_->window_resize(handle_, value);
     }
     
     void window::set_size_constraints(window_size_constraints value) {
         require_valid();
         validate_constraints(value);
-        backend_->window_set_constraints.get_or_throw()(handle_, value);
+        backend_->window_set_constraints(handle_, value);
     }
     
     void window::set_fullscreen(bool value) {
@@ -278,8 +278,8 @@ namespace alia {
             windowed_size_ = size();
         if (value == window_fullscreen_mode::fullscreen) {
             const int index = preferred_monitor_ >= 0 ? preferred_monitor_ : monitor();
-            const auto desktop = backend_->desktop_mode.get_or_throw()(context_, index);
-            const auto modes = backend_->display_modes.get_or_throw()(context_, index);
+            const auto desktop = backend_->desktop_mode(context_, index);
+            const auto modes = backend_->display_modes(context_, index);
             const auto selected =
                 choose_closest_mode(modes, windowed_size_, preferred_refresh_rate_, 0, desktop).value_or(desktop);
             set_fullscreen(selected);
@@ -302,19 +302,19 @@ namespace alia {
     
     bool window::set_cursor(system_mouse_cursor value) {
         require_valid();
-        return backend_->window_set_system_cursor.get_or_throw()(handle_, value);
+        return backend_->window_set_system_cursor(handle_, value);
     }
     
     bool window::set_cursor(const mouse_cursor &value) {
         require_valid();
         if (!value.impl_ || value.impl_->context != context_ || value.impl_->backend != backend_)
             return false;
-        return backend_->window_set_cursor.get_or_throw()(handle_, value.impl_);
+        return backend_->window_set_cursor(handle_, value.impl_);
     }
     
     bool window::set_cursor_position(vec2i value) {
         require_valid();
-        return backend_->window_set_cursor_position.get_or_throw()(handle_, value);
+        return backend_->window_set_cursor_position(handle_, value);
     }
     
     bool window::set_mouse_mode(mouse_mode value) {
@@ -324,17 +324,17 @@ namespace alia {
     
     event_source &window::get_event_source() {
         require_valid();
-        return backend_->window_event_source.get_or_throw()(handle_);
+        return backend_->window_event_source(handle_);
     }
     
     void window::poll() {
         require_valid();
-        backend_->poll.get_or_throw()(context_);
+        backend_->poll(context_);
     }
     
     void *window::native_display() const {
         require_valid();
-        return backend_->native_display.get_or_throw()(context_);
+        return backend_->native_display(context_);
     }
     
     

@@ -152,7 +152,7 @@ namespace alia {
             throw std::logic_error("swapchain::begin_frame: swapchain is not valid");
         if (swapchain.frame_active_)
             throw std::logic_error("swapchain::begin_frame: a frame is already active");
-        swapchain.backend_->swapchain_begin_frame.get_or_throw()(swapchain.handle_);
+        swapchain.backend_->swapchain_begin_frame(swapchain.handle_);
         swapchain.frame_active_ = true;
         active_ = true;
         try {
@@ -211,7 +211,7 @@ namespace alia {
         if (!active_)
             return;
         try {
-            swapchain_->backend_->swapchain_end_frame.get_or_throw()(swapchain_->handle_);
+            swapchain_->backend_->swapchain_end_frame(swapchain_->handle_);
         } catch (...) {
             // Destructors must not throw. The swapchain is still made reusable.
         }
@@ -224,8 +224,8 @@ namespace alia {
 
     void frame::present() {
         ensure_active();
-        swapchain_->backend_->swapchain_end_frame.get_or_throw()(swapchain_->handle_);
-        swapchain_->backend_->swapchain_present.get_or_throw()(swapchain_->handle_);
+        swapchain_->backend_->swapchain_end_frame(swapchain_->handle_);
+        swapchain_->backend_->swapchain_present(swapchain_->handle_);
         swapchain_->frame_active_ = false;
         shader_ = nullptr;
         texture_bindings_.clear();
@@ -238,13 +238,13 @@ namespace alia {
         if (region.width() <= 0 || region.height() <= 0 || !rect_i{{}, swapchain_->size_}.contains(region))
             throw std::invalid_argument("frame::present: region is outside the swapchain");
         auto *swapchain = swapchain_;
-        swapchain->backend_->swapchain_end_frame.get_or_throw()(swapchain->handle_);
+        swapchain->backend_->swapchain_end_frame(swapchain->handle_);
         bool presented = true;
         try {
             if (swapchain->props_.update_display_region)
                 presented = swapchain->backend_->swapchain_present_region.get_or_throw()(swapchain->handle_, region);
             else
-                swapchain->backend_->swapchain_present.get_or_throw()(swapchain->handle_);
+                swapchain->backend_->swapchain_present(swapchain->handle_);
         } catch (...) {
             swapchain->frame_active_ = false;
             shader_ = nullptr;
@@ -279,7 +279,7 @@ namespace alia {
                 ++it;
                 continue;
             }
-            swapchain_->backend_->bind_resources.get_or_throw()(swapchain_->device_, {it->first, nullptr, {}});
+            swapchain_->backend_->bind_resources(swapchain_->device_, {it->first, nullptr, {}});
             if (it->first == 0)
                 slot0_kind_ = slot0_kind::none;
             it = texture_bindings_.erase(it);
@@ -289,7 +289,7 @@ namespace alia {
     void frame::set_target() {
         ensure_active();
         const render_target_info info{swapchain_->handle_, nullptr, 0, 0, swapchain_->size_};
-        if (!swapchain_->backend_->set_render_target.get_or_throw()(swapchain_->device_, info))
+        if (!swapchain_->backend_->set_render_target(swapchain_->device_, info))
             throw std::runtime_error("frame::set_target: backend failed to select the swapchain backbuffer");
         target_size_ = info.target_size;
         target_has_depth_ = swapchain_->has_depth();
@@ -306,7 +306,7 @@ namespace alia {
             throw std::out_of_range("frame::set_target: texture mip level out of range");
         unbind_render_target_source(target.impl());
         const render_target_info info{nullptr, target.impl(), level, 0, mip_size(target.size(), level)};
-        if (!swapchain_->backend_->set_render_target.get_or_throw()(swapchain_->device_, info))
+        if (!swapchain_->backend_->set_render_target(swapchain_->device_, info))
             throw std::runtime_error("frame::set_target: render-to-texture may be unsupported on this device");
         target_size_ = info.target_size;
         target_has_depth_ = false;
@@ -327,7 +327,7 @@ namespace alia {
         const render_target_info info{
             nullptr, target.impl(), level, static_cast<int>(face), mip_size(target.face_size(), level)
         };
-        if (!swapchain_->backend_->set_render_target.get_or_throw()(swapchain_->device_, info))
+        if (!swapchain_->backend_->set_render_target(swapchain_->device_, info))
             throw std::runtime_error("frame::set_target: render-to-cube-face may be unsupported on this device");
         target_size_ = info.target_size;
         target_has_depth_ = false;
@@ -340,7 +340,7 @@ namespace alia {
             throw std::invalid_argument("frame::clear: current render target has no depth attachment");
         if (!color && !depth)
             return;
-        if (!swapchain_->backend_->clear.get_or_throw()(swapchain_->device_, color, depth))
+        if (!swapchain_->backend_->clear(swapchain_->device_, color, depth))
             throw std::runtime_error("frame::clear: backend clear failed");
     }
 
@@ -505,7 +505,7 @@ namespace alia {
             throw std::invalid_argument("frame::set_texture: slot must be non-negative");
         if (texture.backend() != swapchain_->backend_ || texture.device() != swapchain_->device_)
             throw std::invalid_argument("frame::set_texture: texture belongs to another gfx_device");
-        swapchain_->backend_->bind_resources.get_or_throw()(swapchain_->device_, {slot, texture.impl(), sampler});
+        swapchain_->backend_->bind_resources(swapchain_->device_, {slot, texture.impl(), sampler});
         texture_bindings_[slot] = texture.impl();
         if (slot == 0)
             slot0_kind_ = texture.role() == texture_role::alpha_mask ? slot0_kind::alpha_mask : slot0_kind::color;
@@ -521,7 +521,7 @@ namespace alia {
             throw std::invalid_argument("frame::set_texture: slot must be non-negative");
         if (texture.backend() != swapchain_->backend_ || texture.device() != swapchain_->device_)
             throw std::invalid_argument("frame::set_texture: cube texture belongs to another gfx_device");
-        swapchain_->backend_->bind_resources.get_or_throw()(swapchain_->device_, {slot, texture.impl(), sampler});
+        swapchain_->backend_->bind_resources(swapchain_->device_, {slot, texture.impl(), sampler});
         texture_bindings_[slot] = texture.impl();
         if (slot == 0)
             slot0_kind_ = slot0_kind::cube;
@@ -529,7 +529,7 @@ namespace alia {
 
     void frame::set_viewport(const render_viewport &viewport) {
         ensure_active();
-        swapchain_->backend_->set_viewport.get_or_throw()(swapchain_->device_, viewport);
+        swapchain_->backend_->set_viewport(swapchain_->device_, viewport);
     }
 
     void
@@ -573,14 +573,14 @@ namespace alia {
             throw std::invalid_argument("frame::draw: depth state requires a depth attachment");
         if (render_state_dirty_) {
             if (render_state_changed) {
-                backend()->set_render_state.get_or_throw()(device(), next);
+                backend()->set_render_state(device(), next);
                 state_ = next;
             }
             render_state_dirty_ = false;
         }
         if (transforms_dirty_) {
             if (!applied_transforms_ || !same_transforms(*applied_transforms_, transforms_)) {
-                backend()->set_transforms.get_or_throw()(device(), transforms_);
+                backend()->set_transforms(device(), transforms_);
                 applied_transforms_ = transforms_;
             }
             transforms_dirty_ = false;
@@ -622,7 +622,7 @@ namespace alia {
             throw std::invalid_argument("frame::copy_to_texture: source is outside the current target");
         if (!rect_i{{}, mip_size(dst.size(), dst_level)}.contains(rect_i::pos_size(dst_pos, src_rect.size())))
             throw std::invalid_argument("frame::copy_to_texture: destination is outside texture level");
-        if (!swapchain_->backend_->copy_render_target_to_texture.get_or_throw()(
+        if (!swapchain_->backend_->copy_render_target_to_texture(
                 swapchain_->device_, dst.impl(), src_rect, target_size_, dst_pos, dst_level, 0
             ))
             throw std::runtime_error("frame::copy_to_texture: backend copy failed");
@@ -642,7 +642,7 @@ namespace alia {
             throw std::invalid_argument("frame::copy_to_texture: source is outside the current target");
         if (!rect_i{{}, mip_size(dst.face_size(), dst_level)}.contains(rect_i::pos_size(dst_pos, src_rect.size())))
             throw std::invalid_argument("frame::copy_to_texture: destination is outside cube texture level");
-        if (!swapchain_->backend_->copy_render_target_to_texture.get_or_throw()(
+        if (!swapchain_->backend_->copy_render_target_to_texture(
                 swapchain_->device_, dst.impl(), src_rect, target_size_, dst_pos, dst_level, static_cast<int>(face)
             ))
             throw std::runtime_error("frame::copy_to_texture: backend copy failed");
@@ -658,10 +658,8 @@ namespace alia {
             if (!vertices)
                 throw std::invalid_argument("frame::draw: vertex data is null");
             frame.prepare_draw(definition);
-            frame.backend()->upload_transient_vertex_data.get_or_throw()(
-                frame.device(), vertices, vertex_count * definition.stride
-            );
-            frame.backend()->draw.get_or_throw()(frame.device(), topology, vertex_count, 0);
+            frame.backend()->upload_transient_vertex_data(frame.device(), vertices, vertex_count * definition.stride);
+            frame.backend()->draw(frame.device(), topology, vertex_count, 0);
         }
 
         void frame_draw_buffered(
@@ -675,8 +673,8 @@ namespace alia {
             const int total = frame.backend()->vertex_buffer_count.get_or_throw()(vertices);
             validate_range("frame::draw", first_vertex, vertex_count, total);
             frame.prepare_draw(definition);
-            frame.backend()->bind_vertex_buffer.get_or_throw()(frame.device(), vertices);
-            frame.backend()->draw.get_or_throw()(frame.device(), topology, vertex_count, first_vertex);
+            frame.backend()->bind_vertex_buffer(frame.device(), vertices);
+            frame.backend()->draw(frame.device(), topology, vertex_count, first_vertex);
         }
 
         void frame_draw_indexed_transient(
@@ -692,11 +690,9 @@ namespace alia {
             if (format == index_format::u32 && !frame.backend()->caps.index32)
                 throw unsupported_operation_exception("32-bit indices are not supported by this device");
             frame.prepare_draw(definition);
-            frame.backend()->upload_transient_vertex_data.get_or_throw()(
-                frame.device(), vertices, vertex_count * definition.stride
-            );
-            frame.backend()->upload_transient_index_data.get_or_throw()(frame.device(), indices, index_count, format);
-            frame.backend()->draw_indexed.get_or_throw()(frame.device(), topology, index_count, 0, 0);
+            frame.backend()->upload_transient_vertex_data(frame.device(), vertices, vertex_count * definition.stride);
+            frame.backend()->upload_transient_index_data(frame.device(), indices, index_count, format);
+            frame.backend()->draw_indexed(frame.device(), topology, index_count, 0, 0);
         }
 
         void frame_draw_indexed_buffered(
@@ -714,11 +710,9 @@ namespace alia {
             if (base_vertex < 0 || base_vertex >= vertex_count)
                 throw std::out_of_range("frame::draw_indexed: base vertex is outside the vertex buffer");
             frame.prepare_draw(definition);
-            frame.backend()->bind_vertex_buffer.get_or_throw()(frame.device(), vertices);
-            frame.backend()->bind_index_buffer.get_or_throw()(frame.device(), indices);
-            frame.backend()->draw_indexed.get_or_throw()(
-                frame.device(), topology, index_count, first_index, base_vertex
-            );
+            frame.backend()->bind_vertex_buffer(frame.device(), vertices);
+            frame.backend()->bind_index_buffer(frame.device(), indices);
+            frame.backend()->draw_indexed(frame.device(), topology, index_count, first_index, base_vertex);
         }
 
         void frame_draw_instanced_buffered(
@@ -744,7 +738,7 @@ namespace alia {
             if (!frame.shader_)
                 throw std::invalid_argument("frame::draw_instanced: instanced draws require a shader");
             frame.prepare_draw(definition, instance_definition);
-            frame.backend()->bind_vertex_buffer.get_or_throw()(frame.device(), vertices);
+            frame.backend()->bind_vertex_buffer(frame.device(), vertices);
             frame.backend()->bind_instance_buffer.get_or_throw()(frame.device(), instances);
             draw(frame.device(), topology, vertex_count, first_vertex, instance_count, first_instance);
         }
@@ -770,8 +764,8 @@ namespace alia {
             if (!frame.shader_)
                 throw std::invalid_argument("frame::draw_instanced: instanced draws require a shader");
             frame.prepare_draw(definition, instance_definition);
-            frame.backend()->bind_vertex_buffer.get_or_throw()(frame.device(), vertices);
-            frame.backend()->bind_index_buffer.get_or_throw()(frame.device(), indices);
+            frame.backend()->bind_vertex_buffer(frame.device(), vertices);
+            frame.backend()->bind_index_buffer(frame.device(), indices);
             frame.backend()->bind_instance_buffer.get_or_throw()(frame.device(), instances);
             draw(frame.device(), topology, index_count, first_index, base_vertex, instance_count, first_instance);
         }

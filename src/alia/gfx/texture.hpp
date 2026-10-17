@@ -74,7 +74,7 @@ namespace alia {
             void release() {
                 if (state_) {
                     constexpr bool wrote = Mode != texture_lock_mode::read_only;
-                    state_->backend->texture_unlock.get_or_throw()(state_->handle, state_->info, wrote);
+                    state_->backend->texture_unlock(state_->handle, state_->info, wrote);
                     state_.reset();
                 }
             }

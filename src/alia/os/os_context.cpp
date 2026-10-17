@@ -68,7 +68,7 @@ namespace alia {
                     try {
                         result.backend_ = std::make_unique<os_backend_interface>(std::move(created.iface));
                     } catch (...) {
-                        created.iface.destroy_context.get_or_throw()(created.handle);
+                        created.iface.destroy_context(created.handle);
                         throw;
                     }
                     result.handle_ = created.handle;
@@ -87,7 +87,7 @@ namespace alia {
 
     os_context::~os_context() {
         if (handle_)
-            backend_->destroy_context.get_or_throw()(handle_);
+            backend_->destroy_context(handle_);
     }
 
     os_context::os_context(os_context &&other) noexcept
@@ -97,7 +97,7 @@ namespace alia {
     os_context &os_context::operator=(os_context &&other) noexcept {
         if (this != &other) {
             if (handle_)
-                backend_->destroy_context.get_or_throw()(handle_);
+                backend_->destroy_context(handle_);
             handle_ = std::exchange(other.handle_, nullptr);
             backend_ = std::move(other.backend_);
         }
@@ -111,27 +111,27 @@ namespace alia {
 
     void os_context::poll() {
         require_valid();
-        backend_->poll.get_or_throw()(handle_);
+        backend_->poll(handle_);
     }
 
     void *os_context::native_display() const {
         require_valid();
-        return backend_->native_display.get_or_throw()(handle_);
+        return backend_->native_display(handle_);
     }
 
     std::vector<monitor_info> os_context::monitors() const {
         require_valid();
-        return backend_->monitors.get_or_throw()(handle_);
+        return backend_->monitors(handle_);
     }
 
     std::vector<display_mode> os_context::display_modes(int index) const {
         require_valid();
-        return backend_->display_modes.get_or_throw()(handle_, index);
+        return backend_->display_modes(handle_, index);
     }
 
     display_mode os_context::desktop_mode(int index) const {
         require_valid();
-        return backend_->desktop_mode.get_or_throw()(handle_, index);
+        return backend_->desktop_mode(handle_, index);
     }
 
     os_context &get_os_context() {

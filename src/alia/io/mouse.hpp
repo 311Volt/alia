@@ -122,7 +122,6 @@ namespace alia {
     [[nodiscard]] unsigned get_mouse_num_axes();
     [[nodiscard]] unsigned get_mouse_num_buttons();
 
-    [[nodiscard]] bool can_get_mouse_cursor_position();
     [[nodiscard]] std::optional<vec2i> get_mouse_cursor_position();
 
     bool set_mouse_z(int value);

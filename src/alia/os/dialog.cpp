@@ -36,7 +36,7 @@ namespace alia {
     }
     message_box_result show_message_box(const char *t, const char *m, message_box_buttons b, message_box_icon i, const window *p) {
         auto c = context_for(p);
-        return c.backend->message_box.get_or_throw()(c.handle, t, m, b, i, p);
+        return c.backend->message_box(c.handle, t, m, b, i, p);
     }
     void show_info_box(const char *t, const char *m, const window *p) {
         (void)show_message_box(t, m, message_box_buttons::ok, message_box_icon::info, p);
@@ -56,20 +56,20 @@ namespace alia {
         if (!c)
             throw std::invalid_argument("text_log requires a valid OS context");
         backend_ = c.backend();
-        handle_ = backend_->create_text_log.get_or_throw()(c.handle(), title, mono);
+        handle_ = backend_->create_text_log(c.handle(), title, mono);
         if (!handle_)
             throw std::runtime_error("text_log: native window creation failed");
     }
     text_log::~text_log() {
         if (handle_)
-            backend_->destroy_text_log.get_or_throw()(handle_);
+            backend_->destroy_text_log(handle_);
     }
     text_log::text_log(text_log &&other) noexcept : handle_(std::exchange(other.handle_, nullptr)), backend_(other.backend_) {
     }
     text_log &text_log::operator=(text_log &&other) noexcept {
         if (this != &other) {
             if (handle_)
-                backend_->destroy_text_log.get_or_throw()(handle_);
+                backend_->destroy_text_log(handle_);
             handle_ = std::exchange(other.handle_, nullptr);
             backend_ = other.backend_;
         }
@@ -83,26 +83,26 @@ namespace alia {
     }
     void text_log::append(std::string_view text) {
         if (handle_)
-            backend_->text_log_append.get_or_throw()(handle_, text);
+            backend_->text_log_append(handle_, text);
     }
     void text_log::clear() {
         if (handle_)
-            backend_->text_log_clear.get_or_throw()(handle_);
+            backend_->text_log_clear(handle_);
     }
     void text_log::show() {
         if (handle_)
-            backend_->text_log_show.get_or_throw()(handle_, true);
+            backend_->text_log_show(handle_, true);
     }
     void text_log::hide() {
         if (handle_)
-            backend_->text_log_show.get_or_throw()(handle_, false);
+            backend_->text_log_show(handle_, false);
     }
     bool text_log::is_visible() const {
-        return handle_ && backend_->text_log_is_visible.get_or_throw()(handle_);
+        return handle_ && backend_->text_log_is_visible(handle_);
     }
     event_source &text_log::get_event_source() {
         if (!handle_)
             throw std::logic_error("text_log is not valid");
-        return backend_->text_log_event_source.get_or_throw()(handle_);
+        return backend_->text_log_event_source(handle_);
     }
 } // namespace alia

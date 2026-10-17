@@ -30,8 +30,8 @@ namespace alia::detail {
 
         ~stream_runtime() {
             if (handle) {
-                backend->stream_stop.get_or_throw()(handle);
-                backend->destroy_stream.get_or_throw()(handle);
+                backend->stream_stop(handle);
+                backend->destroy_stream(handle);
             }
         }
 
@@ -150,7 +150,7 @@ namespace alia::detail {
                 }
             }
             const audio_stream_desc desc{device->id, {candidate, rate}, config.period_frames, runtime.get()};
-            if (!backend.stream_format_supported.get_or_throw()(context.handle(), direction, device->id, desc.format))
+            if (!backend.stream_format_supported(context.handle(), direction, device->id, desc.format))
                 continue;
             audio_stream_handle *handle;
             if constexpr (output)
@@ -164,7 +164,7 @@ namespace alia::detail {
             if (!handle)
                 continue;
             runtime->handle = handle;
-            const auto props = backend.stream_properties.get_or_throw()(handle);
+            const auto props = backend.stream_properties(handle);
             if (props.format != desc.format || props.max_callback_frames <= 0 || props.period_frames <= 0)
                 throw std::runtime_error("audio backend returned invalid stream properties or substituted a format");
             runtime->device_properties = runtime->user_properties = props;
@@ -186,13 +186,13 @@ namespace alia::detail {
         if (!runtime)
             throw std::logic_error("audio stream is not valid");
         if (runtime->callback_failed.load(std::memory_order_acquire) ||
-            !runtime->backend->stream_start.get_or_throw()(runtime->handle))
+            !runtime->backend->stream_start(runtime->handle))
             throw std::runtime_error("audio stream failed to start");
     }
 
     void stop(stream_runtime *runtime) {
         if (runtime)
-            runtime->backend->stream_stop.get_or_throw()(runtime->handle);
+            runtime->backend->stream_stop(runtime->handle);
     }
 
     audio_stream_state state(const stream_runtime *runtime) {
@@ -200,7 +200,7 @@ namespace alia::detail {
             return audio_stream_state::stopped;
         if (runtime->callback_failed.load(std::memory_order_acquire))
             return audio_stream_state::failed;
-        return runtime->backend->stream_state.get_or_throw()(runtime->handle);
+        return runtime->backend->stream_state(runtime->handle);
     }
 
     const audio_stream_properties &properties(const stream_runtime *runtime) {
@@ -210,7 +210,7 @@ namespace alia::detail {
     }
 
     std::int64_t position(const stream_runtime *runtime) {
-        return runtime ? runtime->backend->stream_position.get_or_throw()(runtime->handle) : 0;
+        return runtime ? runtime->backend->stream_position(runtime->handle) : 0;
     }
 } // namespace alia::detail
 

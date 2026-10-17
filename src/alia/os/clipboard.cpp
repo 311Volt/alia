@@ -11,27 +11,27 @@ namespace alia::clipboard {
 
     bool has_text(os_context &c) {
         validate(c);
-        return c.backend()->clipboard_has_text.get_or_throw()(c.handle());
+        return c.backend()->clipboard_has_text(c.handle());
     }
 
     std::string get_text(os_context &c) {
         validate(c);
-        return c.backend()->clipboard_get_text.get_or_throw()(c.handle());
+        return c.backend()->clipboard_get_text(c.handle());
     }
 
     bool set_text(os_context &c, std::string_view text) {
         validate(c);
-        return c.backend()->clipboard_set_text.get_or_throw()(c.handle(), text);
+        return c.backend()->clipboard_set_text(c.handle(), text);
     }
 
     bool has_image(os_context &c) {
         validate(c);
-        return c.backend()->clipboard_has_image.get_or_throw()(c.handle());
+        return c.backend()->clipboard_has_image(c.handle());
     }
 
     void clear(os_context &c) {
         validate(c);
-        c.backend()->clipboard_clear.get_or_throw()(c.handle());
+        c.backend()->clipboard_clear(c.handle());
     }
 
     bool has_text() {

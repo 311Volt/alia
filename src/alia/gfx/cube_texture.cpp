@@ -36,7 +36,7 @@ namespace alia {
 
     cube_texture::~cube_texture() {
         if (handle_)
-            backend_->destroy_texture.get_or_throw()(handle_);
+            backend_->destroy_texture(handle_);
     }
 
     cube_texture::cube_texture(cube_texture &&other) noexcept
@@ -48,7 +48,7 @@ namespace alia {
     cube_texture &cube_texture::operator=(cube_texture &&other) noexcept {
         if (this != &other) {
             if (handle_)
-                backend_->destroy_texture.get_or_throw()(handle_);
+                backend_->destroy_texture(handle_);
             handle_ = std::exchange(other.handle_, nullptr);
             backend_ = std::exchange(other.backend_, nullptr);
             device_ = std::exchange(other.device_, nullptr);
@@ -118,7 +118,7 @@ namespace alia {
                     throw std::runtime_error("cube_texture: failed to upload initial face pixels");
             }
         } catch (...) {
-            backend_->destroy_texture.get_or_throw()(handle_);
+            backend_->destroy_texture(handle_);
             handle_ = nullptr;
             backend_ = nullptr;
             device_ = nullptr;
@@ -150,23 +150,23 @@ namespace alia {
     }
 
     pixel_format cube_texture::format() const noexcept {
-        return backend_->texture_format.get_or_throw()(handle_);
+        return backend_->texture_format(handle_);
     }
 
     int cube_texture::edge() const noexcept {
-        return backend_->texture_width.get_or_throw()(handle_);
+        return backend_->texture_width(handle_);
     }
 
     int cube_texture::mip_levels() const noexcept {
-        return backend_->texture_mip_levels.get_or_throw()(handle_);
+        return backend_->texture_mip_levels(handle_);
     }
 
     void cube_texture::set_sampler(const sampler_state &s) {
-        backend_->texture_set_sampler.get_or_throw()(handle_, s);
+        backend_->texture_set_sampler(handle_, s);
     }
 
     sampler_state cube_texture::sampler() const noexcept {
-        return backend_->texture_sampler.get_or_throw()(handle_);
+        return backend_->texture_sampler(handle_);
     }
 
     std::unique_ptr<detail::texture_lock_state> cube_texture::lock_impl(
@@ -183,7 +183,7 @@ namespace alia {
         const rect_i requested = region.value_or(rect_i{{0, 0}, {size, size}});
 
         auto state = std::make_unique<detail::texture_lock_state>();
-        if (!backend_->cube_texture_lock.get_or_throw()(handle_, face, requested, level, mode, state->info))
+        if (!backend_->cube_texture_lock(handle_, face, requested, level, mode, state->info))
             return nullptr;
 
         state->handle = handle_;
@@ -203,19 +203,19 @@ namespace alia {
 
         const int size = std::max(1, edge() >> level);
         texture_lock_info info{};
-        if (!backend_->cube_texture_lock.get_or_throw()(
+        if (!backend_->cube_texture_lock(
                 handle_, face, rect_i{{0, 0}, {size, size}}, level, texture_lock_mode::read_only, info
             ))
             throw std::runtime_error("cube_texture::download: backend lock failed");
 
         const std::size_t total = static_cast<std::size_t>(info.stride_bytes) * size;
         bitmap result(format(), {size, size}, std::span<const std::byte>(info.data, total), info.stride_bytes);
-        backend_->texture_unlock.get_or_throw()(handle_, info, false);
+        backend_->texture_unlock(handle_, info, false);
         return result;
     }
 
     cube_texture cube_texture::clone() const {
-        texture_handle *cloned = backend_->texture_clone.get_or_throw()(handle_);
+        texture_handle *cloned = backend_->texture_clone(handle_);
         if (!cloned)
             throw std::runtime_error("cube_texture::clone: backend failed to clone texture");
         return cube_texture(cloned, backend_, device_, usage_);

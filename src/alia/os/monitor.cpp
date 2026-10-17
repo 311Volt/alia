@@ -5,7 +5,7 @@
 namespace alia {
     std::vector<monitor_info> get_monitors() {
         auto &c = get_os_context();
-        return c.backend()->monitors.get_or_throw()(c.handle());
+        return c.backend()->monitors(c.handle());
     }
 
     int get_monitor_count() {
@@ -46,7 +46,7 @@ namespace alia {
 
     monitor_info get_window_monitor(const window &w) {
         const int index = w.monitor();
-        auto monitors = w.backend()->monitors.get_or_throw()(w.context_handle());
+        auto monitors = w.backend()->monitors(w.context_handle());
         if (index < 0 || index >= static_cast<int>(monitors.size()))
             throw std::out_of_range("window monitor no longer available");
         return std::move(monitors[static_cast<std::size_t>(index)]);

@@ -57,7 +57,7 @@ namespace alia {
 
     gfx_device::~gfx_device() {
         if (device_)
-            backend_->destroy_device.get_or_throw()(device_);
+            backend_->destroy_device(device_);
     }
 
     gfx_device::gfx_device(gfx_device &&other) noexcept
@@ -67,7 +67,7 @@ namespace alia {
     gfx_device &gfx_device::operator=(gfx_device &&other) noexcept {
         if (this != &other) {
             if (device_)
-                backend_->destroy_device.get_or_throw()(device_);
+                backend_->destroy_device(device_);
             device_ = std::exchange(other.device_, nullptr);
             backend_ = std::move(other.backend_);
         }
@@ -83,7 +83,7 @@ namespace alia {
             created_device created = factory.create(config);
             if (created.handle) {
                 if (config.render.required() && created.iface.caps.render != config.render.value) {
-                    created.iface.destroy_device.get_or_throw()(created.handle);
+                    created.iface.destroy_device(created.handle);
                     throw std::runtime_error("gfx_device::create: render requirement was not met");
                 }
                 return gfx_device(
@@ -99,19 +99,18 @@ namespace alia {
             throw std::runtime_error("gfx_device::create_swapchain: device is not valid");
         const vec2i size = config.target.size();
         const swapchain_desc desc{config.vsync, config.framebuffer};
-        swapchain_handle *handle =
-            backend_->create_swapchain.get_or_throw()(device_, config.target.native_handle(), size, desc);
+        swapchain_handle *handle = backend_->create_swapchain(device_, config.target.native_handle(), size, desc);
         if (!handle)
             throw std::runtime_error("gfx_device::create_swapchain: backend failed to create swapchain");
         framebuffer_properties props;
         try {
-            props = backend_->swapchain_properties.get_or_throw()(handle);
+            props = backend_->swapchain_properties(handle);
         } catch (...) {
-            backend_->destroy_swapchain.get_or_throw()(handle);
+            backend_->destroy_swapchain(handle);
             throw;
         }
         if (auto error = check_framebuffer_requirements(config.framebuffer, props)) {
-            backend_->destroy_swapchain.get_or_throw()(handle);
+            backend_->destroy_swapchain(handle);
             throw std::runtime_error("gfx_device::create_swapchain: " + *error);
         }
         return swapchain(handle, backend_.get(), device_, size, std::move(props));
@@ -129,7 +128,7 @@ namespace alia {
 
     swapchain::~swapchain() {
         if (handle_)
-            backend_->destroy_swapchain.get_or_throw()(handle_);
+            backend_->destroy_swapchain(handle_);
     }
 
     swapchain::swapchain(swapchain &&other) noexcept
@@ -141,7 +140,7 @@ namespace alia {
     swapchain &swapchain::operator=(swapchain &&other) noexcept {
         if (this != &other) {
             if (handle_)
-                backend_->destroy_swapchain.get_or_throw()(handle_);
+                backend_->destroy_swapchain(handle_);
             handle_ = std::exchange(other.handle_, nullptr);
             backend_ = std::exchange(other.backend_, nullptr);
             device_ = std::exchange(other.device_, nullptr);
@@ -159,9 +158,9 @@ namespace alia {
             throw std::logic_error("swapchain::on_resize: a frame is active");
         if (new_size.x <= 0 || new_size.y <= 0)
             throw std::invalid_argument("swapchain::on_resize: size must be positive");
-        backend_->swapchain_on_resize.get_or_throw()(handle_, new_size);
+        backend_->swapchain_on_resize(handle_, new_size);
         size_ = new_size;
-        props_ = backend_->swapchain_properties.get_or_throw()(handle_);
+        props_ = backend_->swapchain_properties(handle_);
     }
 
     void make_current(window &w) {

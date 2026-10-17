@@ -34,24 +34,22 @@ namespace alia {
             std::optional<cube_face> face
         ) {
             const pixel_format src_fmt = src.format();
-            const pixel_format dst_fmt = backend->texture_format.get_or_throw()(dst_handle);
+            const pixel_format dst_fmt = backend->texture_format(dst_handle);
             if (!can_convert_pixel_lossy(src_fmt, dst_fmt))
                 return false;
 
             texture_lock_info info{};
             const rect_i full{{0, 0}, {src.width(), src.height()}};
             const bool locked =
-                face ? backend->cube_texture_lock.get_or_throw()(
-                           dst_handle, *face, full, 0, texture_lock_mode::write_only, info
-                       )
-                     : backend->texture_lock.get_or_throw()(dst_handle, full, 0, texture_lock_mode::write_only, info);
+                face ? backend->cube_texture_lock(dst_handle, *face, full, 0, texture_lock_mode::write_only, info)
+                     : backend->texture_lock(dst_handle, full, 0, texture_lock_mode::write_only, info);
             if (!locked)
                 return false;
 
             for (int y = 0; y < src.height(); ++y)
                 convert_pixel_row_lossy(dst_fmt, info.data + y * info.stride_bytes, src_fmt, src.line(y), src.width());
 
-            backend->texture_unlock.get_or_throw()(dst_handle, info, true);
+            backend->texture_unlock(dst_handle, info, true);
             return true;
         }
 
@@ -70,7 +68,7 @@ namespace alia {
 
     texture::~texture() {
         if (handle_)
-            backend_->destroy_texture.get_or_throw()(handle_);
+            backend_->destroy_texture(handle_);
     }
 
     texture::texture(texture &&other) noexcept
@@ -82,7 +80,7 @@ namespace alia {
     texture &texture::operator=(texture &&other) noexcept {
         if (this != &other) {
             if (handle_)
-                backend_->destroy_texture.get_or_throw()(handle_);
+                backend_->destroy_texture(handle_);
             handle_ = std::exchange(other.handle_, nullptr);
             backend_ = std::exchange(other.backend_, nullptr);
             device_ = std::exchange(other.device_, nullptr);
@@ -105,8 +103,7 @@ namespace alia {
             throw std::runtime_error("texture: requested pixel format is not supported by this device");
 
         const auto *b = device.backend();
-        handle_ =
-            b->create_texture.get_or_throw()(device.device(), fmt, size, config.mip_levels, config.role, config.usage);
+        handle_ = b->create_texture(device.device(), fmt, size, config.mip_levels, config.role, config.usage);
         if (!handle_)
             throw std::runtime_error("texture: backend failed to create texture");
 
@@ -125,9 +122,7 @@ namespace alia {
 
         const auto *b = device.backend();
         const auto supported = [&](pixel_format fmt) {
-            return b->texture_format_supported.get_or_throw()(
-                device.device(), fmt, config.mip_levels, config.role, config.usage
-            );
+            return b->texture_format_supported(device.device(), fmt, config.mip_levels, config.role, config.usage);
         };
         const auto fmt = config.format ? (supported(*config.format) ? config.format : std::nullopt)
                                        : detail::closest_texture_format(src.format(), config.role, supported);
@@ -136,9 +131,7 @@ namespace alia {
         if (!can_convert_pixel_lossy(src.format(), *fmt))
             throw std::invalid_argument("texture: unsupported source pixel format conversion");
 
-        handle_ = b->create_texture.get_or_throw()(
-            device.device(), *fmt, src.size(), config.mip_levels, config.role, config.usage
-        );
+        handle_ = b->create_texture(device.device(), *fmt, src.size(), config.mip_levels, config.role, config.usage);
         if (!handle_)
             throw std::runtime_error("texture: backend failed to create texture");
 
@@ -147,7 +140,7 @@ namespace alia {
         role_ = config.role;
         usage_ = config.usage;
         if (!detail::upload_bitmap_view(handle_, backend_, src)) {
-            backend_->destroy_texture.get_or_throw()(handle_);
+            backend_->destroy_texture(handle_);
             handle_ = nullptr;
             backend_ = nullptr;
             device_ = nullptr;
@@ -160,14 +153,14 @@ namespace alia {
     }
 
     bool texture::can_create(const gfx_device &device, const texture_config &config) {
-        if (!device.valid() || config.mip_levels < 0 || !device.backend()->texture_format_supported.is_supported())
+        if (!device.valid() || config.mip_levels < 0)
             return false;
         const auto fmt = config.format.value_or(
             config.role == texture_role::alpha_mask ? pixel_format::gray_u8 : pixel_format::bgra8888
         );
         if (bytes_per_pixel_for_format(fmt) == 0)
             return false;
-        return device.backend()->texture_format_supported.get_or_throw()(
+        return device.backend()->texture_format_supported(
             device.device(), fmt, config.mip_levels, config.role, config.usage
         );
     }
@@ -175,27 +168,27 @@ namespace alia {
     // ── Accessors ────────────────────────────────────────────────────────
 
     pixel_format texture::format() const noexcept {
-        return backend_->texture_format.get_or_throw()(handle_);
+        return backend_->texture_format(handle_);
     }
 
     int texture::width() const noexcept {
-        return backend_->texture_width.get_or_throw()(handle_);
+        return backend_->texture_width(handle_);
     }
 
     int texture::height() const noexcept {
-        return backend_->texture_height.get_or_throw()(handle_);
+        return backend_->texture_height(handle_);
     }
 
     int texture::mip_levels() const noexcept {
-        return backend_->texture_mip_levels.get_or_throw()(handle_);
+        return backend_->texture_mip_levels(handle_);
     }
 
     void texture::set_sampler(const sampler_state &s) {
-        backend_->texture_set_sampler.get_or_throw()(handle_, s);
+        backend_->texture_set_sampler(handle_, s);
     }
 
     sampler_state texture::sampler() const noexcept {
-        return backend_->texture_sampler.get_or_throw()(handle_);
+        return backend_->texture_sampler(handle_);
     }
 
     // ── lock_impl ────────────────────────────────────────────────────────
@@ -209,12 +202,12 @@ namespace alia {
         if (expected_fmt && actual_fmt != *expected_fmt)
             return nullptr;
 
-        const int lw = std::max(1, backend_->texture_width.get_or_throw()(handle_) >> level);
-        const int lh = std::max(1, backend_->texture_height.get_or_throw()(handle_) >> level);
+        const int lw = std::max(1, backend_->texture_width(handle_) >> level);
+        const int lh = std::max(1, backend_->texture_height(handle_) >> level);
         const rect_i r = region.value_or(rect_i{{0, 0}, {lw, lh}});
 
         auto state = std::make_unique<detail::texture_lock_state>();
-        if (!backend_->texture_lock.get_or_throw()(handle_, r, level, mode, state->info))
+        if (!backend_->texture_lock(handle_, r, level, mode, state->info))
             return nullptr;
 
         state->handle = handle_;
@@ -230,25 +223,25 @@ namespace alia {
     }
 
     bitmap texture::download(int level) const {
-        const int lw = std::max(1, backend_->texture_width.get_or_throw()(handle_) >> level);
-        const int lh = std::max(1, backend_->texture_height.get_or_throw()(handle_) >> level);
+        const int lw = std::max(1, backend_->texture_width(handle_) >> level);
+        const int lh = std::max(1, backend_->texture_height(handle_) >> level);
         const rect_i full{{0, 0}, {lw, lh}};
 
         texture_lock_info info{};
-        if (!backend_->texture_lock.get_or_throw()(handle_, full, level, texture_lock_mode::read_only, info))
+        if (!backend_->texture_lock(handle_, full, level, texture_lock_mode::read_only, info))
             throw std::runtime_error("texture::download: backend lock failed");
 
-        const pixel_format fmt = backend_->texture_format.get_or_throw()(handle_);
+        const pixel_format fmt = backend_->texture_format(handle_);
         const std::size_t total = static_cast<std::size_t>(info.stride_bytes) * lh;
 
         bitmap result(fmt, {lw, lh}, std::span<const std::byte>(info.data, total), info.stride_bytes);
 
-        backend_->texture_unlock.get_or_throw()(handle_, info, false);
+        backend_->texture_unlock(handle_, info, false);
         return result;
     }
 
     texture texture::clone() const {
-        texture_handle *cloned = backend_->texture_clone.get_or_throw()(handle_);
+        texture_handle *cloned = backend_->texture_clone(handle_);
         if (!cloned)
             throw std::runtime_error("texture::clone: backend failed to clone texture");
         return texture(cloned, backend_, device_, role_, usage_);

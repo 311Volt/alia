@@ -7,9 +7,6 @@
 #include <vector>
 
 namespace alia {
-    template <class Signature>
-    using audio_backend_op = backend_op<Signature>;
-
     struct audio_context_handle {};
 
     struct audio_stream_handle {};
@@ -94,34 +91,35 @@ namespace alia {
         audio_backend id = audio_backend::null;
         audio_caps caps;
         /// Releases the context; all streams must already have been destroyed.
-        audio_backend_op<void(audio_context_handle *)> destroy_context;
+        backend_op<void(audio_context_handle *)> destroy_context;
         /// Active endpoints and their exact preferred callback formats.
-        audio_backend_op<std::vector<audio_device_info>(audio_context_handle *, audio_direction)> enumerate_devices;
+        backend_op<std::vector<audio_device_info>(audio_context_handle *, audio_direction)> enumerate_devices;
         /// True only if the exact callback format/rate can be opened. Host-side
         /// conversion is permitted; a closest match alone is not support.
-        audio_backend_op<bool(audio_context_handle *, audio_direction, std::string_view, const audio_stream_format &)>
+        backend_op<
+            bool(audio_context_handle *, audio_direction, std::string_view, const audio_stream_format &)>
             stream_format_supported;
         /// Creates a stopped stream, or returns null. Never substitutes a
         /// format/rate, and never calls the callback before stream_start.
-        audio_backend_op<audio_stream_handle *(audio_context_handle *, const audio_stream_desc &, audio_render_fn)>
+        optional_backend_op<audio_stream_handle *(audio_context_handle *, const audio_stream_desc &, audio_render_fn)>
             create_output_stream;
         /// Capture counterpart. A null slot denotes no capture hardware/platform support.
-        audio_backend_op<audio_stream_handle *(audio_context_handle *, const audio_stream_desc &, audio_capture_fn)>
+        optional_backend_op<audio_stream_handle *(audio_context_handle *, const audio_stream_desc &, audio_capture_fn)>
             create_input_stream;
         /// Stops and joins the worker before releasing storage. No callbacks
         /// are active or possible after return; forbidden from a callback.
-        audio_backend_op<void(audio_stream_handle *)> destroy_stream;
+        backend_op<void(audio_stream_handle *)> destroy_stream;
         /// Actual callback format, period, maximum buffer size and latency.
-        audio_backend_op<audio_stream_properties(const audio_stream_handle *)> stream_properties;
+        backend_op<audio_stream_properties(const audio_stream_handle *)> stream_properties;
         /// Starts/resumes a stopped stream. False on failure; idempotent when running.
-        audio_backend_op<bool(audio_stream_handle *)> stream_start;
+        backend_op<bool(audio_stream_handle *)> stream_start;
         /// Synchronously quiesces the callback; idempotent. Must not be called
         /// from a callback. A subsequent start may resume the stream.
-        audio_backend_op<void(audio_stream_handle *)> stream_stop;
+        backend_op<void(audio_stream_handle *)> stream_stop;
         /// Device loss/backend errors latch failed; no later callbacks or rerouting.
-        audio_backend_op<audio_stream_state(const audio_stream_handle *)> stream_state;
+        backend_op<audio_stream_state(const audio_stream_handle *)> stream_state;
         /// Hardware-presented/captured frame position in the callback's rate.
-        audio_backend_op<std::int64_t(const audio_stream_handle *)> stream_position;
+        backend_op<std::int64_t(const audio_stream_handle *)> stream_position;
     };
 
     struct created_audio_context {

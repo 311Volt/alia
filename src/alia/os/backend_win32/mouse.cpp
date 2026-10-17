@@ -271,10 +271,6 @@ namespace alia::detail {
         return static_cast<unsigned>((std::max)(0, GetSystemMetrics(SM_CMOUSEBUTTONS)));
     }
 
-    bool win32_platform_can_get_mouse_cursor_position() {
-        return true;
-    }
-
     std::optional<vec2i> win32_platform_get_mouse_cursor_position() {
         POINT point{};
         if (!GetCursorPos(&point))

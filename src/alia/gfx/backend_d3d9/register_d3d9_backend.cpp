@@ -135,8 +135,8 @@ namespace alia {
             iface.set_lighting = {nullptr, reason};
             iface.set_material = {nullptr, reason};
         }
-        iface.set_fog = iface.caps.fog ? gfx_backend_op<void(device_handle *, const fog_state &)>{d3d9_set_fog}
-                                       : gfx_backend_op<void(device_handle *, const fog_state &)>{
+        iface.set_fog = iface.caps.fog ? optional_backend_op<void(device_handle *, const fog_state &)>{d3d9_set_fog}
+                                       : optional_backend_op<void(device_handle *, const fog_state &)>{
                                              nullptr, "device lacks D3DPRASTERCAPS_FOGVERTEX"
                                          };
         iface.set_render_target = {d3d9_set_render_target};

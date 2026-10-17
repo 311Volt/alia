@@ -40,7 +40,7 @@ namespace alia {
 
     shader_program::~shader_program() {
         if (handle_)
-            backend_->destroy_shader_program.get_or_throw()(handle_);
+            backend_->destroy_shader_program(handle_);
     }
 
     shader_program::shader_program(shader_program &&other) noexcept
@@ -50,7 +50,7 @@ namespace alia {
     shader_program &shader_program::operator=(shader_program &&other) noexcept {
         if (this != &other) {
             if (handle_)
-                backend_->destroy_shader_program.get_or_throw()(handle_);
+                backend_->destroy_shader_program(handle_);
             handle_ = std::exchange(other.handle_, nullptr);
             backend_ = std::exchange(other.backend_, nullptr);
         }
@@ -64,7 +64,7 @@ namespace alia {
             throw shader_error(
                 "shader_program::allocate_sampler: negative texture unit for '" + std::string(identifier) + "'"
             );
-        shader_sampler_slot slot = backend_->shader_lookup_sampler.get_or_throw()(handle_, identifier, stage, unit);
+        shader_sampler_slot slot = backend_->shader_lookup_sampler(handle_, identifier, stage, unit);
         if (!slot.valid)
             throw shader_error(
                 "shader_program::allocate_sampler: shader sampler '" + std::string(identifier) + "' not found"
@@ -80,13 +80,13 @@ namespace alia {
     void shader_sampler::set_texture(texture &tex) const {
         if (!*this)
             throw shader_error("shader_sampler::set_texture: invalid shader sampler");
-        backend_->shader_set_sampler.get_or_throw()(program_, slot_, tex.impl());
+        backend_->shader_set_sampler(program_, slot_, tex.impl());
     }
 
     void shader_sampler::set_texture(cube_texture &tex) const {
         if (!*this)
             throw shader_error("shader_sampler::set_texture: invalid shader sampler");
-        backend_->shader_set_sampler.get_or_throw()(program_, slot_, tex.impl());
+        backend_->shader_set_sampler(program_, slot_, tex.impl());
     }
 
 } // namespace alia

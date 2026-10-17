@@ -206,7 +206,7 @@ namespace alia {
                 throw shader_error("shader_constant::set_value: invalid shader constant");
             auto storage = detail::make_shader_constant_payload(value);
             auto payload = storage.payload();
-            backend_->shader_set_constant.get_or_throw()(program_, slot_, payload);
+            backend_->shader_set_constant(program_, slot_, payload);
         }
 
     private:
@@ -299,8 +299,7 @@ namespace alia {
                         "' (" + std::string(detail::to_string(type)) + ")"
                     );
             }
-            shader_constant_slot slot =
-                backend_->shader_lookup_constant.get_or_throw()(handle_, identifier, stage, reg);
+            shader_constant_slot slot = backend_->shader_lookup_constant(handle_, identifier, stage, reg);
             if (!slot.valid)
                 throw shader_error(
                     "shader_program::allocate_constant: shader constant '" + std::string(identifier) + "' not found"

@@ -190,7 +190,6 @@ namespace alia {
         void *win32_cursor_native_handle(const os_cursor_handle *);
         unsigned win32_platform_mouse_num_axes();
         unsigned win32_platform_mouse_num_buttons();
-        bool win32_platform_can_get_mouse_cursor_position();
         std::optional<vec2i> win32_platform_get_mouse_cursor_position();
         bool win32_platform_ungrab_mouse();
 

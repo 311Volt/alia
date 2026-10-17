@@ -10,6 +10,10 @@ This file holds high-level design only: layering, ownership, threading and conve
 
 ## All subsystems
 
+### Stability
+
+The API, public or internal, is still completely unstable. Change or remove anything outright; never keep functions, aliases or shims for compatibility.
+
 ### Layers
 
 Every subsystem is split into the same four layers:
@@ -23,18 +27,18 @@ Every subsystem is split into the same four layers:
 
 Each subsystem has one root object, which owns its L4 table:
 
-| Subsystem | Root object | L4 table | Op slot type | Registration file |
-|-----------|-------------|----------|--------------|-------------------|
-| `gfx/` | `gfx_device` | `graphics_backend_interface` | `gfx_backend_op` | `register_<name>_backend.cpp` |
-| `audio/` | `audio_context` | `audio_backend_interface` | `audio_backend_op` | `register_<name>_audio_backend.cpp` |
-| `os/` | `os_context` | `os_backend_interface` | `os_backend_op` | `register_<name>_os_backend.cpp` |
+| Subsystem | Root object | L4 table | Registration file |
+|-----------|-------------|----------|-------------------|
+| `gfx/` | `gfx_device` | `graphics_backend_interface` | `register_<name>_backend.cpp` |
+| `audio/` | `audio_context` | `audio_backend_interface` | `register_<name>_audio_backend.cpp` |
+| `os/` | `os_context` | `os_backend_interface` | `register_<name>_os_backend.cpp` |
 
 ### Backends
 
 - Each backend lives in `<subsystem>/backend_<name>/`. `<name>_ops.hpp` holds its concrete structs, `as_<name>_*` cast helpers and op declarations; the registration file creates the root object, probes capabilities and fills the L4 table.
 - Backend objects inherit the opaque `*_handle` bases and are downcast with `static_cast` only inside that backend. Concrete backend types and third-party library types never appear in public headers.
-- `backend_op` and `unsupported_operation_exception` live in `core/backend_op.hpp`; the op slot types are aliases of `backend_op`. L3 calls every op through `.get_or_throw()`.
-- A null op slot means the **hardware or platform** lacks the feature, as probed at root creation, with `reason_unsupported` saying why. Never use it for "this backend doesn't implement X yet".
+- Op slots are declared directly with the types from `core/backend_op.hpp`. A `backend_op` is one every backend always provides regardless of hardware or version, and L3 calls it directly; any other op is an `optional_backend_op`, which L3 calls through `.get_or_throw()`.
+- A null `optional_backend_op` slot means the hardware or platform lacks the feature, as probed at root creation, or the backend does not implement it yet; `reason_unsupported` says which.
 - Backends never substitute formats or modes. They deliver exactly what was requested or fail; fallback lives in L3 (`detail::closest_texture_format`, `detail::audio_format_fallbacks`, `choose_closest_mode`).
 - Never name anything `interface`; it is a macro in MinGW's COM headers.
 
@@ -44,10 +48,10 @@ Everything created from a root object holds raw pointers into it, so the root mu
 
 ### Adding a new backend operation
 
-1. Add an op slot (e.g. `gfx_backend_op<R(Args...)>`) to the subsystem's L4 table.
+1. Add an op slot to the subsystem's L4 table: `backend_op<R(Args...)>` if every backend can always provide it, otherwise `optional_backend_op<R(Args...)>`.
 2. Implement the function in each backend's appropriate `.cpp` file and declare it in `<name>_ops.hpp`.
-3. Wire the slot in the registration file: set the `operation` pointer, or if the op is hardware-conditional, leave it null and set `reason_unsupported`.
-4. Add the L3 free function or method that calls `.get_or_throw()`.
+3. Wire the slot in the registration file: set the `operation` pointer, or for an `optional_backend_op` the backend cannot provide, leave it null and set `reason_unsupported`.
+4. Add the L3 free function or method that calls the slot, through `.get_or_throw()` if it is an `optional_backend_op`.
 
 ## Graphics
 

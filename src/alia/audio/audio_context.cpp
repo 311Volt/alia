@@ -77,7 +77,7 @@ namespace alia {
                     try {
                         result.backend_ = std::make_unique<audio_backend_interface>(std::move(created.iface));
                     } catch (...) {
-                        created.iface.destroy_context.get_or_throw()(created.handle);
+                        created.iface.destroy_context(created.handle);
                         throw;
                     }
                     result.handle_ = created.handle;
@@ -96,7 +96,7 @@ namespace alia {
 
     audio_context::~audio_context() {
         if (handle_)
-            backend_->destroy_context.get_or_throw()(handle_);
+            backend_->destroy_context(handle_);
     }
 
     audio_context::audio_context(audio_context &&other) noexcept
@@ -106,7 +106,7 @@ namespace alia {
     audio_context &audio_context::operator=(audio_context &&other) noexcept {
         if (this != &other) {
             if (handle_)
-                backend_->destroy_context.get_or_throw()(handle_);
+                backend_->destroy_context(handle_);
             handle_ = std::exchange(other.handle_, nullptr);
             backend_ = std::move(other.backend_);
         }
@@ -122,7 +122,7 @@ namespace alia {
     std::vector<audio_output_device> audio_context::output_devices() const {
         (void)caps();
         std::vector<audio_output_device> result;
-        for (auto &d : backend_->enumerate_devices.get_or_throw()(handle_, audio_direction::output))
+        for (auto &d : backend_->enumerate_devices(handle_, audio_direction::output))
             result.push_back({std::move(d.id), std::move(d.name), d.is_default, d.preferred});
         return result;
     }
@@ -130,7 +130,7 @@ namespace alia {
     std::vector<audio_input_device> audio_context::input_devices() const {
         (void)caps();
         std::vector<audio_input_device> result;
-        for (auto &d : backend_->enumerate_devices.get_or_throw()(handle_, audio_direction::input))
+        for (auto &d : backend_->enumerate_devices(handle_, audio_direction::input))
             result.push_back({std::move(d.id), std::move(d.name), d.is_default, d.preferred});
         return result;
     }
